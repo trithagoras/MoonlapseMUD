@@ -1,9 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace MoonlightMUD.Utils
+namespace MoonlightMUD
 {
-    public abstract class Utils
+    public static class Utils
     {
         // Key presses
         public static ConsoleKey KeyUp = ConsoleKey.UpArrow, KeyDown = ConsoleKey.DownArrow, KeyLeft = ConsoleKey.LeftArrow,

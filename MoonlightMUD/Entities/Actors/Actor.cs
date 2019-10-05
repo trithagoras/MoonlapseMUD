@@ -38,4 +38,3 @@ namespace MoonlightMUD.Entities.Actors
         Lightning
     }
 }
-}

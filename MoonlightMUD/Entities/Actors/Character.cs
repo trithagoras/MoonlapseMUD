@@ -9,7 +9,7 @@ namespace MoonlightMUD.Entities.Actors
         public int MaxMP { get; protected set; }
         public int MP { get; protected set; }
 
-        public Dictionary<Attribute, int> Attributes { get; } = new Dictionary<Attribute, int>()
+        public Dictionary<Attribute, int> attributes { get; } = new Dictionary<Attribute, int>()
         {
             { Attribute.Vitality, 0 },
             { Attribute.Strength, 0 },
@@ -18,6 +18,8 @@ namespace MoonlightMUD.Entities.Actors
             { Attribute.Willpower, 0 },
             { Attribute.Intelligence, 0 }
         };
+
+        public IReadOnlyDictionary<Attribute, int> Attributes { get => attributes; }
 
         public Weapon MainHand { get; protected set; }
         public IEquippable OffHand { get; protected set; }
@@ -38,12 +40,12 @@ namespace MoonlightMUD.Entities.Actors
             int intelligence, Weapon mainHand, IEquippable offHand,
             Armour head, Armour body, Armour arms, Armour feet) : base(name, description)
         {
-            Attributes[Attribute.Vitality] = vitality;
-            Attributes[Attribute.Strength] = strength;
-            Attributes[Attribute.Agility] = agility;
-            Attributes[Attribute.Dexterity] = dexterity;
-            Attributes[Attribute.Willpower] = willpower;
-            Attributes[Attribute.Intelligence] = intelligence;
+            attributes[Attribute.Vitality] = vitality;
+            attributes[Attribute.Strength] = strength;
+            attributes[Attribute.Agility] = agility;
+            attributes[Attribute.Dexterity] = dexterity;
+            attributes[Attribute.Willpower] = willpower;
+            attributes[Attribute.Intelligence] = intelligence;
 
             Level = 1 + (vitality + strength + agility + dexterity + willpower + intelligence - 60);
 
@@ -141,8 +143,7 @@ namespace MoonlightMUD.Entities.Actors
             {
                 if (reqs[i] < item.Requirements[i])
                 {
-                    Utils.
-                    Utils.WriteMessage("You do not meet the requirements to equip this.", Utils.GameColour.Enemy);
+                    Utils.WriteMessage("You do not meet the requirements to equip this.", GameColour.Enemy);
                     return;
                 }
             }
