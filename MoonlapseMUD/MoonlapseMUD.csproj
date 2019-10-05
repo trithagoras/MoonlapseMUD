@@ -5,8 +5,8 @@
     <Platform Condition=" '$(Platform)' == '' ">anycpu</Platform>
     <ProjectGuid>{95F016FE-54A1-40D8-BD61-0E5B80555B0A}</ProjectGuid>
     <OutputType>Exe</OutputType>
-    <RootNamespace>MoonlightMUD</RootNamespace>
-    <AssemblyName>MoonlightMUD</AssemblyName>
+    <RootNamespace>MoonlapseMUD</RootNamespace>
+    <AssemblyName>MoonlapseMUD</AssemblyName>
     <TargetFrameworkVersion>v4.7</TargetFrameworkVersion>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|anycpu' ">

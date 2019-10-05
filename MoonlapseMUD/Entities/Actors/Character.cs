@@ -1,8 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
-using MoonlightMUD.Entities.Items;
+using MoonlapseMUD.Entities.Items;
 
-namespace MoonlightMUD.Entities.Actors
+namespace MoonlapseMUD.Entities.Actors
 {
     public class Character : Actor
     {

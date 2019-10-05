@@ -1,5 +1,5 @@
 ﻿using System;
-namespace MoonlightMUD.Entities
+namespace MoonlapseMUD.Entities
 {
     public abstract class Entity
     {

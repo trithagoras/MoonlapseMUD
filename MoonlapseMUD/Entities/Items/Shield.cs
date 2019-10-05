@@ -1,5 +1,5 @@
 ﻿using System;
-namespace MoonlightMUD.Entities.Items
+namespace MoonlapseMUD.Entities.Items
 {
     public class Shield : Item, IEquippable
     {

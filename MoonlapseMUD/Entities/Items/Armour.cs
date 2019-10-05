@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 
-namespace MoonlightMUD.Entities.Items
+namespace MoonlapseMUD.Entities.Items
 {
     public class Armour : Item
     {

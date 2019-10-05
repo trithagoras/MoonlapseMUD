@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace MoonlightMUD.Entities.Items
+namespace MoonlapseMUD.Entities.Items
 {
     public abstract class Item : Entity
     {

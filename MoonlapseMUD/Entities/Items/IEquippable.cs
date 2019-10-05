@@ -1,5 +1,5 @@
 ﻿using System;
-namespace MoonlightMUD.Entities.Items
+namespace MoonlapseMUD.Entities.Items
 {
     /// <summary>
     /// Item that can be held in either main hand or off hand.

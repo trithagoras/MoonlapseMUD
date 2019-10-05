@@ -1,7 +1,7 @@
 
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MoonlightMUD", "MoonlightMUD\MoonlightMUD.csproj", "{95F016FE-54A1-40D8-BD61-0E5B80555B0A}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MoonlapseMUD", "MoonlapseMUD\MoonlapseMUD.csproj", "{95F016FE-54A1-40D8-BD61-0E5B80555B0A}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

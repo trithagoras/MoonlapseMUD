@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace MoonlightMUD
+namespace MoonlapseMUD
 {
     public static class Utils
     {
