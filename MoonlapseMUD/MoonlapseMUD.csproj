@@ -40,12 +40,16 @@
     <Compile Include="Entities\Items\IEquippable.cs" />
     <Compile Include="Entities\Items\Shield.cs" />
     <Compile Include="Entities\Items\Armour.cs" />
-    <Compile Include="Utils.cs" />
+    <Compile Include="Locations\Location.cs" />
+    <Compile Include="Utils\UI.cs" />
+    <Compile Include="Utils\Vector.cs" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Entities\" />
     <Folder Include="Entities\Actors\" />
     <Folder Include="Entities\Items\" />
+    <Folder Include="Locations\" />
+    <Folder Include="Utils\" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
 </Project>

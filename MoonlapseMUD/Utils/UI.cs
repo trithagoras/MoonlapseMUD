@@ -1,24 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace MoonlapseMUD
+namespace MoonlapseMUD.Utils
 {
-    public static class Utils
+    public static class UI
     {
-        // Key presses
-        public static ConsoleKey KeyUp = ConsoleKey.UpArrow, KeyDown = ConsoleKey.DownArrow, KeyLeft = ConsoleKey.LeftArrow,
-            KeyRight = ConsoleKey.RightArrow;
-
-
-        public static IReadOnlyDictionary<GameColour, ConsoleColor> GameColours = new Dictionary<GameColour, ConsoleColor>
-        {
-            { GameColour.Ally, ConsoleColor.Green },
-            { GameColour.Player, ConsoleColor.Cyan },
-            { GameColour.Enemy, ConsoleColor.Red },
-            { GameColour.Important, ConsoleColor.Magenta },
-            { GameColour.Neutral, ConsoleColor.DarkYellow }
-        };
-
         /// <summary>
         /// Asks a question with array of possible answers.
         /// </summary>
@@ -65,6 +51,20 @@ namespace MoonlapseMUD
             Console.WriteLine("[ENTER]");
             Console.Clear();
         }
+
+        // Key presses
+        public static ConsoleKey KeyUp = ConsoleKey.UpArrow, KeyDown = ConsoleKey.DownArrow, KeyLeft = ConsoleKey.LeftArrow,
+            KeyRight = ConsoleKey.RightArrow;
+
+
+        public static IReadOnlyDictionary<GameColour, ConsoleColor> GameColours = new Dictionary<GameColour, ConsoleColor>
+        {
+            { GameColour.Ally, ConsoleColor.Green },
+            { GameColour.Player, ConsoleColor.Cyan },
+            { GameColour.Enemy, ConsoleColor.Red },
+            { GameColour.Important, ConsoleColor.Magenta },
+            { GameColour.Neutral, ConsoleColor.DarkYellow }
+        };
     }
 
     public enum GameColour

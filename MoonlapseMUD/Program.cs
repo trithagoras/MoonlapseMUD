@@ -1,4 +1,5 @@
 ﻿using System;
+using MoonlapseMUD.Utils;
 
 namespace MoonlapseMUD
 {
@@ -8,8 +9,14 @@ namespace MoonlapseMUD
         {
             Console.WriteLine("Hello World!");
             Console.WriteLine("Testing collaboration!");
-            Utils.AskQuestion("How are you?", new string[] { "good", "bad" });
+            //UI.AskQuestion("How are you?", new string[] { "good", "bad" });
 
+            Vector left = new Vector(2, 4);
+            Vector right = new Vector(5, 2);
+
+            left += Vector.Down;
+
+            Console.WriteLine(left);
         }
     }
 }

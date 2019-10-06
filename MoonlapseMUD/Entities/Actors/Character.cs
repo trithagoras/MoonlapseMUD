@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using MoonlapseMUD.Entities.Items;
+using MoonlapseMUD.Utils;
 
 namespace MoonlapseMUD.Entities.Actors
 {
@@ -61,6 +62,12 @@ namespace MoonlapseMUD.Entities.Actors
             Body = body;
             Arms = arms;
             Feet = feet;
+        }
+
+        public Character(string name, string description) : this(name, description, 10, 10, 10, 10, 10, 10,
+            GameWeapons.Fist, GameWeapons.Fist, GameArmours.Naked, GameArmours.Naked, GameArmours.Naked, GameArmours.Naked)
+        {
+
         }
         #endregion
 
@@ -143,7 +150,7 @@ namespace MoonlapseMUD.Entities.Actors
             {
                 if (reqs[i] < item.Requirements[i])
                 {
-                    Utils.WriteMessage("You do not meet the requirements to equip this.", GameColour.Enemy);
+                    UI.WriteMessage("You do not meet the requirements to equip this.", GameColour.Enemy);
                     return;
                 }
             }

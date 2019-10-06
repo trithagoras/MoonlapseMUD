@@ -1,10 +1,28 @@
 ﻿using System;
+using MoonlapseMUD.Locations;
+using MoonlapseMUD.Utils;
+
 namespace MoonlapseMUD.Entities
 {
     public abstract class Entity
     {
         public string Name { get; protected set; }
         public string Description { get; protected set; }
+
+        public Location Location
+        {
+            get
+            {
+                return Location;
+            }
+
+            set
+            {
+                Location = value;
+            }
+        }
+
+        public Vector Position;
 
         protected Entity(string name, string description)
         {
