@@ -56,5 +56,11 @@
     <Folder Include="Locations\" />
     <Folder Include="Utils\" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\MoonlapseNetworking\MoonlapseNetworking.csproj">
+      <Project>{8ba88015-66e3-49f3-a1df-50e1fafa89c6}</Project>
+      <Name>MoonlapseNetworking</Name>
+    </ProjectReference>
+  </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
 </Project>
