@@ -1,4 +1,5 @@
 ﻿using System;
+using MoonlapseMUD.Locations;
 using MoonlapseMUD.Utils;
 
 namespace MoonlapseMUD.Entities
@@ -8,13 +9,16 @@ namespace MoonlapseMUD.Entities
     /// </summary>
     public class Portal : Entity
     {
-        public Portal Destination { get; private set; }
-        public Vector EntryPoint { get; private set; }
+        public Location Destination { get; private set; }
+        /// <summary>
+        /// Where the entity is placed on the other side of the portal.
+        /// </summary>
+        public Vector ExitPoint { get; private set; }
 
-        public Portal(string name, string description, Portal destination, Vector entryPoint) : base(name, description)
+        public Portal(string name, string description, Location destination, Vector exitPoint) : base(name, description)
         {
             Destination = destination;
-            EntryPoint = entryPoint;
+            ExitPoint = exitPoint;
         }
     }
 

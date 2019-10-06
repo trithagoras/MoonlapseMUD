@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Linq;
 using MoonlapseMUD.Entities;
 using MoonlapseMUD.Entities.Actors;
@@ -17,7 +16,7 @@ namespace MoonlapseMUD.Locations
         public int Width { get; private set; }
         public int Height { get; private set; }
 
-        private Dictionary<Entity, int>[,] Coordinates;
+        private List<Entity>[,] Map;
 
         /// <summary>
         /// Testing constructor which creates an empty map surrounded by walls.
@@ -29,7 +28,7 @@ namespace MoonlapseMUD.Locations
             Width = width;
             Height = height;
 
-            Coordinates = new Dictionary<Entity, int>[Width, Height];
+            Map = new List<Entity>[Width, Height];
 
             for (int row = 0; row < Height; row++)
             {
@@ -38,11 +37,11 @@ namespace MoonlapseMUD.Locations
                     
                     if (row == 0 || row == Height - 1 || column == 0 || column == Width - 1)
                     {
-                        Coordinates[column, row] = new Dictionary<Entity, int>() { { GameSolids.Wall, 1 } };
+                        Map[column, row] = new List<Entity>() { GameSolids.Wall };
                     }
                     else
                     {
-                        Coordinates[column, row] = new Dictionary<Entity, int>();
+                        Map[column, row] = new List<Entity>();
                     }
                 }
             }
@@ -64,26 +63,25 @@ namespace MoonlapseMUD.Locations
 
                     Console.ResetColor();
 
-                    if (this[column, row].Keys.OfType<Solid>().Any())
+                    if (this[column, row].OfType<Solid>().Any())
                     {
                         key = '#';
                     }
-                    else if (this[column, row].Keys.OfType<Portal>().Any())
+                    else if (this[column, row].OfType<Portal>().Any())
                     {
                         Console.ForegroundColor = UI.GameColours[GameColour.Important];
                         key = 'X';
                     }
-                    else if (this[column, row].Keys.OfType<Player>().Any())
+                    else if (this[column, row].OfType<Player>().Any())
                     {
                         Console.ForegroundColor = UI.GameColours[GameColour.Player];
                         key = '@';
                     }
-                    else if (this[column, row].Keys.OfType<Character>().Any())
+                    else if (this[column, row].OfType<Character>().Any())
                     {
-                        // TODO: Change this. @ should only reference players.
-                        key = '@';
+                        key = 'C';
                     }
-                    else if (this[column, row].Keys.OfType<Item>().Any())
+                    else if (this[column, row].OfType<Item>().Any())
                     {
                         key = '$';
                     }
@@ -101,9 +99,14 @@ namespace MoonlapseMUD.Locations
 
         }
 
-        public Dictionary<Entity, int> this[int x, int y]
+        public List<Entity> this[int x, int y]
         {
-            get => Coordinates[x, y];
+            get => Map[x, y];
+        }
+
+        public List<Entity> this[Vector position]
+        {
+            get => Map[position.X, position.Y];
         }
 
     }

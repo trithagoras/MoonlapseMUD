@@ -5,6 +5,20 @@ namespace MoonlapseMUD.Utils
 {
     public static class UI
     {
+        // Key presses
+        public static ConsoleKey KeyUp = ConsoleKey.UpArrow, KeyDown = ConsoleKey.DownArrow, KeyLeft = ConsoleKey.LeftArrow,
+            KeyRight = ConsoleKey.RightArrow;
+
+
+        public static IReadOnlyDictionary<GameColour, ConsoleColor> GameColours = new Dictionary<GameColour, ConsoleColor>
+        {
+            { GameColour.Ally, ConsoleColor.Green },
+            { GameColour.Player, ConsoleColor.Cyan },
+            { GameColour.Enemy, ConsoleColor.Red },
+            { GameColour.Important, ConsoleColor.Magenta },
+            { GameColour.Neutral, ConsoleColor.DarkYellow }
+        };
+
         /// <summary>
         /// Asks a question with array of possible answers.
         /// </summary>
@@ -49,22 +63,42 @@ namespace MoonlapseMUD.Utils
             Console.WriteLine(message);
             Console.ResetColor();
             Console.WriteLine("[ENTER]");
+            Console.ReadKey(true);
             Console.Clear();
         }
 
-        // Key presses
-        public static ConsoleKey KeyUp = ConsoleKey.UpArrow, KeyDown = ConsoleKey.DownArrow, KeyLeft = ConsoleKey.LeftArrow,
-            KeyRight = ConsoleKey.RightArrow;
-
-
-        public static IReadOnlyDictionary<GameColour, ConsoleColor> GameColours = new Dictionary<GameColour, ConsoleColor>
+        public static void MainUI()
         {
-            { GameColour.Ally, ConsoleColor.Green },
-            { GameColour.Player, ConsoleColor.Cyan },
-            { GameColour.Enemy, ConsoleColor.Red },
-            { GameColour.Important, ConsoleColor.Magenta },
-            { GameColour.Neutral, ConsoleColor.DarkYellow }
-        };
+            while (true)
+            {
+                Console.Clear();
+                MainClass.Player.Location.PrintMap();
+
+                ConsoleKeyInfo keyPress = Console.ReadKey(true);
+
+                if (keyPress.Key == ConsoleKey.Q)
+                {
+                    return;
+                }
+
+                if (keyPress.Key == KeyRight)
+                {
+                    MainClass.Player.Translate(Vector.Right);
+                }
+                else if (keyPress.Key == KeyLeft)
+                {
+                    MainClass.Player.Translate(Vector.Left);
+                }
+                else if (keyPress.Key == KeyUp)
+                {
+                    MainClass.Player.Translate(Vector.Up);
+                }
+                else if (keyPress.Key == KeyDown)
+                {
+                    MainClass.Player.Translate(Vector.Down);
+                }
+            }
+        }
     }
 
     public enum GameColour

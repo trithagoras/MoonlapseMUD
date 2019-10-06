@@ -9,9 +9,8 @@ namespace MoonlapseMUD.Entities
         public string Name { get; protected set; }
         public string Description { get; protected set; }
 
-        public Location Location;
-
-        public Vector Position;
+		public Location Location { get; protected set; }
+        public Vector Position { get; protected set; }
 
         protected Entity(string name, string description)
         {
@@ -29,6 +28,19 @@ namespace MoonlapseMUD.Entities
         public override string ToString()
         {
             return Name;
+        }
+
+        public void PlaceInWorld(Location location, Vector position)
+        {
+            if (Location != null)
+            {
+                Location[Position.X, Position.Y].Remove(this);
+            }
+
+            Location = location;
+
+            Position = position;
+            Location[Position.X, Position.Y].Add(this);
         }
     }
 }

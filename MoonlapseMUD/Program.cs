@@ -15,13 +15,11 @@ namespace MoonlapseMUD
         {
             Console.WriteLine("Hello World!");
             Console.WriteLine("Testing collaboration!");
-            //UI.AskQuestion("How are you?", new string[] { "good", "bad" });
 
             Location location = new Location(11, 11);
+            Player.PlaceInWorld(location, new Vector(5, 5));
+            UI.MainUI();
 
-            Player.Position = new Vector(5, 5);
-            Player.Location = location;
-            location.PrintMap();
         }
     }
 }

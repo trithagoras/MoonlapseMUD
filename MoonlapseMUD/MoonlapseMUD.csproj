@@ -47,6 +47,7 @@
     <Compile Include="Entities\Portal.cs" />
     <Compile Include="Entities\Actors\Player.cs" />
     <Compile Include="Entities\ItemStack.cs" />
+    <Compile Include="Entities\Items\MiscItem.cs" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Entities\" />

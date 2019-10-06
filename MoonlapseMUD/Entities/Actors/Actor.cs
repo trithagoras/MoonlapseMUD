@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
+using MoonlapseMUD.Utils;
 
 namespace MoonlapseMUD.Entities.Actors
 {
@@ -27,6 +29,21 @@ namespace MoonlapseMUD.Entities.Actors
         public abstract void Hit(Actor actor);
 
         public abstract void Die();
+
+        public void EnterPortal(Portal portal)
+        {
+            PlaceInWorld(portal.Destination, portal.ExitPoint);
+        }
+
+        public void Translate(Vector direction)
+        {
+            if (Location[Position + direction].OfType<Solid>().Any())
+            {
+                return;
+            }
+
+            PlaceInWorld(Location, Position + direction);
+        }
     }
 
     public enum Resistance
