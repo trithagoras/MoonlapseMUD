@@ -4,11 +4,11 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{51B95462-718A-430A-8454-F16DE635BA7D}</ProjectGuid>
-    <OutputType>Exe</OutputType>
+    <ProjectGuid>{8BA88015-66E3-49F3-A1DF-50E1FAFA89C6}</ProjectGuid>
+    <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>MoonlapseServer</RootNamespace>
-    <AssemblyName>MoonlapseServer</AssemblyName>
+    <RootNamespace>MoonlapseNetworking</RootNamespace>
+    <AssemblyName>MoonlapseNetworking</AssemblyName>
     <TargetFrameworkVersion>v4.7</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
   </PropertyGroup>
@@ -38,14 +38,8 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Program.cs" />
+    <Compile Include="Packet.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\MoonlapseNetworking\MoonlapseNetworking.csproj">
-      <Project>{8ba88015-66e3-49f3-a1df-50e1fafa89c6}</Project>
-      <Name>MoonlapseNetworking</Name>
-    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

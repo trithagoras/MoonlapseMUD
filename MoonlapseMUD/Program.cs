@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
+using MoonlapseNetworking;
 
 namespace MoonlapseMUD
 {
@@ -16,14 +17,14 @@ namespace MoonlapseMUD
             client.Connect(ip, port);
             Console.WriteLine($"Client connected to Moonlapse server at {client.Client.RemoteEndPoint}");
             NetworkStream ns = client.GetStream();
-            Thread thread = new Thread(o => ReceiveData((TcpClient)o));
+            Thread thread = new Thread(o => HandlePacket((TcpClient) o));
 
             thread.Start(client);
 
             string s;
             while (!string.IsNullOrEmpty((s = Console.ReadLine())))
             {
-                byte[] buffer = Encoding.ASCII.GetBytes(s);
+                byte[] buffer = Packet.BuildBuffer(client, "SAY", s);
                 ns.Write(buffer, 0, buffer.Length);
             }
 
@@ -34,16 +35,24 @@ namespace MoonlapseMUD
             Console.WriteLine("Client disconnected from Moonlapse server, exiting.");
         }
 
-        static void ReceiveData(TcpClient client)
+
+        static void HandlePacket(TcpClient client)
         {
             NetworkStream ns = client.GetStream();
             byte[] receivedBytes = new byte[1024];
-            int byte_count;
-            
-            while ((byte_count = ns.Read(receivedBytes, 0, receivedBytes.Length)) > 0)
+
+            int byteCount;
+            while ((byteCount = ns.Read(receivedBytes, 0, receivedBytes.Length)) > 0)
             {
-                Console.Write(Encoding.ASCII.GetString(receivedBytes, 0, byte_count));
+                Packet packet = new Packet(receivedBytes, byteCount);
+                switch (packet.Header)
+                {
+                    case "SAY":
+                        Console.WriteLine($"[{packet.Client}] [{packet.Header}] [{packet.Body}]");
+                        break;
+                }
             }
+            
         }
     }
 }

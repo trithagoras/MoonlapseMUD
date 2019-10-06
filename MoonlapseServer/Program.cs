@@ -2,8 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
-using System.Text;
 using System.Threading;
+using MoonlapseNetworking;
 
 namespace MoonlapseServer
 {
@@ -50,9 +50,13 @@ namespace MoonlapseServer
           break;
         }
 
-        string data = Encoding.ASCII.GetString(buffer, 0, byteCount);
-        Broadcast(client, data);
-        Console.WriteLine($"[{client.Client.RemoteEndPoint}]: {data}");
+        Packet packet = new Packet(buffer, byteCount);
+        string header = packet.Header;
+        string body = packet.Body;
+
+
+        Broadcast(client, header ,body);
+        Console.WriteLine($"[{client.Client.RemoteEndPoint}] [{header}] [{body}]");
       }
 
       lock (Lock) Clients.Remove(id);
@@ -60,9 +64,9 @@ namespace MoonlapseServer
       client.Close();
     }
 
-    public static void Broadcast(TcpClient fromClient, string msg)
+    public static void Broadcast(TcpClient fromClient, string header, string body)
     {
-      byte[] buffer = Encoding.ASCII.GetBytes($"[{fromClient.Client.RemoteEndPoint}]: {msg + Environment.NewLine}");
+      byte[] buffer = Packet.BuildBuffer(fromClient, header, body);
 
       lock (Lock)
       {

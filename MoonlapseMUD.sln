@@ -5,6 +5,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MoonlapseMUD", "MoonlapseMU
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MoonlapseServer", "MoonlapseServer\MoonlapseServer.csproj", "{51B95462-718A-430A-8454-F16DE635BA7D}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MoonlapseNetworking", "MoonlapseNetworking\MoonlapseNetworking.csproj", "{8BA88015-66E3-49F3-A1DF-50E1FAFA89C6}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|anycpu = Debug|anycpu
@@ -19,5 +21,9 @@ Global
 		{51B95462-718A-430A-8454-F16DE635BA7D}.Debug|anycpu.Build.0 = Debug|Any CPU
 		{51B95462-718A-430A-8454-F16DE635BA7D}.Release|anycpu.ActiveCfg = Release|Any CPU
 		{51B95462-718A-430A-8454-F16DE635BA7D}.Release|anycpu.Build.0 = Release|Any CPU
+		{8BA88015-66E3-49F3-A1DF-50E1FAFA89C6}.Debug|anycpu.ActiveCfg = Debug|Any CPU
+		{8BA88015-66E3-49F3-A1DF-50E1FAFA89C6}.Debug|anycpu.Build.0 = Debug|Any CPU
+		{8BA88015-66E3-49F3-A1DF-50E1FAFA89C6}.Release|anycpu.ActiveCfg = Release|Any CPU
+		{8BA88015-66E3-49F3-A1DF-50E1FAFA89C6}.Release|anycpu.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
