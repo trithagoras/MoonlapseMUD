@@ -3,6 +3,8 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MoonlapseMUD", "MoonlapseMUD\MoonlapseMUD.csproj", "{95F016FE-54A1-40D8-BD61-0E5B80555B0A}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MoonlapseServer", "MoonlapseServer\MoonlapseServer.csproj", "{51B95462-718A-430A-8454-F16DE635BA7D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|anycpu = Debug|anycpu
@@ -13,5 +15,9 @@ Global
 		{95F016FE-54A1-40D8-BD61-0E5B80555B0A}.Debug|anycpu.Build.0 = Debug|anycpu
 		{95F016FE-54A1-40D8-BD61-0E5B80555B0A}.Release|anycpu.ActiveCfg = Release|anycpu
 		{95F016FE-54A1-40D8-BD61-0E5B80555B0A}.Release|anycpu.Build.0 = Release|anycpu
+		{51B95462-718A-430A-8454-F16DE635BA7D}.Debug|anycpu.ActiveCfg = Debug|Any CPU
+		{51B95462-718A-430A-8454-F16DE635BA7D}.Debug|anycpu.Build.0 = Debug|Any CPU
+		{51B95462-718A-430A-8454-F16DE635BA7D}.Release|anycpu.ActiveCfg = Release|Any CPU
+		{51B95462-718A-430A-8454-F16DE635BA7D}.Release|anycpu.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
