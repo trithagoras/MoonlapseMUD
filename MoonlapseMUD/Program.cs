@@ -1,22 +1,58 @@
 ﻿using System;
-using MoonlapseMUD.Utils;
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
+using System.Threading;
+using MoonlapseNetworking;
 
 namespace MoonlapseMUD
 {
-    class MainClass
+    class Program
     {
-        public static void Main(string[] args)
+        static void Main(string[] args)
         {
-            Console.WriteLine("Hello World!");
-            Console.WriteLine("Testing collaboration!");
-            //UI.AskQuestion("How are you?", new string[] { "good", "bad" });
+            IPAddress ip = IPAddress.Parse("10.1.1.10");
+            int port = 8081;
+            TcpClient client = new TcpClient();
+            client.Connect(ip, port);
+            Console.WriteLine($"Client connected to Moonlapse server at {client.Client.RemoteEndPoint}");
+            NetworkStream ns = client.GetStream();
+            Thread thread = new Thread(o => HandlePacket((TcpClient) o));
 
-            Vector left = new Vector(2, 4);
-            Vector right = new Vector(5, 2);
+            thread.Start(client);
 
-            left += Vector.Down;
+            string s;
+            while (!string.IsNullOrEmpty((s = Console.ReadLine())))
+            {
+                byte[] buffer = Packet.BuildBuffer(client, "SAY", s);
+                ns.Write(buffer, 0, buffer.Length);
+            }
 
-            Console.WriteLine(left);
+            client.Client.Shutdown(SocketShutdown.Send);
+            thread.Join();
+            ns.Close();
+            client.Close();
+            Console.WriteLine("Client disconnected from Moonlapse server, exiting.");
+        }
+
+
+        static void HandlePacket(TcpClient client)
+        {
+            NetworkStream ns = client.GetStream();
+            byte[] receivedBytes = new byte[1024];
+
+            int byteCount;
+            while ((byteCount = ns.Read(receivedBytes, 0, receivedBytes.Length)) > 0)
+            {
+                Packet packet = new Packet(receivedBytes, byteCount);
+                switch (packet.Header)
+                {
+                    case "SAY":
+                        Console.WriteLine($"[{packet.Client}] [{packet.Header}] [{packet.Body}]");
+                        break;
+                }
+            }
+            
         }
     }
 }
