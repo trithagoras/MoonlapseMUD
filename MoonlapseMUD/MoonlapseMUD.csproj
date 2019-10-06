@@ -43,6 +43,10 @@
     <Compile Include="Locations\Location.cs" />
     <Compile Include="Utils\UI.cs" />
     <Compile Include="Utils\Vector.cs" />
+    <Compile Include="Entities\Solid.cs" />
+    <Compile Include="Entities\Portal.cs" />
+    <Compile Include="Entities\Actors\Player.cs" />
+    <Compile Include="Entities\ItemStack.cs" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Entities\" />
