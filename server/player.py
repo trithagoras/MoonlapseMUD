@@ -1,34 +1,34 @@
 import random
+from typing import *
+
 
 class Player:
-  def __init__(self, clientsocket, data):
-    self.clientsocket = clientsocket
-    self.playerid = data['id']
+  def __init__(self, client_socket, data):
+    self.client_socket = client_socket
+    self.player_id = data['id']
     self.walls = data['walls']
-    self.mapWidth, self.mapHeight = data['w'], data['h']
+    self.map_width, self.map_height = data['w'], data['h']
 
-    ids = ['#', '@', '&', '+', '%', '$', '£']
+    ids: List[chr] = ['#', '@', '&', '+', '%', '$', '£']
 
-    if self.playerid + 1 > len(ids):
-      playerChar = 65 + self.playerid - len(ids)
-    else:
-      playerChar = ids[self.playerid]
+    player_char: chr = ids[self.player_id]
+    if self.player_id + 1 > len(ids):
+      player_char = 65 + self.player_id - len(ids)
 
     self.state = {
       'pos': {},
-      'c': playerChar, # Character
+      'c': player_char
     }
 
-    self.spawnPlayer()
+    self.spawn_player()
 
-  def spawnPlayer(self):
+  def spawn_player(self) -> None:
     while True:
-      pos = [random.randint(1, self.mapWidth - 2), random.randint(1, self.mapHeight - 2)]
-
-      if not any(pos == wall for wall in self.walls):
+      pos: List[int, int] = [random.randint(1, self.map_width - 2), random.randint(1, self.map_height - 2)]
+      if pos not in self.walls:
         break
 
     self.state['pos'] = {'x': pos[0], 'y': pos[1]}
 
   def disconnect(self):
-    self.clientsocket.close()
+    self.client_socket.close()
