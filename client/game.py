@@ -64,8 +64,6 @@ class Game:
           self.move(2)
         elif key == curses.KEY_LEFT:
           self.move(3)
-        if key == ord('q'):
-          break
 
         self.draw()
 
