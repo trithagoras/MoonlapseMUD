@@ -1,12 +1,13 @@
-import socket, json, time
+import socket, json, time, os
 from room import Room
 from threading import Thread
 
 if __name__ == '__main__':
 
-  ip, port = 'localhost', 8081
+  ip, port = '', 8081
 
-  room = Room(ip, port, './map.bmp.json')
+  pwd = os.path.dirname(__file__)
+  room = Room(ip, port, os.path.join(pwd, '../map.bmp.json'))
 
   Thread(target = room.acceptClients, daemon = True).start()
 

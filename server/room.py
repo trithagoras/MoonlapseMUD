@@ -7,7 +7,7 @@ class Room:
     self.walls = []
 
     self.maxPlayers = 100
-    self.tickrate = 20
+    self.tickrate = 100
 
     self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     self.s.bind((ip, port))

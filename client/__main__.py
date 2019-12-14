@@ -5,7 +5,7 @@ def main(s):
   uiError = None
 
   try:
-      game = Game('localhost', 8081)
+      game = Game('moonlapse.net', 8081)
       game.connect()
 
       windowSize = s.getmaxyx()
