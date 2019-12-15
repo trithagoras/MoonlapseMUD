@@ -1,11 +1,14 @@
-import time, os
+import time, os, sys
 from room import Room
 from threading import Thread
 
 if __name__ == '__main__':
-  ip, port = '', 8081
+  pwd: str = os.path.dirname(__file__)
+  sys.path.append(os.path.abspath(os.path.join(pwd, '..')))
+  sys.path.append(os.path.abspath(os.path.join(pwd, '../payload')))
+  sys.path.append(os.path.abspath(os.path.join(pwd, '../server')))
 
-  pwd = os.path.dirname(__file__)
+  ip, port = '', 8081
   room = Room(ip, port, os.path.join(pwd, '..', 'maps', 'map.bmp.json'))
 
   Thread(target=room.accept_clients, daemon=True).start()

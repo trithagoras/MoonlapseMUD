@@ -1,10 +1,10 @@
-import curses, sys
-from game import Game
+import curses, sys, os
 from typing import *
 from curses_helper import Window
 
 
 def main(s: Window) -> None:
+    from game import Game
     hostname: str = 'moonlapse.net'
     port: int = 8081
 
@@ -39,4 +39,9 @@ def main(s: Window) -> None:
 
 
 if __name__ == '__main__':
+    pwd: str = os.path.dirname(__file__)
+    sys.path.append(os.path.abspath(os.path.join(pwd, '..')))
+    sys.path.append(os.path.abspath(os.path.join(pwd, '../payload')))
+    sys.path.append(os.path.abspath(os.path.join(pwd, '../client')))
+    print(sys.path)
     curses.wrapper(main)
