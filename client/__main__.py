@@ -1,9 +1,8 @@
-import curses, sys, os
+import sys, os
 from typing import *
-from curses_helper import Window
 
 
-def main(s: Window) -> None:
+def main() -> None:
     from game import Game
     hostname: str = 'moonlapse.net'
     port: int = 8081
@@ -22,14 +21,7 @@ def main(s: Window) -> None:
     try:
         game: Game = Game(hostname, port)
         game.connect()
-
-        window_size: Tuple[int, int] = s.getmaxyx()
-
-        if window_size[0] < game.size[0] or window_size[1] < game.size[1]:
-            ui_error = "Sorry, your terminal window has to be at least %dx%d." % (game.size[0], game.size[1])
-
-        else:
-            game.start()
+        game.start()
 
     except Exception as e:
         ui_error = "Error: Connection refused. %s" % str(e)
@@ -44,4 +36,4 @@ if __name__ == '__main__':
     sys.path.append(os.path.abspath(os.path.join(pwd, '../payload')))
     sys.path.append(os.path.abspath(os.path.join(pwd, '../client')))
     print(sys.path)
-    curses.wrapper(main)
+    main()
