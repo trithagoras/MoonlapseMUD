@@ -1,5 +1,4 @@
 from enum import Enum
-import json
 
 
 class Direction(str, Enum):
