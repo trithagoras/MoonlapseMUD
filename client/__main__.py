@@ -20,14 +20,14 @@ def main() -> None:
 
     ui_error: Optional[str] = None
 
-    # try:
-    game: Game = Game(hostname, port)
-    game.connect()
+    try:
+        game: Game = Game(hostname, port)
+        game.connect()
 
-    ncurses.wrapper(game.start, ncurses)
+        ncurses.wrapper(game.start, ncurses)
 
-    # except Exception as e:
-    #     ui_error = "Error: Connection refused. %s" % str(e)
+    except Exception as e:
+        ui_error = "Error: Connection refused. %s" % str(e)
 
     if ui_error:
         print(ui_error, file=sys.stderr)
