@@ -1,5 +1,6 @@
-import json, threading, socket, sys
+import json, threading, socket, sys, time
 from player import Player
+from log import Log
 from payload import move
 from typing import *
 
@@ -7,6 +8,7 @@ from typing import *
 class Room:
     def __init__(self, ip, port, room_map):
         self.players:  List[Optional[Player]] = []
+        self.log: Log = Log()
         self.walls: set = set()
 
         self.max_players = 100
@@ -91,6 +93,9 @@ class Room:
                     if payload == move.Direction.LEFT and pos['x'] - 1 > 0 and [pos['x'] - 1, pos['y']] not in self.walls:
                         pos['x'] -= 1
 
+                elif action == 'c':
+                    self.log.log(time.time(), f"Player {player_id} says: {payload}")
+
             except Exception as e:
                 print(e, file=sys.stderr)
                 pass
@@ -100,9 +105,11 @@ class Room:
 
         for index in range(0, len(self.players)):
             player = self.players[index]
-
             players.append(player.state if player else None)
 
         for player in self.players:
             if player:
-                player.client_socket.send(bytes(json.dumps({'p': players}) + ";", 'utf-8'))
+                player.client_socket.send(bytes(json.dumps({
+                    'p': players,
+                    'l': self.log.latest
+                }) + ";", 'utf-8'))

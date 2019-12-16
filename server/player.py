@@ -28,7 +28,10 @@ class Player:
             if pos not in self.walls:
                 break
 
-        self.state['pos'] = {'x': pos[0], 'y': pos[1]}
+        self.state['pos'] = {
+            'x': pos[0],
+            'y': pos[1]
+        }
 
     def disconnect(self):
         self.client_socket.close()

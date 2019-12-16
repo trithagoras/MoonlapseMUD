@@ -36,12 +36,11 @@ class Game:
             pass
 
     def chat(self, message: str):
-        delimiter: str = "Say: "
         try:
             # Action: chat, Payload: message
             self.s.send(bytes(json.dumps({
                 'a': 'c',
-                'p': message[message.index(delimiter) + len(delimiter):]  # Strip, e.g. "Say: "
+                'p': message
             }) + ';', 'utf-8'))
         except sock.error:
             pass
@@ -91,6 +90,7 @@ class Game:
         message: str = self.chatbox.edit(lambda k: 7 if k in (ord('\n'), '\r') else k)
         self.chat(message)
         self.chatbox = None
+        self.view.chatwin.clear()
 
     def get_player_input(self, stdscr: Window, curses: Curses):
         try:
@@ -114,6 +114,9 @@ class Game:
             elif key in (curses.KEY_ENTER, ord('\n'), ord('\r')) and self.view.win3 is not None:
                 self.focus = 4
                 self.chatbox = textpad.Textbox(self.view.chatwin)
+
+            elif key == ord('q'):
+                exit()
 
         except KeyboardInterrupt:
             exit()
