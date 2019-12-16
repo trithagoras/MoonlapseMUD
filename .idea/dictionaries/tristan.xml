@@ -2,6 +2,9 @@
   <dictionary name="tristan">
     <words>
       <w>moonlapse</w>
+      <w>ncurses</w>
+      <w>stdscr</w>
+      <w>textpad</w>
     </words>
   </dictionary>
 </component>

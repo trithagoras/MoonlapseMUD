@@ -1,5 +1,7 @@
 import sys, os
+from time import sleep
 from typing import *
+import curses as ncurses
 
 
 def main() -> None:
@@ -18,13 +20,14 @@ def main() -> None:
 
     ui_error: Optional[str] = None
 
-    try:
-        game: Game = Game(hostname, port)
-        game.connect()
-        game.start()
+    # try:
+    game: Game = Game(hostname, port)
+    game.connect()
 
-    except Exception as e:
-        ui_error = "Error: Connection refused. %s" % str(e)
+    ncurses.wrapper(game.start, ncurses)
+
+    # except Exception as e:
+    #     ui_error = "Error: Connection refused. %s" % str(e)
 
     if ui_error:
         print(ui_error, file=sys.stderr)
@@ -35,5 +38,4 @@ if __name__ == '__main__':
     sys.path.append(os.path.abspath(os.path.join(pwd, '..')))
     sys.path.append(os.path.abspath(os.path.join(pwd, '../payload')))
     sys.path.append(os.path.abspath(os.path.join(pwd, '../client')))
-    print(sys.path)
     main()
