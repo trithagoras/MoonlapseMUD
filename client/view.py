@@ -18,11 +18,14 @@ class View:
         self.win2_y, self.win2_x = (9, 53)
         self.win3_height, self.win3_width = (14, 106)
         self.win3_y, self.win3_x = (32, 0)
+        self.chatwin_height, self.chatwin_width = (1, self.win3_width - 2)
+        self.chatwin_y, self.chatwin_x = (self.win3_y + self.win3_height - self.chatwin_height - 1, self.win3_x + 1)
 
         # Init windows
         self.win1 = stdscr.subwin(self.win1_height, self.win1_width, self.win1_y, self.win1_x)
         self.win2 = stdscr.subwin(self.win2_height, self.win2_width, self.win2_y, self.win2_x)
         self.win3 = stdscr.subwin(self.win3_height, self.win3_width, self.win3_y, self.win3_x)
+        self.chatwin = stdscr.subwin(self.chatwin_height, self.chatwin_width, self.chatwin_y, self.chatwin_x)
 
         # Start colors in curses
         curses.start_color()
@@ -112,7 +115,7 @@ class View:
 
             # Window 3 content
             self.win3.hline(self.win3_height - 3, 1, curses.ACS_HLINE, self.win3_width - 2)
-            self.win3.addstr(self.win3_height - 2, 2, "Say: ")
+            self.chatwin.addstr(0, 2, "Say: ")
 
             # sample lines in win3
             self.win3.addstr(3, 1, "[14:22] coreyb65 says: Hello and welcome to Moonlapse!")

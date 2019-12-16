@@ -22,10 +22,7 @@ class Game:
 
         # UI
         self.focus: int = 1
-        self.textbox: Optional[textpad.Textbox] = None
-        self.win1: Optional[Window] = None
-        self.win2: Optional[Window] = None
-        self.win3: Optional[Window] = None
+        self.chatbox: Optional[textpad.Textbox] = None
         self.view: Optional[View] = None
 
     def move(self, direction: move.Direction):
@@ -39,11 +36,12 @@ class Game:
             pass
 
     def chat(self, message: str):
+        delimiter: str = "Say: "
         try:
             # Action: chat, Payload: message
             self.s.send(bytes(json.dumps({
                 'a': 'c',
-                'p': message
+                'p': message[message.index(delimiter) + len(delimiter):]  # Strip, e.g. "Say: "
             }) + ';', 'utf-8'))
         except sock.error:
             pass
@@ -86,9 +84,9 @@ class Game:
 
     def handle_chatbox(self):
         # https://stackoverflow.com/questions/36121802/python-curses-make-enter-key-terminate-textbox
-        message: str = self.textbox.edit(lambda k: 7 if k in (ord('\n'), '\r') else k)
+        message: str = self.chatbox.edit(lambda k: 7 if k in (ord('\n'), '\r') else k)
         self.chat(message)
-        self.textbox = None
+        self.chatbox = None
 
     def get_player_input(self, stdscr: Window, curses: Curses):
         try:
@@ -109,14 +107,14 @@ class Game:
                 self.focus = int(chr(key))
 
             # Chat
-            elif key in (curses.KEY_ENTER, ord('\n'), ord('\r')) and self.win3 is not None:
+            elif key in (curses.KEY_ENTER, ord('\n'), ord('\r')) and self.view.win3 is not None:
                 self.focus = 4
-                self.textbox = textpad.Textbox(self.win3)
+                self.chatbox = textpad.Textbox(self.view.chatwin)
 
         except KeyboardInterrupt:
             exit()
 
-        if self.textbox is not None:
+        if self.chatbox is not None:
             self.handle_chatbox()
 
     def load_data(self):
