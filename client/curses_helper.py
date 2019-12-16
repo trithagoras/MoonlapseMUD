@@ -413,7 +413,7 @@ class Window:
     Paint character ch at (y, x) with attributes attr, overwriting any character previously painter at that location.
     By default, the character position and attributes are the current settings for the window object.
     """
-    def addchr(self, y, x, ch, attr=None) -> None:
+    def addch(self, y, x, ch, attr=None) -> None:
         pass
 
     """
