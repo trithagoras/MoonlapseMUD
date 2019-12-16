@@ -7,6 +7,7 @@ from threading import Thread
 from payload import move
 from typing import *
 from curses_helper import Window, Curses
+import curses.textpad as textpad
 
 
 class Game:
@@ -21,15 +22,30 @@ class Game:
         self.size: Tuple[int, int] = (-1, -1)
         self.tick_rate: int = -1
 
+        # UI
         self.focus: int = 1
+        self.textbox: Optional[textpad.Textbox] = None
+        self.win1: Optional[Window] = None
+        self.win2: Optional[Window] = None
+        self.win3: Optional[Window] = None
 
     def move(self, direction: move.Direction):
         try:
-            # Action: Move, payload: direction
+            # Action: move, Payload: direction
             self.s.send(bytes(json.dumps({
                 'a': 'm',
                 'p': direction
-            }) + ";", "utf-8"))
+            }) + ';', 'utf-8'))
+        except sock.error:
+            pass
+
+    def chat(self, message: str):
+        try:
+            # Action: chat, Payload: message
+            self.s.send(bytes(json.dumps({
+                'a': 'c',
+                'p': message
+            }) + ';', 'utf-8'))
         except sock.error:
             pass
 
@@ -61,11 +77,17 @@ class Game:
     def listen(self):
         Thread(target=self.update, daemon=True).start()
 
+    def handle_chatbox(self):
+        # https://stackoverflow.com/questions/36121802/python-curses-make-enter-key-terminate-textbox
+        message: str = self.textbox.edit(lambda k: 7 if k in (ord('\n'), '\r') else k)
+        self.chat(message)
+        self.textbox = None
+
     def get_player_input(self, stdscr: Window, curses: Curses):
         try:
             key = stdscr.getch()
 
-            # movement
+            # Movement
             if key == curses.KEY_UP:
                 self.move(move.Direction.UP)
             elif key == curses.KEY_RIGHT:
@@ -75,12 +97,20 @@ class Game:
             elif key == curses.KEY_LEFT:
                 self.move(move.Direction.LEFT)
 
-            # changing window focus
+            # Changing window focus
             elif key in [ord('1'), ord('2'), ord('3')]:
                 self.focus = int(chr(key))
 
+            # Chat
+            elif key in (curses.KEY_ENTER, ord('\n'), ord('\r')) and self.win3 is not None:
+                self.focus = 4
+                self.textbox = textpad.Textbox(self.win3)
+
         except KeyboardInterrupt:
             exit()
+
+        if self.textbox is not None:
+            self.handle_chatbox()
 
     def update(self):
         message = ""
@@ -96,6 +126,7 @@ class Game:
     def draw(self, stdscr: Window, curses: Curses):
         stdscr.keypad(1)
         stdscr.timeout(round(1000 / self.tick_rate))
+        curses.curs_set(False)
 
         # init window sizes
         height, width = (46, 106)
@@ -106,6 +137,11 @@ class Game:
         win2_y, win2_x = (9, 53)
         win3_height, win3_width = (14, 106)
         win3_y, win3_x = (32, 0)
+
+        # Init windows
+        self.win1 = stdscr.subwin(win1_height, win1_width, win1_y, win1_x)
+        self.win2 = stdscr.subwin(win2_height, win2_width, win2_y, win2_x)
+        self.win3 = stdscr.subwin(win3_height, win3_width, win3_y, win3_x)
 
         # Start colors in curses
         curses.start_color()
@@ -144,74 +180,66 @@ class Game:
                 stdscr.addstr(7, 1,
                               "[V] Look  [D] Pick up item  [E] Use/Equip  [←/→/↑/↓] Move  [</>] Use Stairs/Ladders")
 
-                # Init windows
-                win1 = stdscr.subwin(win1_height, win1_width, win1_y, win1_x)
-                win2 = stdscr.subwin(win2_height, win2_width, win2_y, win2_x)
-                win3 = stdscr.subwin(win3_height, win3_width, win3_y, win3_x)
-
                 # Adding border to windows
-                win1.border()
-                win2.border()
-                win3.border()
+                self.win1.border()
+                self.win2.border()
+                self.win3.border()
 
                 # Rendering window titles
                 if self.focus == 1:
-                    win1.addstr(0, 2, "[1] Forgotten Moor ", curses.color_pair(3))
+                    self.win1.addstr(0, 2, "[1] Forgotten Moor ", curses.color_pair(3))
                 else:
-                    win1.addstr(0, 2, "[1] Forgotten Moor ")
+                    self.win1.addstr(0, 2, "[1] Forgotten Moor ")
 
                 if self.focus == 2:
-                    win2.addstr(0, 2, "[2] Skills ", curses.color_pair(3))
+                    self.win2.addstr(0, 2, "[2] Skills ", curses.color_pair(3))
                 else:
-                    win2.addstr(0, 2, "[2] Skills ")
+                    self.win2.addstr(0, 2, "[2] Skills ")
 
                 if self.focus == 3:
-                    win3.addstr(0, 2, "[3] Log ", curses.color_pair(3))
+                    self.win3.addstr(0, 2, "[3] Log ", curses.color_pair(3))
                 else:
-                    win3.addstr(0, 2, "[3] Log ")
+                    self.win3.addstr(0, 2, "[3] Log ")
 
                 # win1 content
                 for index in range(0, len(self.game['p'])):
                     player = self.game['p'][index]
 
                     if player is not None:
-                        win1.addch(player['pos']['y'] + 1, player['pos']['x'], player['c'])
+                        self.win1.addch(player['pos']['y'] + 1, player['pos']['x'], player['c'])
 
                 for wall in self.walls:
-                    win1.addch(wall[1] + 1, wall[0], '█')
+                    self.win1.addch(wall[1] + 1, wall[0], '█')
 
                 # Window 2 content
-                win2.addstr(1, 1, "coreyb65, Guardian of Forgotten Moor")
-                win2.addstr(3, 1, f"Level 15 {progress_bar(7, 10)} (7/10 skill levels to 16)")
+                self.win2.addstr(1, 1, "coreyb65, Guardian of Forgotten Moor")
+                self.win2.addstr(3, 1, f"Level 15 {progress_bar(7, 10)} (7/10 skill levels to 16)")
 
-                win2.addstr(5, 1, f"Vitality      31/31 {progress_bar(3, 10)} (3,000/10,000)")
-                win2.addstr(6, 1, f"Strength      10/10 {progress_bar(3, 10)} (3,000/10,000)")
-                win2.addstr(7, 1, f"Agility       31/31 {progress_bar(3, 10)} (3,000/10,000)")
-                win2.addstr(8, 1, f"Dexterity     31/31 {progress_bar(3, 10)} (3,000/10,000)")
-                win2.addstr(9, 1, f"Astrology     31/31 {progress_bar(3, 10)} (3,000/10,000)")
-                win2.addstr(10, 1, f"Intelligence  31/31 {progress_bar(3, 10)} (3,000/10,000)")
+                self.win2.addstr(5, 1, f"Vitality      31/31 {progress_bar(3, 10)} (3,000/10,000)")
+                self.win2.addstr(6, 1, f"Strength      10/10 {progress_bar(3, 10)} (3,000/10,000)")
+                self.win2.addstr(7, 1, f"Agility       31/31 {progress_bar(3, 10)} (3,000/10,000)")
+                self.win2.addstr(8, 1, f"Dexterity     31/31 {progress_bar(3, 10)} (3,000/10,000)")
+                self.win2.addstr(9, 1, f"Astrology     31/31 {progress_bar(3, 10)} (3,000/10,000)")
+                self.win2.addstr(10, 1, f"Intelligence  31/31 {progress_bar(3, 10)} (3,000/10,000)")
 
-                win2.addstr(12, 1, f"Woodcutting   31/31 {progress_bar(3, 10)} (3,000/10,000)")
-                win2.addstr(13, 1, f"Crafting      31/31 {progress_bar(3, 10)} (3,000/10,000)")
-                win2.addstr(14, 1, f"Mining        31/31 {progress_bar(3, 10)} (3,000/10,000)")
-                win2.addstr(15, 1, f"Smithing      31/31 {progress_bar(3, 10)} (3,000/10,000)")
-                win2.addstr(16, 1, f"Fishing       31/31 {progress_bar(3, 10)} (3,000/10,000)")
-                win2.addstr(17, 1, f"Cooking       31/31 {progress_bar(3, 10)} (3,000/10,000)")
-                win2.addstr(18, 1, f"Alchemy       31/31 {progress_bar(3, 10)} (3,000/10,000)")
-                win2.addstr(19, 1, f"Enchanting    31/31 {progress_bar(3, 10)} (3,000/10,000)")
-                win2.addstr(20, 1, f"??????????    31/31 {progress_bar(3, 10)} (3,000/10,000)")
+                self.win2.addstr(12, 1, f"Woodcutting   31/31 {progress_bar(3, 10)} (3,000/10,000)")
+                self.win2.addstr(13, 1, f"Crafting      31/31 {progress_bar(3, 10)} (3,000/10,000)")
+                self.win2.addstr(14, 1, f"Mining        31/31 {progress_bar(3, 10)} (3,000/10,000)")
+                self.win2.addstr(15, 1, f"Smithing      31/31 {progress_bar(3, 10)} (3,000/10,000)")
+                self.win2.addstr(16, 1, f"Fishing       31/31 {progress_bar(3, 10)} (3,000/10,000)")
+                self.win2.addstr(17, 1, f"Cooking       31/31 {progress_bar(3, 10)} (3,000/10,000)")
+                self.win2.addstr(18, 1, f"Alchemy       31/31 {progress_bar(3, 10)} (3,000/10,000)")
+                self.win2.addstr(19, 1, f"Enchanting    31/31 {progress_bar(3, 10)} (3,000/10,000)")
+                self.win2.addstr(20, 1, f"??????????    31/31 {progress_bar(3, 10)} (3,000/10,000)")
 
                 # Window 3 content
-                win3.hline(win3_height - 3, 1, curses.ACS_HLINE, win3_width - 2)
-                win3.addstr(win3_height - 2, 2, "Say: ")
+                self.win3.hline(win3_height - 3, 1, curses.ACS_HLINE, win3_width - 2)
+                self.win3.addstr(win3_height - 2, 2, "Say: ")
 
                 # sample lines in win3
-                win3.addstr(3, 1, "[14:22] coreyb65 says: Hello and welcome to Moonlapse!")
-                win3.addstr(4, 1, "[14:25] A forbidden void has opened in the Forgotten Moor!",
+                self.win3.addstr(3, 1, "[14:22] coreyb65 says: Hello and welcome to Moonlapse!")
+                self.win3.addstr(4, 1, "[14:25] A forbidden void has opened in the Forgotten Moor!",
                             curses.color_pair(6))
-
-                # move cursor
-                stdscr.move(win3_y + win3_height - 2, 7)
 
                 # get input (last line)
                 self.get_player_input(stdscr, curses)
