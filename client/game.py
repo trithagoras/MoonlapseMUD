@@ -80,6 +80,10 @@ class Game:
 
         while True:
             self.view.draw(stdscr, curses)
+            if stdscr.getmaxyx() < (self.view.height, self.view.width):
+                time.sleep(0.2)
+                continue
+
             self.get_player_input(stdscr, curses)
 
     def handle_chatbox(self):
