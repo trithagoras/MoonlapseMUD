@@ -12,7 +12,7 @@ class View:
         self.log: dict = {}
         self.log_latest: dict = {}
 
-        # init window sizes
+        # Init window sizes
         self.height, self.width = (46, 106)
 
         self.win1_height, self.win1_width = (23, 53)
@@ -29,6 +29,9 @@ class View:
         self.win2 = stdscr.subwin(self.win2_height, self.win2_width, self.win2_y, self.win2_x)
         self.win3 = stdscr.subwin(self.win3_height, self.win3_width, self.win3_y, self.win3_x)
         self.chatwin = stdscr.subwin(self.chatwin_height, self.chatwin_width, self.chatwin_y, self.chatwin_x)
+
+        # Position cursor
+        stdscr.move(self.chatwin_y, self.chatwin_x)
 
         # Start colors in curses
         curses.start_color()

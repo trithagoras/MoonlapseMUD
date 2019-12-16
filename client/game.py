@@ -85,12 +85,14 @@ class Game:
 
             self.get_player_input(stdscr, curses)
 
-    def handle_chatbox(self):
+    def handle_chatbox(self, curses: Curses):
         # https://stackoverflow.com/questions/36121802/python-curses-make-enter-key-terminate-textbox
         message: str = self.chatbox.edit(lambda k: 7 if k in (ord('\n'), '\r') else k)
-        self.chat(message)
+        if len(message) > 0:
+            self.chat(message)
         self.chatbox = None
         self.view.chatwin.clear()
+        curses.curs_set(False)
 
     def get_player_input(self, stdscr: Window, curses: Curses):
         try:
@@ -114,6 +116,7 @@ class Game:
             elif key in (curses.KEY_ENTER, ord('\n'), ord('\r')) and self.view.win3 is not None:
                 self.focus = 4
                 self.chatbox = textpad.Textbox(self.view.chatwin)
+                curses.curs_set(True)
 
             elif key == ord('q'):
                 exit()
@@ -122,7 +125,7 @@ class Game:
             exit()
 
         if self.chatbox is not None:
-            self.handle_chatbox()
+            self.handle_chatbox(curses)
 
     def load_data(self):
         message = ""
