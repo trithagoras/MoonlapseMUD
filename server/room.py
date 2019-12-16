@@ -1,5 +1,6 @@
-import json, threading, socket, sys
+import json, threading, socket, sys, time
 from player import Player
+from log import Log
 from payload import move
 from typing import *
 
@@ -7,6 +8,7 @@ from typing import *
 class Room:
     def __init__(self, ip, port, room_map):
         self.players:  List[Optional[Player]] = []
+        self.log: Log = Log()
         self.walls: set = set()
 
         self.max_players = 100
@@ -40,7 +42,8 @@ class Room:
                 client_socket.close()
                 print("Connection from %s rejected." % address)
             else:
-                print("Connection from %s. Assigning to player %d" % (address, player_id))
+                print(f"Connection from {address}. Assigning to player {player_id}")
+                self.log.log(time.time(), f"Player {player_id} has arrived.")
                 init_data = {
                   'id': player_id,
                   'w': self.width,
@@ -66,7 +69,8 @@ class Room:
                         break
 
             except Exception as e:
-                print("Player %d: Disconnected. %s" % (player_id, str(e)))
+                print(f"Player {player_id}: Disconnected. {e}")
+                self.log.log(time.time(), f"Player {player_id} has departed.")
                 player.client_socket.close()
                 self.players[player_id] = None
                 break
@@ -91,6 +95,9 @@ class Room:
                     if payload == move.Direction.LEFT and pos['x'] - 1 > 0 and [pos['x'] - 1, pos['y']] not in self.walls:
                         pos['x'] -= 1
 
+                elif action == 'c':
+                    self.log.log(time.time(), f"Player {player_id} says: {payload}")
+
             except Exception as e:
                 print(e, file=sys.stderr)
                 pass
@@ -100,9 +107,11 @@ class Room:
 
         for index in range(0, len(self.players)):
             player = self.players[index]
-
             players.append(player.state if player else None)
 
         for player in self.players:
             if player:
-                player.client_socket.send(bytes(json.dumps({'p': players}) + ";", 'utf-8'))
+                player.client_socket.send(bytes(json.dumps({
+                    'p': players,
+                    'l': self.log.latest
+                }) + ";", 'utf-8'))
