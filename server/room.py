@@ -42,7 +42,8 @@ class Room:
                 client_socket.close()
                 print("Connection from %s rejected." % address)
             else:
-                print("Connection from %s. Assigning to player %d" % (address, player_id))
+                print(f"Connection from {address}. Assigning to player {player_id}")
+                self.log.log(time.time(), f"Player {player_id} has arrived.")
                 init_data = {
                   'id': player_id,
                   'w': self.width,
@@ -68,7 +69,8 @@ class Room:
                         break
 
             except Exception as e:
-                print("Player %d: Disconnected. %s" % (player_id, str(e)))
+                print(f"Player {player_id}: Disconnected. {e}")
+                self.log.log(time.time(), f"Player {player_id} has departed.")
                 player.client_socket.close()
                 self.players[player_id] = None
                 break
