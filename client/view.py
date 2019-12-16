@@ -42,7 +42,7 @@ class View:
         stdscr.erase()
 
         # max terminal size
-        if stdscr.getmaxyx() < (46, 106):
+        if stdscr.getmaxyx() < (self.height, self.width):
             stdscr.addstr(0, 0, f"Must be {self.height} rows x {self.width} cols")
             stdscr.refresh()
         else:
