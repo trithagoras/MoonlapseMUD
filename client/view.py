@@ -25,10 +25,10 @@ class View:
         self.chatwin_y, self.chatwin_x = (self.win3_y + self.win3_height - self.chatwin_height - 1, self.win3_x + 7)
 
         # Init windows
-        self.win1 = stdscr.subwin(self.win1_height, self.win1_width, self.win1_y, self.win1_x)
-        self.win2 = stdscr.subwin(self.win2_height, self.win2_width, self.win2_y, self.win2_x)
-        self.win3 = stdscr.subwin(self.win3_height, self.win3_width, self.win3_y, self.win3_x)
-        self.chatwin = stdscr.subwin(self.chatwin_height, self.chatwin_width, self.chatwin_y, self.chatwin_x)
+        self.win1: Window = stdscr.subwin(self.win1_height, self.win1_width, self.win1_y, self.win1_x)
+        self.win2: Window = stdscr.subwin(self.win2_height, self.win2_width, self.win2_y, self.win2_x)
+        self.win3: Window = stdscr.subwin(self.win3_height, self.win3_width, self.win3_y, self.win3_x)
+        self.chatwin: Window = stdscr.subwin(self.chatwin_height, self.chatwin_width, self.chatwin_y, self.chatwin_x)
 
         # Position cursor
         stdscr.move(self.chatwin_y, self.chatwin_x)
@@ -44,7 +44,7 @@ class View:
         curses.init_pair(5, curses.COLOR_GREEN, curses.COLOR_BLACK)
         curses.init_pair(6, curses.COLOR_MAGENTA, curses.COLOR_BLACK)
 
-    def draw(self, stdscr: Window, curses: Curses):
+    def draw(self, stdscr: Window, curses: Curses) -> None:
         stdscr.erase()
 
         # Max terminal size

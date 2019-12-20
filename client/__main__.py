@@ -1,5 +1,5 @@
-import sys, os
-from time import sleep
+import sys
+import os
 from typing import *
 import curses as ncurses
 

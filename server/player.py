@@ -33,5 +33,5 @@ class Player:
             'y': pos[1]
         }
 
-    def disconnect(self):
+    def disconnect(self) -> None:
         self.client_socket.close()

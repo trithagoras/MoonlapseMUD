@@ -1,4 +1,8 @@
-import json, threading, socket, sys, time
+import json
+import threading
+import socket
+import sys
+import time
 from player import Player
 from log import Log
 from payload import move
@@ -19,9 +23,9 @@ class Room:
         self.s.listen(16)
 
         with open(room_map) as data:
-            mapData = json.load(data)
-            self.walls = mapData['walls']
-            self.width, self.height = mapData['size']
+            map_data = json.load(data)
+            self.walls = map_data['walls']
+            self.width, self.height = map_data['size']
 
         # Create player spots in game object
         for index in range(0, self.max_players):
@@ -88,11 +92,14 @@ class Room:
                 if action == 'm':
                     if payload == move.Direction.UP and pos['y'] - 1 > 0 and [pos['x'], pos['y'] - 1] not in self.walls:
                         pos['y'] -= 1
-                    if payload == move.Direction.RIGHT and pos['x'] + 1 < self.width - 1 and [pos['x'] + 1, pos['y']] not in self.walls:
+                    if payload == move.Direction.RIGHT and pos['x'] + 1 < self.width - 1 and [pos['x'] + 1, pos['y']] \
+                            not in self.walls:
                         pos['x'] += 1
-                    if payload == move.Direction.DOWN and pos['y'] + 1 < self.height - 1 and [pos['x'], pos['y'] + 1] not in self.walls:
+                    if payload == move.Direction.DOWN and pos['y'] + 1 < self.height - 1 and [pos['x'], pos['y'] + 1] \
+                            not in self.walls:
                         pos['y'] += 1
-                    if payload == move.Direction.LEFT and pos['x'] - 1 > 0 and [pos['x'] - 1, pos['y']] not in self.walls:
+                    if payload == move.Direction.LEFT and pos['x'] - 1 > 0 and [pos['x'] - 1, pos['y']] not in \
+                            self.walls:
                         pos['x'] -= 1
 
                 elif action == 'c':

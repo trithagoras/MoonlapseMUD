@@ -1,5 +1,7 @@
 import socket as sock
-import json, sys, time
+import json
+import sys
+import time
 from threading import Thread
 from payload import move
 from typing import *
@@ -14,8 +16,8 @@ class Game:
         self.address: Tuple[str, int] = (host, port)
 
         self.player_id: int = 0
-        self.game_data = {}
-        self.walls = []
+        self.game_data: dict = {}
+        self.walls: list = []
 
         self.size: Tuple[int, int] = (-1, -1)
         self.tick_rate: int = -1
@@ -25,27 +27,7 @@ class Game:
         self.chatbox: Optional[textpad.Textbox] = None
         self.view: Optional[View] = None
 
-    def move(self, direction: move.Direction):
-        try:
-            # Action: move, Payload: direction
-            self.s.send(bytes(json.dumps({
-                'a': 'm',
-                'p': direction
-            }) + ';', 'utf-8'))
-        except sock.error:
-            pass
-
-    def chat(self, message: str):
-        try:
-            # Action: chat, Payload: message
-            self.s.send(bytes(json.dumps({
-                'a': 'c',
-                'p': message
-            }) + ';', 'utf-8'))
-        except sock.error:
-            pass
-
-    def connect(self):
+    def connect(self) -> None:
         self.s.connect(self.address)
         message: str = ""
         while True:
@@ -66,7 +48,7 @@ class Game:
         self.walls = data['walls']
         self.tick_rate = data['t']
 
-    def start(self, stdscr: Window, curses: Curses):
+    def start(self, stdscr: Window, curses: Curses) -> None:
         # Listen for game data in its own thread
         Thread(target=self.load_data, daemon=True).start()
 
@@ -85,16 +67,18 @@ class Game:
 
             self.get_player_input(stdscr, curses)
 
-    def handle_chatbox(self, curses: Curses):
-        # https://stackoverflow.com/questions/36121802/python-curses-make-enter-key-terminate-textbox
-        message: str = self.chatbox.edit(lambda k: 7 if k in (ord('\n'), '\r') else k)
-        if len(message) > 0:
-            self.chat(message)
-        self.chatbox = None
-        self.view.chatwin.clear()
-        curses.curs_set(False)
+    def load_data(self) -> None:
+        message = ""
+        while True:
+            try:
+                message += self.s.recv(1).decode('utf-8')
+                if message[-1] == ";":
+                    self.game_data = json.loads(message[:-1])
+                    message = ""
+            except sock.error:
+                message = ""
 
-    def get_player_input(self, stdscr: Window, curses: Curses):
+    def get_player_input(self, stdscr: Window, curses: Curses) -> None:
         try:
             key = stdscr.getch()
 
@@ -127,13 +111,31 @@ class Game:
         if self.chatbox is not None:
             self.handle_chatbox(curses)
 
-    def load_data(self):
-        message = ""
-        while True:
-            try:
-                message += self.s.recv(1).decode('utf-8')
-                if message[-1] == ";":
-                    self.game_data = json.loads(message[:-1])
-                    message = ""
-            except sock.error:
-                message = ""
+    def move(self, direction: move.Direction) -> None:
+        try:
+            # Action: move, Payload: direction
+            self.s.send(bytes(json.dumps({
+                'a': 'm',
+                'p': direction
+            }) + ';', 'utf-8'))
+        except sock.error:
+            pass
+
+    def chat(self, message: str) -> None:
+        try:
+            # Action: chat, Payload: message
+            self.s.send(bytes(json.dumps({
+                'a': 'c',
+                'p': message
+            }) + ';', 'utf-8'))
+        except sock.error:
+            pass
+
+    def handle_chatbox(self, curses: Curses) -> None:
+        # https://stackoverflow.com/questions/36121802/python-curses-make-enter-key-terminate-textbox
+        message: str = self.chatbox.edit(lambda k: 7 if k in (ord('\n'), '\r') else k)
+        if len(message) > 0:
+            self.chat(message)
+        self.chatbox = None
+        self.view.chatwin.clear()
+        curses.curs_set(False)
