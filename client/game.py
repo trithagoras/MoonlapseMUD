@@ -73,7 +73,13 @@ class Game:
             try:
                 message += self.s.recv(1).decode('utf-8')
                 if message[-1] == ";":
-                    self.game_data = json.loads(message[:-1])
+                    if message[-2] != '\\':
+                        # Terminate, end of JSON clause
+                        self.game_data = json.loads(message[:-1])
+                    else:
+                        # Interpret as a literal
+                        message = message[:-3] + ';'
+                        continue
                     message = ""
             except sock.error:
                 message = ""
@@ -122,6 +128,9 @@ class Game:
             pass
 
     def chat(self, message: str) -> None:
+        # Sanitise semicolons
+        message = message.replace(';', '\\;')
+
         try:
             # Action: chat, Payload: message
             self.s.send(bytes(json.dumps({
