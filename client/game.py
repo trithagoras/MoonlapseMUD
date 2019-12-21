@@ -3,7 +3,6 @@ import json
 import sys
 import time
 from threading import Thread
-from payload import move
 from typing import *
 from curses_helper import Window, Curses
 import curses.textpad as textpad
@@ -90,13 +89,13 @@ class Game:
 
             # Movement
             if key == curses.KEY_UP:
-                self.move(move.Direction.UP)
+                self.move(0)
             elif key == curses.KEY_RIGHT:
-                self.move(move.Direction.RIGHT)
+                self.move(1)
             elif key == curses.KEY_DOWN:
-                self.move(move.Direction.DOWN)
+                self.move(2)
             elif key == curses.KEY_LEFT:
-                self.move(move.Direction.LEFT)
+                self.move(3)
 
             # Changing window focus
             elif key in [ord('1'), ord('2'), ord('3')]:
@@ -117,7 +116,7 @@ class Game:
         if self.chatbox is not None:
             self.handle_chatbox(curses)
 
-    def move(self, direction: move.Direction) -> None:
+    def move(self, direction: int) -> None:
         try:
             # Action: move, Payload: direction
             self.s.send(bytes(json.dumps({

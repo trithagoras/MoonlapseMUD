@@ -1,11 +1,10 @@
 import sys
-import os
 from typing import *
 import curses as ncurses
+from game import Game
 
 
 def main() -> None:
-    from game import Game
     hostname: str = 'moonlapse.net'
     port: int = 8081
 
@@ -34,7 +33,4 @@ def main() -> None:
 
 
 if __name__ == '__main__':
-    pwd: str = os.path.dirname(__file__)
-    for path in ('..', '../payload', '../client', '../server'):
-        sys.path.append(os.path.abspath(os.path.join(pwd, path)))
     main()

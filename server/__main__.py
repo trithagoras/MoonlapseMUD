@@ -5,11 +5,9 @@ from room import Room
 from threading import Thread
 
 if __name__ == '__main__':
-    pwd: str = os.path.dirname(__file__)
-    for path in ('..', '../payload', '../client', '../server'):
-        sys.path.append(os.path.abspath(os.path.join(pwd, path)))
-
     ip, port = '', 8081
+
+    pwd: str = os.path.dirname(__file__)
     room = Room(ip, port, os.path.join(pwd, '..', 'maps', 'map.bmp.json'))
 
     Thread(target=room.accept_clients, daemon=True).start()
@@ -26,3 +24,4 @@ if __name__ == '__main__':
 
         except Exception as e:
             print(e, file=sys.stderr)
+            pass

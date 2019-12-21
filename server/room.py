@@ -5,7 +5,6 @@ import sys
 import time
 from player import Player
 from log import Log
-from payload import move
 from typing import *
 
 
@@ -38,6 +37,10 @@ class Room:
         while True:
             try:
                 client_socket, address = self.s.accept()
+            except socket.error:
+                print("Socket error while accepting new client... Trying again.")
+                time.sleep(1)
+                continue
             except Exception as e:
                 print(e, file=sys.stderr)
                 continue
@@ -55,6 +58,7 @@ class Room:
                     print(f"Connection from {address} rejected.")
                 except Exception as e:
                     print(e, file=sys.stderr)
+                    continue
 
             elif player_id != -1:
                 print(f"Connection from {address}. Assigning to player {player_id}")
@@ -75,6 +79,12 @@ class Room:
                     print(e)
                     continue
 
+    def kick(self, player_id: int):
+        self.players[player_id].disconnect()
+        self.log.log(time.time(), f"Player {player_id} has departed.")
+        self.players[player_id] = None
+        print(f"Kicked player {player_id}")
+
     def listen(self, player_id) -> None:
         while True:
             player = self.players[player_id]
@@ -86,11 +96,8 @@ class Room:
                     if data[-1] == ';':
                         break
 
-            except Exception as e:
-                print(f"Player {player_id}: Disconnected. {e}")
-                self.log.log(time.time(), f"Player {player_id} has departed.")
-                player.client_socket.close()
-                self.players[player_id] = None
+            except socket.error:
+                self.kick(player_id)
                 break
 
             try:
@@ -104,15 +111,15 @@ class Room:
 
                 # Move
                 if action == 'm':
-                    if payload == move.Direction.UP and pos['y'] - 1 > 0 and [pos['x'], pos['y'] - 1] not in self.walls:
+                    if payload == 0 and pos['y'] - 1 > 0 and [pos['x'], pos['y'] - 1] not in self.walls:
                         pos['y'] -= 1
-                    if payload == move.Direction.RIGHT and pos['x'] + 1 < self.width - 1 and [pos['x'] + 1, pos['y']] \
+                    if payload == 1 and pos['x'] + 1 < self.width - 1 and [pos['x'] + 1, pos['y']] \
                             not in self.walls:
                         pos['x'] += 1
-                    if payload == move.Direction.DOWN and pos['y'] + 1 < self.height - 1 and [pos['x'], pos['y'] + 1] \
+                    if payload == 2 and pos['y'] + 1 < self.height - 1 and [pos['x'], pos['y'] + 1] \
                             not in self.walls:
                         pos['y'] += 1
-                    if payload == move.Direction.LEFT and pos['x'] - 1 > 0 and [pos['x'] - 1, pos['y']] not in \
+                    if payload == 3 and pos['x'] - 1 > 0 and [pos['x'] - 1, pos['y']] not in \
                             self.walls:
                         pos['x'] -= 1
 
@@ -137,5 +144,9 @@ class Room:
                         'p': players,
                         'l': self.log.latest
                     }) + ";", 'utf-8'))
+                except socket.error:
+                    self.kick(player.player_id)
+                    continue
                 except Exception as e:
                     print(e, file=sys.stderr)
+                    continue
