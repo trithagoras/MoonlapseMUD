@@ -18,9 +18,12 @@ class Room:
         self.max_players = 100
         self.tick_rate = 100
 
-        self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.s.bind((ip, port))
-        self.s.listen(16)
+        try:
+            self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.s.bind((ip, port))
+            self.s.listen(16)
+        except Exception as e:
+            print(e, file=sys.stderr)
 
         with open(room_map) as data:
             map_data = json.load(data)
@@ -33,7 +36,11 @@ class Room:
 
     def accept_clients(self) -> None:
         while True:
-            client_socket, address = self.s.accept()
+            try:
+                client_socket, address = self.s.accept()
+            except Exception as e:
+                print(e, file=sys.stderr)
+                continue
 
             player_id: int = -1
             for index in range(0, len(self.players)):
@@ -42,10 +49,14 @@ class Room:
                     break
 
             if player_id == -1:
-                client_socket.send(bytes("full;", 'utf-8'))
-                client_socket.close()
-                print("Connection from %s rejected." % address)
-            else:
+                try:
+                    client_socket.send(bytes("full;", 'utf-8'))
+                    client_socket.close()
+                    print(f"Connection from {address} rejected.")
+                except Exception as e:
+                    print(e, file=sys.stderr)
+
+            elif player_id != -1:
                 print(f"Connection from {address}. Assigning to player {player_id}")
                 self.log.log(time.time(), f"Player {player_id} has arrived.")
                 init_data = {
@@ -56,10 +67,13 @@ class Room:
                   't': self.tick_rate
                 }
 
-                client_socket.send(bytes(json.dumps(init_data) + ";", 'utf-8'))
-                self.players[player_id] = Player(client_socket, init_data)
-
-                threading.Thread(target=self.listen, args=(player_id, ), daemon=True).start()
+                try:
+                    client_socket.send(bytes(json.dumps(init_data) + ";", 'utf-8'))
+                    self.players[player_id] = Player(client_socket, init_data)
+                    threading.Thread(target=self.listen, args=(player_id,), daemon=True).start()
+                except Exception as e:
+                    print(e)
+                    continue
 
     def listen(self, player_id) -> None:
         while True:
@@ -107,7 +121,7 @@ class Room:
 
             except Exception as e:
                 print(e, file=sys.stderr)
-                pass
+                break
 
     def update_clients(self) -> None:
         players = []
@@ -118,7 +132,10 @@ class Room:
 
         for player in self.players:
             if player:
-                player.client_socket.send(bytes(json.dumps({
-                    'p': players,
-                    'l': self.log.latest
-                }) + ";", 'utf-8'))
+                try:
+                    player.client_socket.send(bytes(json.dumps({
+                        'p': players,
+                        'l': self.log.latest
+                    }) + ";", 'utf-8'))
+                except Exception as e:
+                    print(e, file=sys.stderr)

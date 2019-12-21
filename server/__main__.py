@@ -6,9 +6,8 @@ from threading import Thread
 
 if __name__ == '__main__':
     pwd: str = os.path.dirname(__file__)
-    sys.path.append(os.path.abspath(os.path.join(pwd, '..')))
-    sys.path.append(os.path.abspath(os.path.join(pwd, '../payload')))
-    sys.path.append(os.path.abspath(os.path.join(pwd, '../server')))
+    for path in ('..', '../payload', '../client', '../server'):
+        sys.path.append(os.path.abspath(os.path.join(pwd, path)))
 
     ip, port = '', 8081
     room = Room(ip, port, os.path.join(pwd, '..', 'maps', 'map.bmp.json'))
@@ -24,3 +23,6 @@ if __name__ == '__main__':
             for player in room.players:
                 if player is not None:
                     player.disconnect()
+
+        except Exception as e:
+            print(e, file=sys.stderr)

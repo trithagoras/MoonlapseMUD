@@ -1,4 +1,5 @@
 import random
+import sys
 from typing import *
 
 
@@ -34,4 +35,7 @@ class Player:
         }
 
     def disconnect(self) -> None:
-        self.client_socket.close()
+        try:
+            self.client_socket.close()
+        except Exception as e:
+            print(e, file=sys.stderr)

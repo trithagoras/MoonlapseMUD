@@ -35,7 +35,6 @@ def main() -> None:
 
 if __name__ == '__main__':
     pwd: str = os.path.dirname(__file__)
-    sys.path.append(os.path.abspath(os.path.join(pwd, '..')))
-    sys.path.append(os.path.abspath(os.path.join(pwd, '../payload')))
-    sys.path.append(os.path.abspath(os.path.join(pwd, '../client')))
+    for path in ('..', '../payload', '../client', '../server'):
+        sys.path.append(os.path.abspath(os.path.join(pwd, path)))
     main()
