@@ -21,6 +21,8 @@ if __name__ == '__main__':
             for player in room.players:
                 if player is not None:
                     player.disconnect()
+            room.s.close()
+            exit()
 
         except Exception as e:
             print(e, file=sys.stderr)
