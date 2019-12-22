@@ -1,4 +1,5 @@
 import time
+import os
 
 
 class Log:
@@ -13,6 +14,8 @@ class Log:
         self.latest = {timestamp: message}
         self.state['log'].update(self.latest)
 
+        logdir: str = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'logs')
         datestr: str = time.strftime('%Y-%m-%d', time.gmtime())
-        with open(f"{datestr}.log", 'a') as f:
+        logfile: str = os.path.join(logdir, f"{datestr}.log")
+        with open(logfile, 'a') as f:
             print(f"{time.strftime('%R', time.gmtime(timestamp))}: {message}", file=f)
