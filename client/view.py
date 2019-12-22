@@ -13,14 +13,14 @@ class View:
         self.log_latest: dict = {}
 
         # Init window sizes
-        self.height, self.width = (46, 106)
+        self.height, self.width = (43, 106)
 
         self.win1_height, self.win1_width = (23, 53)
-        self.win1_y, self.win1_x = (9, 0)
+        self.win1_y, self.win1_x = (3, 0)
         self.win2_height, self.win2_width = (23, 53)
-        self.win2_y, self.win2_x = (9, 53)
+        self.win2_y, self.win2_x = (3, 53)
         self.win3_height, self.win3_width = (17, 106)
-        self.win3_y, self.win3_x = (32, 0)
+        self.win3_y, self.win3_x = (26, 0)
         self.chatwin_height, self.chatwin_width = (1, self.win3_width - 8)
         self.chatwin_y, self.chatwin_x = (self.win3_y + self.win3_height - self.chatwin_height - 1, self.win3_x + 7)
 
@@ -53,18 +53,18 @@ class View:
             stdscr.refresh()
         else:
             # Window controls labels
-            stdscr.hline(0, 0, curses.ACS_HLINE, self.width)
-            stdscr.addstr(0, 2, "Window Controls ")
-            stdscr.addstr(1, 2, "[1/2/3] Change window focus  [ENTER] Chat")
-            stdscr.addstr(3, 2, "[M] Map  [T] Travel")
-
-            stdscr.addstr(3, self.win2_x + 2, "[I] Inventory  [P] Spellbook  [B] Equipment")
-            stdscr.addstr(4, self.win2_x + 2, "[G] Guild      [K] Skills")
+            # stdscr.hline(0, 0, curses.ACS_HLINE, self.width)
+            # stdscr.addstr(0, 2, "Window Controls ")
+            # stdscr.addstr(1, 2, "[1/2/3] Change window focus  [ENTER] Chat")
+            # stdscr.addstr(3, 2, "[M] Map  [T] Travel")
+            #
+            # stdscr.addstr(3, self.win2_x + 2, "[I] Inventory  [P] Spellbook  [B] Equipment")
+            # stdscr.addstr(4, self.win2_x + 2, "[G] Guild      [K] Skills")
 
             # Map controls labels
-            stdscr.hline(6, 0, curses.ACS_HLINE, self.width)
-            stdscr.addstr(6, 2, "Map Controls ")
-            stdscr.addstr(7, 2, "[V] Look  [D] Pick up item  [E] Use/Equip  [←/→/↑/↓] Move  [</>] Use Stairs/Ladders")
+            stdscr.hline(0, 0, curses.ACS_HLINE, self.width)
+            stdscr.addstr(0, 2, "Map Controls ")
+            stdscr.addstr(1, 2, "[V] Look  [D] Pick up item  [E] Use/Equip  [←/→/↑/↓] Move  [</>] Use Stairs/Ladders")
 
             # Adding border to windows
             self.win1.border()
