@@ -139,9 +139,16 @@ class Game:
         except sock.error:
             pass
 
+    def validate_chatbox(self, k):
+        if k in (ord('\n'), ord('\r')):
+            return 7
+        if str(chr(k)) == '\b':
+            return 6
+        return k
+
     def handle_chatbox(self, curses: Curses) -> None:
         # https://stackoverflow.com/questions/36121802/python-curses-make-enter-key-terminate-textbox
-        message: str = self.chatbox.edit(lambda k: 7 if k in (ord('\n'), '\r') else k)
+        message: str = self.chatbox.edit(self.validate_chatbox)
         if len(message) > 0:
             self.chat(message)
         self.chatbox = None
