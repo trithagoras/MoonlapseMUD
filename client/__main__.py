@@ -26,7 +26,7 @@ def main() -> None:
         ncurses.wrapper(game.start, ncurses)
 
     except Exception as e:
-        ui_error = "Error: Connection refused. %s" % str(e)
+        ui_error = f"Error: Connection refused. {e}"
 
     if ui_error:
         print(ui_error, file=sys.stderr)

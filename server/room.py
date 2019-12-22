@@ -53,7 +53,7 @@ class Room:
 
             if player_id == -1:
                 try:
-                    client_socket.send(bytes("full;", 'utf-8'))
+                    client_socket.send(bytes('full;', 'utf-8'))
                     client_socket.close()
                     print(f"Connection from {address} rejected.")
                 except Exception as e:
@@ -72,7 +72,7 @@ class Room:
                 }
 
                 try:
-                    client_socket.send(bytes(json.dumps(init_data) + ";", 'utf-8'))
+                    client_socket.send(bytes(json.dumps(init_data) + ';', 'utf-8'))
                     self.players[player_id] = Player(client_socket, init_data)
                     threading.Thread(target=self.listen, args=(player_id,), daemon=True).start()
                 except Exception as e:
@@ -105,7 +105,7 @@ class Room:
                 action: str = data['a']
                 payload: str = data['p']
 
-                print("Received data from player %d: Action=%s, Payload=%s" % (player_id, action, payload))
+                print(f"Received data from player {player_id}: Action={action}, Payload={payload}")
 
                 pos = player.state['pos']
 
@@ -113,14 +113,11 @@ class Room:
                 if action == 'm':
                     if payload == 0 and pos['y'] - 1 > 0 and [pos['x'], pos['y'] - 1] not in self.walls:
                         pos['y'] -= 1
-                    if payload == 1 and pos['x'] + 1 < self.width - 1 and [pos['x'] + 1, pos['y']] \
-                            not in self.walls:
+                    if payload == 1 and pos['x'] + 1 < self.width - 1 and [pos['x'] + 1, pos['y']] not in self.walls:
                         pos['x'] += 1
-                    if payload == 2 and pos['y'] + 1 < self.height - 1 and [pos['x'], pos['y'] + 1] \
-                            not in self.walls:
+                    if payload == 2 and pos['y'] + 1 < self.height - 1 and [pos['x'], pos['y'] + 1] not in self.walls:
                         pos['y'] += 1
-                    if payload == 3 and pos['x'] - 1 > 0 and [pos['x'] - 1, pos['y']] not in \
-                            self.walls:
+                    if payload == 3 and pos['x'] - 1 > 0 and [pos['x'] - 1, pos['y']] not in self.walls:
                         pos['x'] -= 1
 
                 elif action == 'c':
@@ -130,7 +127,7 @@ class Room:
 
             except Exception as e:
                 print(e, file=sys.stderr)
-                break
+                continue
 
     def update_clients(self) -> None:
         players = []
