@@ -128,7 +128,7 @@ class Room:
 
             except Exception as e:
                 print(e, file=sys.stderr)
-                break
+                continue
 
     def update_clients(self) -> None:
         players = []
