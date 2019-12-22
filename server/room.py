@@ -17,10 +17,13 @@ class Room:
         self.max_players = 100
         self.tick_rate = 100
 
+        self.ip = ip
+        self.port = port
+
+        self.s = None
+
         try:
-            self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.s.bind((ip, port))
-            self.s.listen(16)
+            self.create_socket()
         except Exception as e:
             print(e, file=sys.stderr)
 
@@ -33,12 +36,20 @@ class Room:
         for index in range(0, self.max_players):
             self.players.append(None)
 
+    def create_socket(self):
+        if self.s:
+            self.s.close()
+        self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.s.bind((self.ip, self.port))
+        self.s.listen(16)
+
     def accept_clients(self) -> None:
         while True:
             try:
                 client_socket, address = self.s.accept()
-            except socket.error:
-                print("Socket error while accepting new client... Trying again.")
+            except socket.error as e:
+                print(f"Socket error while accepting new client ({e})... Trying again.")
+                self.create_socket()
                 time.sleep(1)
                 continue
             except Exception as e:
