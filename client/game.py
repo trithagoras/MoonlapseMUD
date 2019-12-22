@@ -139,11 +139,13 @@ class Game:
         except sock.error:
             pass
 
-    def validate_chatbox(self, k):
+    @staticmethod
+    def validate_chatbox(k):
+        # https://docs.python.org/3/library/curses.html#module-curses
         if k in (ord('\n'), ord('\r')):
             return 7
-        if str(chr(k)) == '\b':
-            return 6
+        if str(chr(k)) == '\b' or k == 127:
+            return 8
         return k
 
     def handle_chatbox(self, curses: Curses) -> None:
