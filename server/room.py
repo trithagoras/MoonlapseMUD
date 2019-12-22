@@ -124,6 +124,8 @@ class Room:
                         pos['x'] -= 1
 
                 elif action == 'c':
+                    payload = payload.replace(';', '\\;')
+                    payload = payload.replace('\\\\;', '\\;')
                     self.log.log(time.time(), f"Player {player_id} says: {payload}")
 
             except Exception as e:
