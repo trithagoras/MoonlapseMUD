@@ -6,7 +6,7 @@ from threading import Thread
 from typing import *
 from curses_helper import Window, Curses
 import curses.textpad as textpad
-from view import View
+from view import View, Window2Focus
 
 
 class Game:
@@ -22,7 +22,6 @@ class Game:
         self.tick_rate: int = -1
 
         # UI
-        self.focus: int = 1
         self.chatbox: Optional[textpad.Textbox] = None
         self.view: Optional[View] = None
 
@@ -99,11 +98,24 @@ class Game:
 
             # Changing window focus
             elif key in [ord('1'), ord('2'), ord('3')]:
-                self.focus = int(chr(key))
+                self.view.focus = int(chr(key))
+
+            # Changing window 2 focus
+            elif key == ord('?'):
+                self.view.win2_focus = Window2Focus.HELP
+            elif key == ord('k'):
+                self.view.win2_focus = Window2Focus.SKILLS
+            elif key == ord('i'):
+                self.view.win2_focus = Window2Focus.INVENTORY
+            elif key == ord('p'):
+                self.view.win2_focus = Window2Focus.SPELLBOOK
+            elif key == ord('g'):
+                self.view.win2_focus = Window2Focus.GUILD
+            elif key == ord('j'):
+                self.view.win2_focus = Window2Focus.JOURNAL
 
             # Chat
             elif key in (curses.KEY_ENTER, ord('\n'), ord('\r')) and self.view.win3 is not None:
-                self.focus = 4
                 self.chatbox = textpad.Textbox(self.view.chatwin)
                 curses.curs_set(True)
 
