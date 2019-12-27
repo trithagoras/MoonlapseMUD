@@ -14,52 +14,52 @@ class Curses:
     A_BLINK = curses.A_BLINK
     A_BOLD = curses.A_BOLD
     A_DIM = curses.A_DIM
-    A_INVIS = 0
-    A_ITALIC = 0
-    A_NORMAL = 0
-    A_PROTECT = 0
-    A_REVERSE = 0
-    A_STANDOUT = 0
-    A_UNDERLINE = 0
-    A_HORIZONTAL = 0
-    A_LEFT = 0
-    A_LOW = 0
-    A_RIGHT = 0
-    A_TOP = 0
-    A_VERTICAL = 0
-    A_CHARTEXT = 0
+    A_INVIS = curses.A_INVIS
+    # A_ITALIC = curses.A_ITALIC
+    A_NORMAL = curses.A_NORMAL
+    A_PROTECT = curses.A_PROTECT
+    A_REVERSE = curses.A_REVERSE
+    A_STANDOUT = curses.A_STANDOUT
+    A_UNDERLINE = curses.A_UNDERLINE
+    A_HORIZONTAL = curses.A_HORIZONTAL
+    A_LEFT = curses.A_LEFT
+    A_LOW = curses.A_LOW
+    A_RIGHT = curses.A_RIGHT
+    A_TOP = curses.A_TOP
+    A_VERTICAL = curses.A_VERTICAL
+    A_CHARTEXT = curses.A_CHARTEXT
 
-    A_ATTRIBUTES = 0
-    A_COLOR = 0
+    A_ATTRIBUTES = curses.A_ATTRIBUTES
+    A_COLOR = curses.A_COLOR
 
     # colors
-    COLOR_BLACK = 0
-    COLOR_BLUE = 0
-    COLOR_CYAN = 0
-    COLOR_GREEN = 0
-    COLOR_MAGENTA = 0
-    COLOR_RED = 0
-    COLOR_WHITE = 0
-    COLOR_YELLOW = 0
+    COLOR_BLACK = curses.COLOR_BLACK
+    COLOR_BLUE = curses.COLOR_BLUE
+    COLOR_CYAN = curses.COLOR_CYAN
+    COLOR_GREEN = curses.COLOR_GREEN
+    COLOR_MAGENTA = curses.COLOR_MAGENTA
+    COLOR_RED = curses.COLOR_RED
+    COLOR_WHITE = curses.COLOR_WHITE
+    COLOR_YELLOW = curses.COLOR_YELLOW
 
     # keys
-    KEY_MIN = 0
-    KEY_BREAK = 0
-    KEY_DOWN = 0
-    KEY_UP = 0
-    KEY_LEFT = 0
-    KEY_RIGHT = 0
-    KEY_HOME = 0
-    KEY_BACKSPACE = 0
-    KEY_F0 = 0
-    KEY_Fn = 0
-    KEY_DL = 0
-    KEY_DC = 0
-    KEY_IC = 0
-    KEY_EIC = 0
-    KEY_CLEAR = 0
-    KEY_EOS = 0
-    KEY_EOL = 0
+    KEY_MIN = curses.KEY_MIN
+    KEY_BREAK = curses.KEY_BREAK
+    KEY_DOWN = curses.KEY_DOWN
+    KEY_UP = curses.KEY_UP
+    KEY_LEFT = curses.KEY_LEFT
+    KEY_RIGHT = curses.KEY_RIGHT
+    KEY_HOME = curses.KEY_HOME
+    KEY_BACKSPACE = curses.KEY_BACKSPACE
+    KEY_F0 = curses.KEY_F0
+    #KEY_Fn = curses.KEY_F
+    KEY_DL = curses.KEY_DL
+    KEY_DC = curses.KEY_DC
+    KEY_IC = curses.KEY_IC
+    KEY_EIC = curses.KEY_EIC
+    KEY_CLEAR = curses.KEY_CLEAR
+    KEY_EOS = curses.KEY_EOS
+    KEY_EOL = curses.KEY_EOL
     KEY_SF = 0
     KEY_SR = 0
     KEY_NPAGE = 0
@@ -482,11 +482,15 @@ Window objects, as returned by initscr() and newwin(), have the following method
 
 
 class Window:
+    def __init__(self, window):
+        self.window: Window = window
+
     """
     Paint character ch at (y, x) with attributes attr, overwriting any character previously painter at that location.
     By default, the character position and attributes are the current settings for the window object.
     """
     def addch(self, y, x, ch, attr=None) -> None:
+        self.window.addch(y, x, ch, attr)
         pass
 
     """
