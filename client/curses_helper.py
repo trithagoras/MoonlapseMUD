@@ -1,20 +1,19 @@
-from __future__ import annotations
 from typing import *
+import curses
 
 
 # https://docs.python.org/3/library/curses.html#module-curses
 
 class Curses:
-    ERR = 0
-    OK = 0
-    version = 0
-    ncurses_version = 0
+    ERR = curses.ERR
+    OK = curses.OK
+    version = curses.version
 
     # attributes
-    A_ALTCHARSET = 0
-    A_BLINK = 0
-    A_BOLD = 0
-    A_DIM = 0
+    A_ALTCHARSET = curses.A_ALTCHARSET
+    A_BLINK = curses.A_BLINK
+    A_BOLD = curses.A_BOLD
+    A_DIM = curses.A_DIM
     A_INVIS = 0
     A_ITALIC = 0
     A_NORMAL = 0
@@ -180,226 +179,300 @@ class Curses:
     ACS_URCORNER = 0
     ACS_VLINE = 0
 
-    def baudrate(self):
-        pass
-
-    def beep(self):
-        pass
-
-    def can_change_color(self):
-        pass
-
-    def cbreak(self):
-        pass
-
-    def color_content(self, color_number):
-        pass
-
-    def color_pair(self, color_number):
-        pass
-
-    def curs_set(self, visibility):
-        pass
-
-    def def_prog_mode(self):
-        pass
-
-    def def_shell_mode(self):
-        pass
-
-    def delay_output(self, ms):
-        pass
-
-    def doupdate(self):
-        pass
-
-    def echo(self):
-        pass
-
-    def endwin(self):
-        pass
-
-    def erasechar(self):
-        pass
-
-    def filter(self):
-        pass
-
-    def flash(self):
-        pass
-
-    def flushinp(self):
-        pass
-
-    def getmouse(self):
-        pass
-
-    def getsyx(self):
-        pass
-
-    def getwin(self, file):
-        pass
-
-    def has_colors(self):
-        pass
-
-    def has_ic(self):
-        pass
-
-    def has_il(self):
-        pass
-
-    def has_key(self, ch):
-        pass
-
-    def halfdelay(self, tenths):
-        pass
-
-    def init_color(self, color_number, r, g, b):
-        pass
-
-    def init_pair(self, pair_number, fg, bg):
-        pass
-
-    def initscr(self):
-        pass
-
-    def is_term_resized(self, nlines, ncols):
-        pass
-
-    def isendwin(self):
-        pass
-
-    def keyname(self, k):
-        pass
-
-    def killchar(self):
-        pass
-
-    def longname(self):
-        pass
-
-    def meta(self, flag):
-        pass
-
-    def mouseinterval(self, interval):
-        pass
-
-    def mousemask(self, mousemask):
-        pass
-
-    def napms(self, ms):
-        pass
-
-    def newpad(self, nlines, ncols):
-        pass
-
-    def newwin(self, nlines, ncols, begin_y=0, begin_x=0):
-        pass
-
-    def nl(self):
-        pass
-
-    def nocbreak(self):
-        pass
-
-    def noecho(self):
-        pass
-
-    def nonl(self):
-        pass
-
-    def noqiflush(self):
-        pass
-
-    def noraw(self):
-        pass
-
-    def pair_content(self, pair_number):
-        pass
-
-    def pair_number(self, attr):
-        pass
-
-    def putp(self, string):
-        pass
-
-    def qiflush(self, flag=None):
-        pass
-
-    def raw(self):
-        pass
-
-    def reset_prog_mode(self):
-        pass
-
-    def reset_shell_mode(self):
-        pass
-
-    def resetty(self):
-        pass
-
-    def resize_term(self, nlines, ncols):
-        pass
-
-    def resizeterm(self, nlines, ncols):
-        pass
-
-    def savetty(self):
-        pass
-
-    def setsyx(self, y, x):
-        pass
-
-    def setupterm(self, term=None, fd=-1):
-        pass
-
-    def start_color(self):
-        pass
-
-    def termattrs(self):
-        pass
-
-    def termname(self):
-        pass
-
-    def tigetflag(self, capname):
-        pass
-
-    def tigetnum(self, capname):
-        pass
-
-    def tigetstr(self, capname):
-        pass
-
-    def tparm(self, string, *args):
-        pass
-
-    def typeahead(self, fd):
-        pass
-
-    def unctrl(self, ch):
-        pass
-
-    def ungetch(self, ch):
-        pass
-
-    def update_lines_cols(self):
-        pass
-
-    def unget_wch(self, ch):
-        pass
-
-    def ungetmouse(self, id, x, y, z, bstate):
-        pass
-
-    def use_env(self, flag):
-        pass
-
-    def use_default_colors(self):
-        pass
-
-    def wrapper(self, func, *args):
+    @staticmethod
+    def baudrate():
+        pass
+        
+    @staticmethod
+    def beep():
+        pass
+    
+    @staticmethod
+    def can_change_color():
+        pass
+    
+    @staticmethod
+    def cbreak():
+        pass
+    
+    @staticmethod
+    def color_content(color_number):
+        pass
+    
+    @staticmethod
+    def color_pair(color_number):
+        pass
+    
+    @staticmethod
+    def curs_set(visibility):
+        pass
+    
+    @staticmethod
+    def def_prog_mode():
+        pass
+    
+    @staticmethod
+    def def_shell_mode():
+        pass
+    
+    @staticmethod
+    def delay_output(ms):
+        pass
+    
+    @staticmethod
+    def doupdate():
+        pass
+    
+    @staticmethod
+    def echo():
+        pass
+    
+    @staticmethod
+    def endwin():
+        pass
+    
+    @staticmethod
+    def erasechar():
+        pass
+    
+    @staticmethod
+    def filter():
+        pass
+    
+    @staticmethod
+    def flash():
+        pass
+    
+    @staticmethod
+    def flushinp():
+        pass
+    
+    @staticmethod
+    def getmouse():
+        pass
+    
+    @staticmethod
+    def getsyx():
+        pass
+    
+    @staticmethod
+    def getwin(file):
+        pass
+    
+    @staticmethod
+    def has_colors():
+        pass
+    
+    @staticmethod
+    def has_ic():
+        pass
+    
+    @staticmethod
+    def has_il():
+        pass
+    
+    @staticmethod
+    def has_key(ch):
+        pass
+    
+    @staticmethod
+    def halfdelay(tenths):
+        pass
+    
+    @staticmethod
+    def init_color(color_number, r, g, b):
+        pass
+    
+    @staticmethod
+    def init_pair(pair_number, fg, bg):
+        pass
+    
+    @staticmethod
+    def initscr():
+        pass
+    
+    @staticmethod
+    def is_term_resized(nlines, ncols):
+        pass
+    
+    @staticmethod
+    def isendwin():
+        pass
+    
+    @staticmethod
+    def keyname(k):
+        pass
+    
+    @staticmethod
+    def killchar():
+        pass
+    
+    @staticmethod
+    def longname():
+        pass
+    
+    @staticmethod
+    def meta(flag):
+        pass
+    
+    @staticmethod
+    def mouseinterval(interval):
+        pass
+    
+    @staticmethod
+    def mousemask(mousemask):
+        pass
+    
+    @staticmethod
+    def napms(ms):
+        pass
+    
+    @staticmethod
+    def newpad(nlines, ncols):
+        pass
+    
+    @staticmethod
+    def newwin(nlines, ncols, begin_y=0, begin_x=0):
+        pass
+    
+    @staticmethod
+    def nl():
+        pass
+    
+    @staticmethod
+    def nocbreak():
+        pass
+    
+    @staticmethod
+    def noecho():
+        pass
+    
+    @staticmethod
+    def nonl():
+        pass
+    
+    @staticmethod
+    def noqiflush():
+        pass
+    
+    @staticmethod
+    def noraw():
+        pass
+    
+    @staticmethod
+    def pair_content(pair_number):
+        pass
+    
+    @staticmethod
+    def pair_number(attr):
+        pass
+    
+    @staticmethod
+    def putp(string):
+        pass
+    
+    @staticmethod
+    def qiflush(flag=None):
+        pass
+    
+    @staticmethod
+    def raw():
+        pass
+    
+    @staticmethod
+    def reset_prog_mode():
+        pass
+    
+    @staticmethod
+    def reset_shell_mode():
+        pass
+    
+    @staticmethod
+    def resetty():
+        pass
+    
+    @staticmethod
+    def resize_term(nlines, ncols):
+        pass
+    
+    @staticmethod
+    def resizeterm(nlines, ncols):
+        pass
+    
+    @staticmethod
+    def savetty():
+        pass
+    
+    @staticmethod
+    def setsyx(y, x):
+        pass
+    
+    @staticmethod
+    def setupterm(term=None, fd=-1):
+        pass
+    
+    @staticmethod
+    def start_color():
+        pass
+    
+    @staticmethod
+    def termattrs():
+        pass
+    
+    @staticmethod
+    def termname():
+        pass
+    
+    @staticmethod
+    def tigetflag(capname):
+        pass
+    
+    @staticmethod
+    def tigetnum(capname):
+        pass
+    
+    @staticmethod
+    def tigetstr(capname):
+        pass
+    
+    @staticmethod
+    def tparm(string, *args):
+        pass
+    
+    @staticmethod
+    def typeahead(fd):
+        pass
+    
+    @staticmethod
+    def unctrl(ch):
+        pass
+    
+    @staticmethod
+    def ungetch(ch):
+        pass
+    
+    @staticmethod
+    def update_lines_cols():
+        pass
+    
+    @staticmethod
+    def unget_wch(ch):
+        pass
+    
+    @staticmethod
+    def ungetmouse(id, x, y, z, bstate):
+        pass
+    
+    @staticmethod
+    def use_env(flag):
+        pass
+    
+    @staticmethod
+    def use_default_colors():
+        pass
+    
+    @staticmethod
+    def wrapper(func, *args):
         pass
 
 
@@ -541,7 +614,7 @@ class Window:
     are relative to the origin of the window, rather than relative to the entire screen. Return a window object 
     for the derived window.
     """
-    def derwin(self, nlines, ncols, begin_y, begin_x) -> Window:
+    def derwin(self, nlines, ncols, begin_y, begin_x) -> 'Window':
         pass
 
     """
@@ -884,14 +957,14 @@ class Window:
     """
     Return a sub-window, whose upper-left corner is at (begin_y, begin_x), and whose width/height is ncols/nlines.
     """
-    def subpad(self, nlines, ncols, begin_y, begin_x) -> Window:
+    def subpad(self, nlines, ncols, begin_y, begin_x) -> 'Window':
         pass
 
     """
     Return a sub-window, whose upper-left corner is at (begin_y, begin_x), and whose width/height is ncols/nlines.
     By default, the sub-window will extend from the specified position to the lower right corner of the window.
     """
-    def subwin(self, nlines, ncols, begin_y, begin_x) -> Window:
+    def subwin(self, nlines, ncols, begin_y, begin_x) -> 'Window':
         pass
 
     """
@@ -959,13 +1032,13 @@ class Panel:
     """
     Returns the panel above the current panel.
     """
-    def above(self) -> Panel:
+    def above(self) -> 'Panel':
         pass
 
     """
     Returns the panel below the current panel.
     """
-    def below(self) -> Panel:
+    def below(self) -> 'Panel':
         pass
 
     """
