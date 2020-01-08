@@ -1,29 +1,29 @@
 import json
-import threading
-import socket
 import sys
+import datetime
 import time
-from player import Player
-from log import Log
+import psycopg2
 from typing import *
+from player import Player
 
 
 class Room:
-    def __init__(self, ip, port, room_map):
-        self.players:  List[Optional[Player]] = []
-        self.log: Log = Log()
+    def __init__(self, tcpsrv, room_map, capacity):
         self.walls: set = set()
+        self.players: List[Optional[Player]] = []
+        self.capacity = capacity
 
-        self.max_players = 100
-        self.tick_rate = 100
-
-        self.ip = ip
-        self.port = port
-
-        self.s = None
+        self.tcpsrv = tcpsrv
+        self.dbconn = None
+        self.dbcurs = None
 
         try:
-            self.create_socket()
+            self.tcpsrv.connect_socket()
+        except Exception as e:
+            print(e, file=sys.stderr)
+
+        try:
+            self.connect_db()
         except Exception as e:
             print(e, file=sys.stderr)
 
@@ -33,130 +33,59 @@ class Room:
             self.width, self.height = map_data['size']
 
         # Create player spots in game object
-        for index in range(0, self.max_players):
+        for index in range(0, self.capacity):
             self.players.append(None)
 
-    def create_socket(self):
-        if self.s:
-            self.s.close()
-        self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.s.bind((self.ip, self.port))
-        self.s.listen(16)
+    def connect_db(self):
+        print("Connecting to database... ", end='')
+        if self.dbconn:
+            self.dbconn.close()
+        if self.dbcurs:
+            self.dbcurs.close()
 
-    def accept_clients(self) -> None:
-        while True:
-            try:
-                client_socket, address = self.s.accept()
-            except socket.error as e:
-                print(f"Socket error while accepting new client ({e})... Trying again.")
-                self.create_socket()
-                time.sleep(1)
-                continue
-            except Exception as e:
-                print(e, file=sys.stderr)
-                continue
+        with open('server/connectionstrings.json', 'r') as f:
+            cs = json.load(f)
 
-            player_id: int = -1
-            for index in range(0, len(self.players)):
-                if self.players[index] is None:
-                    player_id = index
-                    break
+        self.dbconn = psycopg2.connect(
+            user=cs['user'],
+            password=cs['password'],
+            host=cs['host'],
+            port=cs['port'],
+            database=cs['database']
+        )
 
-            if player_id == -1:
-                try:
-                    client_socket.send(bytes('full;', 'utf-8'))
-                    client_socket.close()
-                    print(f"Connection from {address} rejected.")
-                except Exception as e:
-                    print(e, file=sys.stderr)
-                    continue
+        self.dbcurs = self.dbconn.cursor()
 
-            elif player_id != -1:
-                print(f"Connection from {address}. Assigning to player {player_id}")
-                self.log.log(time.time(), f"Player {player_id} has arrived.")
-                init_data = {
-                  'id': player_id,
-                  'w': self.width,
-                  'h': self.height,
-                  'walls': self.walls,
-                  't': self.tick_rate
-                }
+        p = self.dbconn.get_dsn_parameters()
+        print(f"done: host={p['host']}, port={p['port']}, dbname={p['dbname']}, user={p['user']}")
 
-                try:
-                    client_socket.send(bytes(json.dumps(init_data) + ';', 'utf-8'))
-                    self.players[player_id] = Player(client_socket, init_data)
-                    threading.Thread(target=self.listen, args=(player_id,), daemon=True).start()
-                except Exception as e:
-                    print(e)
-                    continue
+    def register_player(self, connection, username, password):
+        cursor = connection.cursor()
+
+        cursor.execute(f"""
+            INSERT INTO users (username, password)
+            VALUES ('{username}', '{password}')
+            RETURNING id;
+        """)
+        userid = cursor.fetchone()[0]
+
+        now = str(datetime.datetime.utcnow())
+        cursor.execute(f"""
+            INSERT INTO entities (type, lastupdated)
+            VALUES ('Player', '{now}')
+            RETURNING id;
+        """)
+        entityid = cursor.fetchone()[0]
+
+        cursor.execute(f"""
+            INSERT INTO players (entityid, userid, name, locationid) 
+            VALUES ({entityid}, {userid}, '{username}', 1);
+        """)
+
+        connection.commit()
 
     def kick(self, player_id: int):
         self.players[player_id].disconnect()
-        self.log.log(time.time(), f"Player {player_id} has departed.")
+        self.tcpsrv.log.log(time.time(), f"Player {player_id} has departed.")
         self.players[player_id] = None
         print(f"Kicked player {player_id}")
-
-    def listen(self, player_id) -> None:
-        while True:
-            player = self.players[player_id]
-            data = ''
-            try:
-                while True:
-                    data += player.client_socket.recv(1024).decode('utf-8')
-
-                    if data[-1] == ';':
-                        break
-
-            except socket.error:
-                self.kick(player_id)
-                break
-
-            try:
-                data = json.loads(data[:-1])
-                action: str = data['a']
-                payload: str = data['p']
-
-                print(f"Received data from player {player_id}: Action={action}, Payload={payload}")
-
-                pos = player.state['pos']
-
-                # Move
-                if action == 'm':
-                    if payload == 0 and pos['y'] - 1 > 0 and [pos['x'], pos['y'] - 1] not in self.walls:
-                        pos['y'] -= 1
-                    if payload == 1 and pos['x'] + 1 < self.width - 1 and [pos['x'] + 1, pos['y']] not in self.walls:
-                        pos['x'] += 1
-                    if payload == 2 and pos['y'] + 1 < self.height - 1 and [pos['x'], pos['y'] + 1] not in self.walls:
-                        pos['y'] += 1
-                    if payload == 3 and pos['x'] - 1 > 0 and [pos['x'] - 1, pos['y']] not in self.walls:
-                        pos['x'] -= 1
-
-                elif action == 'c':
-                    payload = payload.replace(';', '\\;')
-                    payload = payload.replace('\\\\;', '\\;')
-                    self.log.log(time.time(), f"Player {player_id} says: {payload}")
-
-            except Exception as e:
-                print(e, file=sys.stderr)
-                continue
-
-    def update_clients(self) -> None:
-        players = []
-
-        for index in range(0, len(self.players)):
-            player = self.players[index]
-            players.append(player.state if player else None)
-
-        for player in self.players:
-            if player:
-                try:
-                    player.client_socket.send(bytes(json.dumps({
-                        'p': players,
-                        'l': self.log.latest
-                    }) + ";", 'utf-8'))
-                except socket.error:
-                    self.kick(player.player_id)
-                    continue
-                except Exception as e:
-                    print(e, file=sys.stderr)
-                    continue

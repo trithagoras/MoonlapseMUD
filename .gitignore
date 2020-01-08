@@ -1,3 +1,4 @@
 *.pyproj
 .vs/*
 *.log
+server/connectionstrings.json
