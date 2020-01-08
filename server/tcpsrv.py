@@ -11,10 +11,11 @@ from threading import Thread
 
 
 class TcpServer:
-    def __init__(self, ip, port):
+    def __init__(self, ip, port, database):
         self.ip = ip
         self.port = port
         self.sock = None
+        self.database = database
 
         self.log: Log = Log()
         self.tick_rate = 100
@@ -25,6 +26,8 @@ class TcpServer:
         ]
 
     def start(self):
+        self.connect_database()
+
         Thread(target=self.accept_clients, daemon=True).start()
         while True:
             try:
@@ -52,6 +55,12 @@ class TcpServer:
         self.sock.listen(16)
 
         print(f"done: {self.sock.getsockname()}")
+
+    def connect_database(self):
+        try:
+            self.database.connect()
+        except Exception as e:
+            print(e, file=sys.stderr)
 
     def accept_clients(self) -> None:
         while True:

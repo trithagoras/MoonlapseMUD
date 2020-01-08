@@ -14,16 +14,9 @@ class Room:
         self.capacity = capacity
 
         self.tcpsrv = tcpsrv
-        self.dbconn = None
-        self.dbcurs = None
 
         try:
             self.tcpsrv.connect_socket()
-        except Exception as e:
-            print(e, file=sys.stderr)
-
-        try:
-            self.connect_db()
         except Exception as e:
             print(e, file=sys.stderr)
 
@@ -35,54 +28,6 @@ class Room:
         # Create player spots in game object
         for index in range(0, self.capacity):
             self.players.append(None)
-
-    def connect_db(self):
-        print("Connecting to database... ", end='')
-        if self.dbconn:
-            self.dbconn.close()
-        if self.dbcurs:
-            self.dbcurs.close()
-
-        with open('server/connectionstrings.json', 'r') as f:
-            cs = json.load(f)
-
-        self.dbconn = psycopg2.connect(
-            user=cs['user'],
-            password=cs['password'],
-            host=cs['host'],
-            port=cs['port'],
-            database=cs['database']
-        )
-
-        self.dbcurs = self.dbconn.cursor()
-
-        p = self.dbconn.get_dsn_parameters()
-        print(f"done: host={p['host']}, port={p['port']}, dbname={p['dbname']}, user={p['user']}")
-
-    def register_player(self, connection, username, password):
-        cursor = connection.cursor()
-
-        cursor.execute(f"""
-            INSERT INTO users (username, password)
-            VALUES ('{username}', '{password}')
-            RETURNING id;
-        """)
-        userid = cursor.fetchone()[0]
-
-        now = str(datetime.datetime.utcnow())
-        cursor.execute(f"""
-            INSERT INTO entities (type, lastupdated)
-            VALUES ('Player', '{now}')
-            RETURNING id;
-        """)
-        entityid = cursor.fetchone()[0]
-
-        cursor.execute(f"""
-            INSERT INTO players (entityid, userid, name, locationid) 
-            VALUES ({entityid}, {userid}, '{username}', 1);
-        """)
-
-        connection.commit()
 
     def kick(self, player_id: int):
         self.players[player_id].disconnect()
