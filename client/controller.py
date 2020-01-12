@@ -41,7 +41,7 @@ class Menu(Controller):
                 if fn is not None:
                     fn()
             elif key == ord('q'):
-                exit()
+                self.view.stop() 
 
         except KeyboardInterrupt:
             exit()
@@ -63,14 +63,17 @@ class MainMenu(Menu):
     def play(self):
         game = Game(self.hostname, self.port)
         game.start()
+        self.start()
 
     def login(self):
         loginmenu = LoginMenu()
         loginmenu.start()
+        self.start()
 
     def register(self):
         registermenu = RegisterMenu()
         registermenu.start()
+        self.start()
 
 
 class LoginMenu(Menu):
@@ -133,6 +136,9 @@ class Game(Controller):
         self.player_id = data['id']
         self.walls = data['walls']
         self.tick_rate = data['t']
+
+    def disconnect(self) -> None:
+        self.s.close()
 
     def start(self) -> None:
         self.connect()
@@ -201,10 +207,12 @@ class Game(Controller):
                 ncurses.curs_set(True)
 
             elif key == ord('q'):
-                exit()
+                self.disconnect()
+                self.view.stop()
 
         except KeyboardInterrupt:
-            exit()
+           self.disconnect()
+           exit()
 
         if self.chatbox is not None:
             self.handle_chatbox()

@@ -13,6 +13,8 @@ class View:
         self.height, self.width = (43, 106)
         self.stdscr: Optional[Window] = None
 
+        self.running = True
+
     def display(self, stdscr: Window):
         self.stdscr = stdscr
 
@@ -27,7 +29,7 @@ class View:
         ncurses.init_pair(5, ncurses.COLOR_GREEN, ncurses.COLOR_BLACK)
         ncurses.init_pair(6, ncurses.COLOR_MAGENTA, ncurses.COLOR_BLACK)
 
-        while True:
+        while self.running:
             self.stdscr.erase()
             self.draw()
             self.stdscr.refresh()
@@ -38,6 +40,9 @@ class View:
         # Max terminal size
         if self.stdscr.getmaxyx() < (self.height, self.width):
             self.stdscr.addstr(0, 0, f"Must be {self.height} rows x {self.width} cols")
+
+    def stop(self) -> None:
+        self.running = False
 
 
 class MenuView(View):
@@ -60,7 +65,7 @@ class MenuView(View):
 class GameView(View):
     def __init__(self, game):
         super().__init__(game)
-        
+
         self.game = game
         self.log: dict = {}
         self.log_latest: dict = {}
