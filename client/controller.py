@@ -4,13 +4,101 @@ import sys
 import time
 from threading import Thread
 from typing import *
-from curses_helper import Window, Curses
 import curses.textpad as textpad
-from view import View, Window2Focus
+from view import GameView, Window2Focus, MenuView, View
+import curses as ncurses
 
 
-class Game:
+class Controller:
+    def __init__(self):
+        self.view: View = View(self)
+
+    def start(self):
+        ncurses.wrapper(self.view.display)
+
+    def get_input(self) -> None:
+        pass
+
+
+class Menu(Controller):
+    def __init__(self, menu):
+        super().__init__()
+        self.menu = menu
+        self.cursor: int = 0
+        self.view = MenuView(self)
+
+    def get_input(self) -> None:
+        try:
+            key = self.view.stdscr.getch()
+
+            # Movement
+            if key == ncurses.KEY_UP:
+                self.cursor = max(self.cursor - 1, 0)
+            elif key == ncurses.KEY_DOWN:
+                self.cursor = min(self.cursor + 1, len(self.menu) - 1)
+            elif key in (ncurses.KEY_ENTER, ord('\n'), ord('\r')):
+                fn = self.menu[list(self.menu.keys())[self.cursor]]
+                if fn is not None:
+                    fn()
+            elif key == ord('q'):
+                exit()
+
+        except KeyboardInterrupt:
+            exit()
+
+
+class MainMenu(Menu):
+    def __init__(self, hostname, port):
+        super().__init__({
+            "Play": self.play,
+            "Login": self.login,
+            "Register": self.register
+        })
+
+        self.hostname =  hostname
+        self.port = port
+
+        self.view = MenuView(self, f"Welcome to {hostname}:{port}")
+
+    def play(self):
+        game = Game(self.hostname, self.port)
+        game.start()
+
+    def login(self):
+        loginmenu = LoginMenu()
+        loginmenu.start()
+
+    def register(self):
+        registermenu = RegisterMenu()
+        registermenu.start()
+
+
+class LoginMenu(Menu):
+    def __init__(self):
+        super().__init__({
+            "Username": None,
+            "Password": None,
+            "Remember me": None
+        })
+
+        self.view = MenuView(self, "Login")
+
+
+class RegisterMenu(Menu):
+    def __init__(self):
+        super().__init__({
+            "Email": None,
+            "Username": None,
+            "Password": None,
+            "Sign up for newsletter": None
+        })
+
+        self.view = MenuView(self, "Registration")
+
+
+class Game(Controller):
     def __init__(self, host: str, port: int):
+        super().__init__()
         self.s: sock.socket = sock.socket(sock.AF_INET, sock.SOCK_STREAM)
         self.address: Tuple[str, int] = (host, port)
 
@@ -23,7 +111,7 @@ class Game:
 
         # UI
         self.chatbox: Optional[textpad.Textbox] = None
-        self.view: Optional[View] = None
+        self.view = GameView(self)
 
     def connect(self) -> None:
         self.s.connect(self.address)
@@ -46,24 +134,17 @@ class Game:
         self.walls = data['walls']
         self.tick_rate = data['t']
 
-    def start(self, stdscr: Window, curses: Curses) -> None:
+    def start(self) -> None:
+        self.connect()
+
         # Listen for game data in its own thread
         Thread(target=self.load_data, daemon=True).start()
-
-        # Initialise the view
-        self.view = View(stdscr, curses, self)
 
         # Don't use game data until it's been received
         while self.game_data == {}:
             time.sleep(0.2)
 
-        while True:
-            self.view.draw(stdscr, curses)
-            if stdscr.getmaxyx() < (self.view.height, self.view.width):
-                time.sleep(0.2)
-                continue
-
-            self.get_player_input(stdscr, curses)
+        super().start()
 
     def load_data(self) -> None:
         message = ""
@@ -82,18 +163,18 @@ class Game:
             except sock.error:
                 message = ""
 
-    def get_player_input(self, stdscr: Window, curses: Curses) -> None:
+    def get_input(self) -> None:
         try:
-            key = stdscr.getch()
+            key = self.view.stdscr.getch()
 
             # Movement
-            if key == curses.KEY_UP:
+            if key == ncurses.KEY_UP:
                 self.move(0)
-            elif key == curses.KEY_RIGHT:
+            elif key == ncurses.KEY_RIGHT:
                 self.move(1)
-            elif key == curses.KEY_DOWN:
+            elif key == ncurses.KEY_DOWN:
                 self.move(2)
-            elif key == curses.KEY_LEFT:
+            elif key == ncurses.KEY_LEFT:
                 self.move(3)
 
             # Changing window focus
@@ -115,9 +196,9 @@ class Game:
                 self.view.win2_focus = Window2Focus.JOURNAL
 
             # Chat
-            elif key in (curses.KEY_ENTER, ord('\n'), ord('\r')) and self.view.win3 is not None:
+            elif key in (ncurses.KEY_ENTER, ord('\n'), ord('\r')) and self.view.win3 is not None:
                 self.chatbox = textpad.Textbox(self.view.chatwin)
-                curses.curs_set(True)
+                ncurses.curs_set(True)
 
             elif key == ord('q'):
                 exit()
@@ -126,7 +207,7 @@ class Game:
             exit()
 
         if self.chatbox is not None:
-            self.handle_chatbox(curses)
+            self.handle_chatbox()
 
     def move(self, direction: int) -> None:
         try:
@@ -156,15 +237,15 @@ class Game:
         # https://docs.python.org/3/library/curses.html#module-curses
         if k in (ord('\n'), ord('\r')):
             return 7
-        if str(chr(k)) == '\b' or k == 127:
+        if k == 127:
             return 8
         return k
 
-    def handle_chatbox(self, curses: Curses) -> None:
+    def handle_chatbox(self) -> None:
         # https://stackoverflow.com/questions/36121802/python-curses-make-enter-key-terminate-textbox
         message: str = self.chatbox.edit(self.validate_chatbox)
         if len(message) > 0:
             self.chat(message)
         self.chatbox = None
         self.view.chatwin.clear()
-        curses.curs_set(False)
+        ncurses.curs_set(False)

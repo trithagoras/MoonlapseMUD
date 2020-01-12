@@ -1,8 +1,6 @@
 import json
 import sys
-import datetime
 import time
-import psycopg2
 from typing import *
 from player import Player
 
