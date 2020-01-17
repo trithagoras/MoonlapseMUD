@@ -101,45 +101,46 @@ class View:
                 self.title(self.win3, "[3] Log")
 
             # Window 1 content
-            for index in range(0, len(self.game.game_data['p'])):
-                player = self.game.game_data['p'][index]
-
-                if player is not None:
-                    self.win1.addch(player['pos']['y'] + 1, player['pos']['x'], player['c'])
-
-            for wall in self.game.walls:
-                self.win1.addch(wall[1] + 1, wall[0], '█')
+            self.draw_map()
 
             # Window 2 content
             if self.win2_focus == Window2Focus.SKILLS:
-                self.status_win()
+                self.draw_status_win()
             elif self.win2_focus == Window2Focus.HELP:
-                self.help_win()
+                self.draw_help_win()
 
             # Window 3 content
-            self.win3.hline(self.win3_height - 3, 1, curses.ACS_HLINE, self.win3_width - 2)
+            self.draw_log(curses)
 
-            # Fill the log
-            if self.game.game_data['l'] and self.game.game_data['l'] != self.log_latest:
-                self.log.update(self.game.game_data['l'])
-                self.log_latest = self.game.game_data['l']
+    def draw_map(self):
+        # Window 1 content
+        sight_radius = 10
 
-            if self.log != {}:
-                log_keys = list(self.log.keys())
-                # Strip the old logs that can't fit in the window.
-                log_keys = log_keys[max(0, len(log_keys) - self.win3_height + self.chatwin_height + 4):]
+        player = self.game.game_data['p'][self.game.player_id]
 
-                log_line: int = 2
-                for k in log_keys:
-                    timestamp: str = time.strftime('%R', time.localtime(float(k)))
-                    message: str = self.log[k]
-                    self.win3.addstr(log_line, 1, f" [{timestamp}] {message}")
-                    log_line += 1
+        for row in range(-sight_radius, sight_radius + 1):
+            for col in range(-sight_radius, sight_radius + 1):
 
-            # Add chat prompt
-            self.win3.addstr(15, 2, "Say: ")
+                pos = (player['pos']['y'] + row, player['pos']['x'] + col)
 
-    def help_win(self):
+                if self.coordinate_exists(pos[0], pos[1]):
+                    # drawing walls
+                    if [pos[1], pos[0]] in self.game.walls:
+                        self.win1.addch(11 + row, 26 + col * 2, '█')
+                    else:
+                        self.win1.addch(11 + row, 26 + col * 2, '·')
+
+                    # drawing other players
+                    for index in range(0, len(self.game.game_data['p'])):
+                        other_player = self.game.game_data['p'][index]
+                        if other_player is not None and other_player is not player:
+                            if (other_player['pos']['y'], other_player['pos']['x']) == pos:
+                                self.win1.addch(11 + row, 26 + col * 2, 'P')
+
+        # drawing player to centre of screen
+        self.win1.addch(11, 26, '☺')
+
+    def draw_help_win(self):
         self.win2.addstr(2, 2, "Navigating the 3 game panels can be done with the")
         self.win2.addstr(3, 2, "[1], [2], [3] keys.")
         self.win2.addstr(4, 2, "Controls for each focused panel is shown above.")
@@ -156,7 +157,7 @@ class View:
         self.win2.addstr(15, 2, "[G] Guild / Social")
         self.win2.addstr(16, 2, "[J] Journal")
 
-    def status_win(self):
+    def draw_status_win(self):
         self.win2.addstr(1, 2, "coreyb65, Guardian of Forgotten Moor")
         self.win2.addstr(3, 2, f"Level 15 {self.progress_bar(7, 10)} (7/10 skill levels to 16)")
 
@@ -177,6 +178,30 @@ class View:
         self.win2.addstr(19, 2, f"Enchanting    31/31 {self.progress_bar(3, 10)} (3,000/10,000)")
         self.win2.addstr(20, 2, f"??????????    31/31 {self.progress_bar(3, 10)} (3,000/10,000)")
 
+    def draw_log(self, curses: Curses):
+        # Window 3 content
+        self.win3.hline(self.win3_height - 3, 1, curses.ACS_HLINE, self.win3_width - 2)
+
+        # Fill the log
+        if self.game.game_data['l'] and self.game.game_data['l'] != self.log_latest:
+            self.log.update(self.game.game_data['l'])
+            self.log_latest = self.game.game_data['l']
+
+        if self.log != {}:
+            log_keys = list(self.log.keys())
+            # Strip the old logs that can't fit in the window.
+            log_keys = log_keys[max(0, len(log_keys) - self.win3_height + self.chatwin_height + 4):]
+
+            log_line: int = 2
+            for k in log_keys:
+                timestamp: str = time.strftime('%R', time.localtime(float(k)))
+                message: str = self.log[k]
+                self.win3.addstr(log_line, 1, f" [{timestamp}] {message}")
+                log_line += 1
+
+        # Add chat prompt
+        self.win3.addstr(15, 2, "Say: ")
+
     @staticmethod
     def progress_bar(value: float, max_value: float) -> str:
         percent = int(10 * (value / max_value)) + 1
@@ -191,6 +216,9 @@ class View:
             window.addstr(0, 2, f"{s} ")
         else:
             window.addstr(0, 2, f"{s} ", ncurses.color_pair(3))
+
+    def coordinate_exists(self, y: int, x: int) -> bool:
+        return 0 <= y < self.game.size[0] and 0 <= x < self.game.size[1]
 
 
 class Window2Focus:
