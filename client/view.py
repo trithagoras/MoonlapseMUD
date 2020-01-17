@@ -135,10 +135,11 @@ class View:
                         other_player = self.game.game_data['p'][index]
                         if other_player is not None and other_player is not player:
                             if (other_player['pos']['y'], other_player['pos']['x']) == pos:
-                                self.win1.addch(11 + row, 26 + col * 2, 'P')
+                                self.win1.addch(11 + row, 26 + col * 2, '☺')
 
         # drawing player to centre of screen
-        self.win1.addch(11, 26, '☺')
+        self.win1.addch(11, 26, '☻')
+
 
     def draw_help_win(self):
         self.win2.addstr(2, 2, "Navigating the 3 game panels can be done with the")
