@@ -1,4 +1,5 @@
 import curses as ncurses
+from curses import textpad
 from typing import *
 
 from curses_helper import Window, Curses
@@ -56,10 +57,35 @@ class MenuView(View):
             string = list(self.controller.menu.keys())[i]
             if i == self.controller.cursor:
                 string += ' *'
-            self.stdscr.addstr(6 + i, 5, string)
+            self.stdscr.addstr(6 + i * 3, 5, string)
 
         if self.title is not None:
             self.stdscr.addstr(5, 5, self.title)
+
+
+class LoginView(MenuView):
+    def __init__(self, controller):
+        self.username: str = ''
+        self.password: str = ''
+        super().__init__(controller)
+
+    def display(self, stdscr: Window):
+        self.win1: Window = stdscr.subwin(1, 20, 6, 20)
+        self.win2: Window = stdscr.subwin(1, 20, 9, 20)
+
+        self.usernamebox = textpad.Textbox(self.win1)
+        self.passwordbox = textpad.Textbox(self.win2)
+
+        super().display(stdscr)
+
+    def draw(self):
+        try:
+            self.win1.addstr(0, 0, self.controller.username)
+            self.win2.addstr(0, 0, self.controller.password)
+        except ncurses.error as e:
+            self.title = str(e)
+        super().draw()
+        self.stdscr.move(6 + self.controller.cursor * 3, 21)
 
 
 class GameView(View):
@@ -80,15 +106,13 @@ class GameView(View):
         self.chatwin_y, self.chatwin_x = (self.win3_y + self.win3_height - self.chatwin_height - 1, self.win3_x + 7)
 
     def display(self, stdscr: Window):
-        self.stdscr = stdscr
-
-        self.stdscr.timeout(round(1000 / self.game.tick_rate))
+        stdscr.timeout(round(1000 / self.game.tick_rate))
 
         # Init windows
-        self.win1: Window = self.stdscr.subwin(self.win1_height, self.win1_width, self.win1_y, self.win1_x)
-        self.win2: Window = self.stdscr.subwin(self.win2_height, self.win2_width, self.win2_y, self.win2_x)
-        self.win3: Window = self.stdscr.subwin(self.win3_height, self.win3_width, self.win3_y, self.win3_x)
-        self.chatwin: Window = self.stdscr.subwin(self.chatwin_height, self.chatwin_width, self.chatwin_y, self.chatwin_x)
+        self.win1: Window = stdscr.subwin(self.win1_height, self.win1_width, self.win1_y, self.win1_x)
+        self.win2: Window = stdscr.subwin(self.win2_height, self.win2_width, self.win2_y, self.win2_x)
+        self.win3: Window = stdscr.subwin(self.win3_height, self.win3_width, self.win3_y, self.win3_x)
+        self.chatwin: Window = stdscr.subwin(self.chatwin_height, self.chatwin_width, self.chatwin_y, self.chatwin_x)
 
         # Window 2 and focus
         self.focus = 1

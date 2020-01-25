@@ -5,7 +5,7 @@ import time
 from threading import Thread
 from typing import *
 import curses.textpad as textpad
-from view import GameView, Window2Focus, MenuView, View
+from view import GameView, Window2Focus, MenuView, View, LoginView
 import curses as ncurses
 
 
@@ -18,6 +18,15 @@ class Controller:
 
     def get_input(self) -> None:
         pass
+
+    @staticmethod
+    def validate_textbox(k):
+        # https://docs.python.org/3/library/curses.html#module-curses
+        if k in (ord('\n'), ord('\r')):
+            return 7
+        if k == 127:
+            return 8
+        return k
 
 
 class Menu(Controller):
@@ -41,7 +50,7 @@ class Menu(Controller):
                 if fn is not None:
                     fn()
             elif key == ord('q'):
-                self.view.stop() 
+                self.view.stop()
 
         except KeyboardInterrupt:
             exit()
@@ -55,7 +64,7 @@ class MainMenu(Menu):
             "Register": self.register
         })
 
-        self.hostname =  hostname
+        self.hostname = hostname
         self.port = port
 
         self.view = MenuView(self, f"Welcome to {hostname}:{port}")
@@ -78,13 +87,49 @@ class MainMenu(Menu):
 
 class LoginMenu(Menu):
     def __init__(self):
+        self.username: str = ''
+        self.password: str = ''
+
         super().__init__({
-            "Username": None,
-            "Password": None,
+            "Username": self.login,
+            "Password": self.login,
             "Remember me": None
         })
 
-        self.view = MenuView(self, "Login")
+        self.view = LoginView(self)
+
+    def start(self):
+        super().start()
+
+    def get_input(self) -> None:
+        try:
+            key = self.view.stdscr.getch()
+            # Only trigger for alphanumeric key presses
+            if key == ncurses.KEY_UP:
+                self.cursor = max(self.cursor - 1, 0)
+            elif key == ncurses.KEY_DOWN:
+                self.cursor = min(self.cursor + 1, len(self.menu) - 1)
+            elif key in (ncurses.KEY_ENTER, ord('\n'), ord('\r')):
+                fn = self.menu[list(self.menu.keys())[self.cursor]]
+                if fn is not None:
+                    fn()
+            elif key == ord('q'):
+                self.view.stop()
+            elif key in range(32, 127):
+                self.handle_box()
+        except KeyboardInterrupt:
+            exit()
+
+    def login(self):
+        self.view.title = f"Logged in as {self.username} with password {self.password}"
+
+    def handle_box(self) -> None:
+        ncurses.curs_set(True)
+        if self.cursor == 0:
+            self.username = self.view.usernamebox.edit(self.validate_textbox)
+        elif self.cursor == 1:
+            self.password = self.view.passwordbox.edit(self.validate_textbox)
+        ncurses.curs_set(False)
 
 
 class RegisterMenu(Menu):
@@ -240,18 +285,10 @@ class Game(Controller):
         except sock.error:
             pass
 
-    @staticmethod
-    def validate_chatbox(k):
-        # https://docs.python.org/3/library/curses.html#module-curses
-        if k in (ord('\n'), ord('\r')):
-            return 7
-        if k == 127:
-            return 8
-        return k
 
     def handle_chatbox(self) -> None:
         # https://stackoverflow.com/questions/36121802/python-curses-make-enter-key-terminate-textbox
-        message: str = self.chatbox.edit(self.validate_chatbox)
+        message: str = self.chatbox.edit(self.validate_textbox)
         if len(message) > 0:
             self.chat(message)
         self.chatbox = None
