@@ -57,25 +57,25 @@ class Menu(Controller):
 
 
 class MainMenu(Menu):
-    def __init__(self, hostname, port):
+    def __init__(self, host, port):
         super().__init__({
             "Play": self.play,
             "Login": self.login,
             "Register": self.register
         })
 
-        self.hostname = hostname
+        self.host = host
         self.port = port
 
-        self.view = MenuView(self, f"Welcome to {hostname}:{port}")
+        self.view = MenuView(self, f"Welcome to {host}:{port}")
 
     def play(self):
-        game = Game(self.hostname, self.port)
+        game = Game(self.host, self.port)
         game.start()
         self.start()
 
     def login(self):
-        loginmenu = LoginMenu()
+        loginmenu = LoginMenu(self.host, self.port)
         loginmenu.start()
         self.start()
 
@@ -86,9 +86,12 @@ class MainMenu(Menu):
 
 
 class LoginMenu(Menu):
-    def __init__(self):
+    def __init__(self, host, port):
         self.username: str = ''
         self.password: str = ''
+
+        self.s: sock.socket = sock.socket(sock.AF_INET, sock.SOCK_STREAM)
+        self.address = (host, port)
 
         super().__init__({
             "Username": self.login,
@@ -99,6 +102,7 @@ class LoginMenu(Menu):
         self.view = LoginView(self)
 
     def start(self):
+        self.s.connect(self.address)
         super().start()
 
     def get_input(self) -> None:
@@ -109,7 +113,7 @@ class LoginMenu(Menu):
                 self.cursor = max(self.cursor - 1, 0)
             elif key == ncurses.KEY_DOWN:
                 self.cursor = min(self.cursor + 1, len(self.menu) - 1)
-            elif key in (ncurses.KEY_ENTER, ord('\n'), ord('\r')):
+            elif key in (ncurses.KEY_ENTER, ord('\n'), ord('\r')) and self.username != '' and self.password != '':
                 fn = self.menu[list(self.menu.keys())[self.cursor]]
                 if fn is not None:
                     fn()
@@ -122,13 +126,22 @@ class LoginMenu(Menu):
 
     def login(self):
         self.view.title = f"Logged in as {self.username} with password {self.password}"
+        try:
+            # Action: move, Payload: direction
+            self.s.send(bytes(json.dumps({
+                'a': 'login',
+                'p': self.username,
+                'p2': self.password
+            }) + ';', 'utf-8'))
+        except sock.error as e:
+            self.view.title = str(e)
 
     def handle_box(self) -> None:
         ncurses.curs_set(True)
         if self.cursor == 0:
-            self.username = self.view.usernamebox.edit(self.validate_textbox)
+            self.username = self.view.usernamebox.edit(self.validate_textbox).strip()
         elif self.cursor == 1:
-            self.password = self.view.passwordbox.edit(self.validate_textbox)
+            self.password = self.view.passwordbox.edit(self.validate_textbox).strip()
         ncurses.curs_set(False)
 
 
@@ -284,7 +297,6 @@ class Game(Controller):
             }) + ';', 'utf-8'))
         except sock.error:
             pass
-
 
     def handle_chatbox(self) -> None:
         # https://stackoverflow.com/questions/36121802/python-curses-make-enter-key-terminate-textbox

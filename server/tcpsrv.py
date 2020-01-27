@@ -130,8 +130,12 @@ class TcpServer:
                     data = json.loads(data[:-1])
                     action: str = data['a']
                     payload: str = data['p']
+                    try:
+                        payload2 = data['p2']
+                    except KeyError:
+                        payload2 = ''
 
-                    print(f"Received data from player {player_id}: Action={action}, Payload={payload}")
+                    print(f"Received data from player {player_id}: Action={action}, Payload={payload}:{payload2}")
 
                     pos = player.state['pos']
 
@@ -146,10 +150,22 @@ class TcpServer:
                         if payload == 3 and pos['x'] - 1 > 0 and [pos['x'] - 1, pos['y']] not in room.walls:
                             pos['x'] -= 1
 
+                    # Chat
                     elif action == 'c':
                         payload = payload.replace(';', '\\;')
                         payload = payload.replace('\\\\;', '\\;')
                         self.log.log(time.time(), f"Player {player_id} says: {payload}")
+
+                    # Login
+                    elif action == 'login':
+                        username = payload
+                        password = payload2
+                        print(f"Got username: {username} and password: {password}")
+
+                        if self.database.user_exists(username):
+                            print(f"{username} is comin' in hot")
+                        else:
+                            print(f"{username} is arriving somewhere but not here")
 
                 except Exception as e:
                     print(e, file=sys.stderr)
@@ -164,15 +180,17 @@ class TcpServer:
                 players.append(player.state if player else None)
 
             for player in room.players:
-                if player:
-                    try:
-                        player.client_socket.send(bytes(json.dumps({
-                            'p': players,
-                            'l': self.log.latest
-                        }) + ";", 'utf-8'))
-                    except socket.error:
-                        room.kick(player.player_id)
-                        continue
-                    except Exception as e:
-                        print(e, file=sys.stderr)
-                        continue
+                self.send(room, player, {
+                    'p': players,
+                    'l': self.log.latest
+                })
+
+    @staticmethod
+    def send(room, player, data):
+        if player:
+            try:
+                player.client_socket.send(bytes(json.dumps(data) + ";", 'utf-8'))
+            except socket.error:
+                room.kick(player.player_id)
+            except Exception as e:
+                print(e, file=sys.stderr)

@@ -53,3 +53,16 @@ class Database:
         """)
 
         self.conn.commit()
+
+    def user_exists(self, username: str) -> bool:
+        self.curs.execute(f"""
+            SELECT CASE 
+                WHEN EXISTS(
+                    SELECT NULL
+                    FROM users
+                    WHERE username = '{username}'
+                ) THEN TRUE
+                  ELSE FALSE
+            END
+        """)
+        return self.curs.fetchone()[0]
