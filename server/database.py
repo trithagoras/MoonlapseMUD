@@ -57,12 +57,26 @@ class Database:
     def user_exists(self, username: str) -> bool:
         self.curs.execute(f"""
             SELECT CASE 
-                WHEN EXISTS(
+                WHEN EXISTS (
                     SELECT NULL
                     FROM users
                     WHERE username = '{username}'
                 ) THEN TRUE
                   ELSE FALSE
-            END
+            END;
+        """)
+        return self.curs.fetchone()[0]
+
+    def password_correct(self, username: str, password: str) -> bool:
+        self.curs.execute(f"""
+            SELECT CASE 
+                WHEN EXISTS (
+                    SELECT NULL
+                    FROM users
+                    WHERE username = '{username}'
+                    AND password = '{password}'
+                ) THEN TRUE
+                  ELSE FALSE
+            END;
         """)
         return self.curs.fetchone()[0]

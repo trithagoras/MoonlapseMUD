@@ -164,6 +164,10 @@ class TcpServer:
 
                         if self.database.user_exists(username):
                             print(f"{username} is comin' in hot")
+                            if self.database.password_correct(username, password):
+                                print(f"{username} got their password correct... Good job!")
+                            else:
+                                print(f"{username} messed up. What is {password}???")
                         else:
                             print(f"{username} is arriving somewhere but not here")
 
