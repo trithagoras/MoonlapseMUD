@@ -8,6 +8,7 @@ from room import Room
 from player import Player
 from log import Log
 from threading import Thread
+import random
 
 
 class TcpServer:
@@ -64,137 +65,74 @@ class TcpServer:
 
     def accept_clients(self) -> None:
         while True:
-            for room in self.rooms:
-                try:
-                    client_socket, address = self.sock.accept()
-                except socket.error as e:
-                    print(f"Socket error while accepting new client ({e})... Trying again.")
-                    self.connect_socket()
-                    time.sleep(1)
-                    continue
-                except Exception as e:
-                    print(e, file=sys.stderr)
-                    continue
+            # Establish connecting to the new client
+            try:
+                client_socket, address = self.sock.accept()
+            except socket.error as e:
+                print(f"Socket error while accepting new client ({e})... Trying again.", file=sys.stderr)
+                self.connect_socket()
+                time.sleep(1)
+                continue
+            except Exception as e:
+                print(e, file=sys.stderr)
+                continue
 
-                player_id: int = -1
-                for index in range(0, len(room.players)):
-                    if room.players[index] is None:
-                        player_id = index
+            # Check for login and register packets from the new client
+            data = ''
+            try:
+                while True:
+                    data += client_socket.recv(1024).decode('utf-8')
+
+                    if data[-1] == ';':
                         break
 
-                if player_id == -1:
-                    try:
-                        client_socket.send(bytes('full;', 'utf-8'))
+            except socket.error:
+                client_socket.close()
+                break
+
+            try:
+                data = json.loads(data[:-1])
+                action: str = data['a']
+                payload: str = data['p']
+                try:
+                    payload2 = data['p2']
+                except KeyError:
+                    payload2 = ''
+
+                print(f"Received data from client {client_socket}: Action={action}, Payload={payload}:{payload2}")
+
+                if action == 'login':
+                    username = payload
+                    password = payload2
+                    print(f"Got username: {username} and password: {password}")
+
+                    if self.database.user_exists(username):
+                        print(f"Incoming login request from {username}...", end='')
+                        if self.database.password_correct(username, password):
+                            print("Password matched!")
+
+                            # Try to spawn the new player into the next available room
+                            for room in self.rooms:
+                                try:
+                                    room.spawn(client_socket, address)
+                                except Exception as e:
+                                    print(e, file=sys.stderr)
+                                    continue
+                        else:
+                            print("Incorrect password.")
+                    else:
+                        print("No username match in database.")
                         client_socket.close()
-                        print(f"Connection from {address} rejected.")
-                    except Exception as e:
-                        print(e, file=sys.stderr)
-                        continue
 
-                else:
-                    print(f"Connection from {address}. Assigning to player {player_id}")
-                    self.log.log(time.time(), f"Player {player_id} has arrived.")
-                    init_data = {
-                      'id': player_id,
-                      'w': room.width,
-                      'h': room.height,
-                      'walls': room.walls,
-                      't': self.tick_rate
-                    }
-
-                    try:
-                        client_socket.send(bytes(json.dumps(init_data) + ';', 'utf-8'))
-                        room.players[player_id] = Player(client_socket, init_data)
-                        Thread(target=self.listen, args=(player_id,), daemon=True).start()
-                    except Exception as e:
-                        print(e)
-                        continue
+            except Exception as e:
+                print(e, file=sys.stderr)
+                continue
 
     def listen(self, player_id) -> None:
         while True:
             for room in self.rooms:
-                player = room.players[player_id]
-                data = ''
-                try:
-                    while True:
-                        data += player.client_socket.recv(1024).decode('utf-8')
-
-                        if data[-1] == ';':
-                            break
-
-                except socket.error:
-                    room.kick(player_id)
-                    break
-
-                try:
-                    data = json.loads(data[:-1])
-                    action: str = data['a']
-                    payload: str = data['p']
-                    try:
-                        payload2 = data['p2']
-                    except KeyError:
-                        payload2 = ''
-
-                    print(f"Received data from player {player_id}: Action={action}, Payload={payload}:{payload2}")
-
-                    pos = player.state['pos']
-
-                    # Move
-                    if action == 'm':
-                        if payload == 0 and pos['y'] - 1 > 0 and [pos['x'], pos['y'] - 1] not in room.walls:
-                            pos['y'] -= 1
-                        if payload == 1 and pos['x'] + 1 < room.width - 1 and [pos['x'] + 1, pos['y']] not in room.walls:
-                            pos['x'] += 1
-                        if payload == 2 and pos['y'] + 1 < room.height - 1 and [pos['x'], pos['y'] + 1] not in room.walls:
-                            pos['y'] += 1
-                        if payload == 3 and pos['x'] - 1 > 0 and [pos['x'] - 1, pos['y']] not in room.walls:
-                            pos['x'] -= 1
-
-                    # Chat
-                    elif action == 'c':
-                        payload = payload.replace(';', '\\;')
-                        payload = payload.replace('\\\\;', '\\;')
-                        self.log.log(time.time(), f"Player {player_id} says: {payload}")
-
-                    # Login
-                    elif action == 'login':
-                        username = payload
-                        password = payload2
-                        print(f"Got username: {username} and password: {password}")
-
-                        if self.database.user_exists(username):
-                            print(f"{username} is comin' in hot")
-                            if self.database.password_correct(username, password):
-                                print(f"{username} got their password correct... Good job!")
-                            else:
-                                print(f"{username} messed up. What is {password}???")
-                        else:
-                            print(f"{username} is arriving somewhere but not here")
-
-                except Exception as e:
-                    print(e, file=sys.stderr)
-                    continue
+                room.listen(player_id)
 
     def update_clients(self) -> None:
         for room in self.rooms:
-            players = []
-
-            for index in range(0, len(room.players)):
-                player = room.players[index]
-                players.append(player.state if player else None)
-
-            for player in room.players:
-                self.send(room, player, {
-                    'p': players,
-                    'l': self.log.latest
-                })
-
-    @staticmethod
-    def send(room, player, data):
-        if player:
-            try:
-                player.client_socket.send(bytes(json.dumps(data) + ";", 'utf-8'))
-            except socket.error:
-                room.kick(player.player_id)
-            except Exception as e:
-                print(e, file=sys.stderr)
+            room.update_clients()

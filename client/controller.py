@@ -59,7 +59,6 @@ class Menu(Controller):
 class MainMenu(Menu):
     def __init__(self, host, port):
         super().__init__({
-            "Play": self.play,
             "Login": self.login,
             "Register": self.register
         })
@@ -68,11 +67,6 @@ class MainMenu(Menu):
         self.port = port
 
         self.view = MenuView(self, f"Welcome to {host}:{port}")
-
-    def play(self):
-        game = Game(self.host, self.port)
-        game.start()
-        self.start()
 
     def login(self):
         loginmenu = LoginMenu(self.host, self.port)
@@ -125,14 +119,18 @@ class LoginMenu(Menu):
             exit()
 
     def login(self):
-        self.view.title = f"Logged in as {self.username} with password {self.password}"
+        self.view.title = f"Attempted login in as {self.username} with password {self.password}"
         try:
-            # Action: move, Payload: direction
             self.s.send(bytes(json.dumps({
                 'a': 'login',
                 'p': self.username,
                 'p2': self.password
             }) + ';', 'utf-8'))
+
+            game = Game(self.s, self.address)
+            game.start()
+            self.start()
+
         except sock.error as e:
             self.view.title = str(e)
 
@@ -158,10 +156,10 @@ class RegisterMenu(Menu):
 
 
 class Game(Controller):
-    def __init__(self, host: str, port: int):
+    def __init__(self, s: sock.socket, address: Tuple[str, int]):
         super().__init__()
-        self.s: sock.socket = sock.socket(sock.AF_INET, sock.SOCK_STREAM)
-        self.address: Tuple[str, int] = (host, port)
+        self.s: sock.socket = s
+        self.address: Tuple[str, int] = address
 
         self.player_id: int = 0
         self.game_data: dict = {}
@@ -175,7 +173,7 @@ class Game(Controller):
         self.view = GameView(self)
 
     def connect(self) -> None:
-        self.s.connect(self.address)
+        # self.s.connect(self.address)
         message: str = ""
         while True:
             try:

@@ -118,10 +118,10 @@ class GameView(View):
         self.focus = 1
         self.win2_focus = Window2Focus.SKILLS
 
+        super().display(stdscr)
+
         # Position cursor
         self.stdscr.move(self.chatwin_y, self.chatwin_x)
-
-        super().display(stdscr)
 
     def draw(self) -> None:
         super().draw()
