@@ -111,10 +111,12 @@ class TcpServer:
                         if self.database.password_correct(username, password):
                             print("Password matched!")
 
+                            player: Player = Player(client_socket, address, username)
+
                             # Try to spawn the new player into the next available room
                             for room in self.rooms:
                                 try:
-                                    room.spawn(client_socket, address)
+                                    room.spawn(player)
                                 except Exception as e:
                                     print(e, file=sys.stderr)
                                     continue

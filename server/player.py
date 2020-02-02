@@ -4,8 +4,12 @@ from typing import *
 
 
 class Player:
-    def __init__(self, client_socket, data):
+    def __init__(self, client_socket, address, username):
         self.client_socket = client_socket
+        self.address = address
+        self.username = username
+
+    def init_data(self, data) -> None:
         self.player_id = data['id']
         self.walls = data['walls']
         self.map_width, self.map_height = data['w'], data['h']
@@ -17,11 +21,9 @@ class Player:
             player_char = 65 + self.player_id - len(ids)
 
         self.state = {
-          'pos': {},
-          'c': player_char
+            'pos': {},
+            'c': player_char
         }
-
-        self.spawn_player()
 
     def spawn_player(self) -> None:
         while True:

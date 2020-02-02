@@ -35,7 +35,7 @@ class Room:
         self.players[player_id] = None
         print(f"Kicked player {player_id}")
 
-    def spawn(self, client_socket, address):
+    def spawn(self, player: Player):
         player_id: int = -1
         for index in range(self.capacity):
             if self.players[index] is None:
@@ -43,13 +43,13 @@ class Room:
                 break
 
         if player_id == -1:
-            client_socket.send(bytes('full;', 'utf-8'))
-            client_socket.close()
-            print(f"Connection from {address} rejected.")
+            player.client_socket.send(bytes('full;', 'utf-8'))
+            player.client_socket.close()
+            print(f"Connection from {player.address} rejected.")
 
         else:
-            print(f"Connection from {address}. Assigning to player {player_id}")
-            self.tcpsrv.log.log(time.time(), f"Player {player_id} has arrived.")
+            print(f"Connection from {player.address}. Assigning to player {player_id}")
+            self.tcpsrv.log.log(time.time(), f"{player.username} has arrived.")
             init_data = {
                 'id': player_id,
                 'w': self.width,
@@ -58,8 +58,10 @@ class Room:
                 't': self.tcpsrv.tick_rate
             }
 
-            client_socket.send(bytes(json.dumps(init_data) + ';', 'utf-8'))
-            self.players[player_id] = Player(client_socket, init_data)
+            player.client_socket.send(bytes(json.dumps(init_data) + ';', 'utf-8'))
+            player.init_data(init_data)
+            player.spawn_player()
+            self.players[player_id] = player
             Thread(target=self.tcpsrv.listen, args=(player_id,), daemon=True).start()
             
     def listen(self, player_id) -> None:
@@ -104,7 +106,7 @@ class Room:
             elif action == 'c':
                 payload = payload.replace(';', '\\;')
                 payload = payload.replace('\\\\;', '\\;')
-                self.tcpsrv.log.log(time.time(), f"Player {player_id} says: {payload}")
+                self.tcpsrv.log.log(time.time(), f"{player.username} says: {payload}")
 
         except Exception as e:
             print(e, file=sys.stderr)
