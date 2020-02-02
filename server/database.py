@@ -32,6 +32,7 @@ class Database:
         print(f"done: host={p['host']}, port={p['port']}, dbname={p['dbname']}, user={p['user']}")
 
     def register_player(self, username, password):
+        print(f"Attempting to register player to database: {username}:{password}...", end='')
         self.curs.execute(f"""
             INSERT INTO users (username, password)
             VALUES ('{username}', '{password}')
@@ -53,8 +54,10 @@ class Database:
         """)
 
         self.conn.commit()
+        print("Success!")
 
     def user_exists(self, username: str) -> bool:
+        print(f"Checking if user exists: {username}...", end='')
         self.curs.execute(f"""
             SELECT CASE 
                 WHEN EXISTS (
@@ -65,9 +68,12 @@ class Database:
                   ELSE FALSE
             END;
         """)
-        return self.curs.fetchone()[0]
+        result = self.curs.fetchone()[0]
+        print(f"Result: {result}")
+        return result
 
     def password_correct(self, username: str, password: str) -> bool:
+        print(f"Checking if credentials: {username}:{password} are correct...", end='')
         self.curs.execute(f"""
             SELECT CASE 
                 WHEN EXISTS (
@@ -79,4 +85,6 @@ class Database:
                   ELSE FALSE
             END;
         """)
-        return self.curs.fetchone()[0]
+        result = self.curs.fetchone()[0]
+        print(f"Result: {result}")
+        return result

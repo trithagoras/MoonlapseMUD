@@ -126,6 +126,19 @@ class TcpServer:
                         print("No username match in database.")
                         client_socket.close()
 
+                elif action == 'register':
+                    username = payload
+                    password = payload2
+                    print(f"Got username: {username} and password: {password}")
+
+                    if self.database.user_exists(username):
+                        print(f"Attempted registration for {username} but user already exists.", end='')
+                        client_socket.close()
+                    else:
+                        print(f"Attempted registration for {username}, continuing...")
+                        self.database.register_player(username, password)
+                        client_socket.close()
+
             except Exception as e:
                 print(e, file=sys.stderr)
                 continue

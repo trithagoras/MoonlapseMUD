@@ -5,7 +5,7 @@ import time
 from threading import Thread
 from typing import *
 import curses.textpad as textpad
-from view import GameView, Window2Focus, MenuView, View, LoginView
+from view import *
 import curses as ncurses
 
 
@@ -74,7 +74,7 @@ class MainMenu(Menu):
         self.start()
 
     def register(self):
-        registermenu = RegisterMenu()
+        registermenu = RegisterMenu(self.host, self.port)
         registermenu.start()
         self.start()
 
@@ -144,15 +144,71 @@ class LoginMenu(Menu):
 
 
 class RegisterMenu(Menu):
-    def __init__(self):
+    def __init__(self, host, port):
+        self.username: str = ''
+        self.password: str = ''
+        self.confirmpassword: str = ''
+
+        self.s: sock.socket = sock.socket(sock.AF_INET, sock.SOCK_STREAM)
+        self.address = (host, port)
+
         super().__init__({
-            "Email": None,
-            "Username": None,
-            "Password": None,
-            "Sign up for newsletter": None
+            "Username": self.register,
+            "Password": self.register,
+            "Confirm password": self.register
         })
 
-        self.view = MenuView(self, "Registration")
+        self.view = RegisterView(self)
+
+    def start(self):
+        self.s.connect(self.address)
+        super().start()
+
+    def get_input(self) -> None:
+        try:
+            key = self.view.stdscr.getch()
+            # Only trigger for alphanumeric key presses
+            if key == ncurses.KEY_UP:
+                self.cursor = max(self.cursor - 1, 0)
+            elif key == ncurses.KEY_DOWN:
+                self.cursor = min(self.cursor + 1, len(self.menu) - 1)
+            elif key in (ncurses.KEY_ENTER, ord('\n'), ord('\r')) and self.username != '' and self.password != '' and self.confirmpassword != '':
+                fn = self.menu[list(self.menu.keys())[self.cursor]]
+                if fn is not None:
+                    fn()
+            elif key == ord('q'):
+                self.view.stop()
+            elif key in range(32, 127):
+                self.handle_box()
+        except KeyboardInterrupt:
+            exit()
+
+    def register(self):
+        self.view.title = f"Attempted registration as {self.username} with password {self.password}"
+
+        if self.password != self.confirmpassword:
+            self.view.title = "Passwords do not match!"
+            return
+
+        try:
+            self.s.send(bytes(json.dumps({
+                'a': 'register',
+                'p': self.username,
+                'p2': self.password
+            }) + ';', 'utf-8'))
+
+        except sock.error as e:
+            self.view.title = str(e)
+
+    def handle_box(self) -> None:
+        ncurses.curs_set(True)
+        if self.cursor == 0:
+            self.username = self.view.usernamebox.edit(self.validate_textbox).strip()
+        elif self.cursor == 1:
+            self.password = self.view.passwordbox.edit(self.validate_textbox).strip()
+        elif self.cursor == 2:
+            self.confirmpassword = self.view.confirmpasswordbox.edit(self.validate_textbox).strip()
+        ncurses.curs_set(False)
 
 
 class Game(Controller):

@@ -88,6 +88,35 @@ class LoginView(MenuView):
         self.stdscr.move(6 + self.controller.cursor * 3, 21)
 
 
+class RegisterView(MenuView):
+    def __init__(self, controller):
+        self.username: str = ''
+        self.password: str = ''
+        self.confirmpassword: str = ''
+        super().__init__(controller)
+
+    def display(self, stdscr: Window):
+        self.win1: Window = stdscr.subwin(1, 20, 6, 20)
+        self.win2: Window = stdscr.subwin(1, 20, 9, 20)
+        self.win3: Window = stdscr.subwin(1, 20, 12, 20)
+
+        self.usernamebox = textpad.Textbox(self.win1)
+        self.passwordbox = textpad.Textbox(self.win2)
+        self.confirmpasswordbox = textpad.Textbox(self.win3)
+
+        super().display(stdscr)
+
+    def draw(self):
+        try:
+            self.win1.addstr(0, 0, self.controller.username)
+            self.win2.addstr(0, 0, self.controller.password)
+            self.win3.addstr(0, 0, self.controller.confirmpassword)
+        except ncurses.error as e:
+            self.title = str(e)
+        super().draw()
+        self.stdscr.move(6 + self.controller.cursor * 3, 21)
+
+
 class GameView(View):
     def __init__(self, game):
         super().__init__(game)
