@@ -1,7 +1,6 @@
 import sys
 from typing import *
-import curses as ncurses
-from game import Game
+from controller import MainMenu
 
 
 def main() -> None:
@@ -19,14 +18,12 @@ def main() -> None:
 
     ui_error: Optional[str] = None
 
-    try:
-        game: Game = Game(hostname, port)
-        game.connect()
+    if True:#try:
+        mainmenu = MainMenu(hostname, port)
+        mainmenu.start()
 
-        ncurses.wrapper(game.start, ncurses)
-
-    except Exception as e:
-        ui_error = f"Error: Connection refused. {e}"
+    #except Exception as e:
+    #    ui_error = f"Error: Connection refused. {e}"
 
     if ui_error:
         print(ui_error, file=sys.stderr)

@@ -3,8 +3,10 @@
     <words>
       <w>chatbox</w>
       <w>chatwin</w>
+      <w>connectionstringfilename</w>
       <w>moonlapse</w>
       <w>ncurses</w>
+      <w>postgre</w>
       <w>stdscr</w>
       <w>textpad</w>
     </words>
