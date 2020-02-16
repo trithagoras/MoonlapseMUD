@@ -36,24 +36,24 @@ class Menu(Controller):
         self.cursor: int = 0
         self.view = MenuView(self)
 
-    def get_input(self) -> None:
-        try:
-            key = self.view.stdscr.getch()
+    def get_input(self) -> int:
+        key = self.view.stdscr.getch()
 
-            # Movement
-            if key == ncurses.KEY_UP:
-                self.cursor = max(self.cursor - 1, 0)
-            elif key == ncurses.KEY_DOWN:
-                self.cursor = min(self.cursor + 1, len(self.menu) - 1)
-            elif key in (ncurses.KEY_ENTER, ord('\n'), ord('\r')):
-                fn = self.menu[list(self.menu.keys())[self.cursor]]
-                if fn is not None:
-                    fn()
-            elif key == ord('q'):
-                self.view.stop()
+        # Movement
+        if key == ncurses.KEY_UP:
+            self.cursor = max(self.cursor - 1, 0)
+        elif key == ncurses.KEY_DOWN:
+            self.cursor = min(self.cursor + 1, len(self.menu) - 1)
+        elif key == ord('\t'):
+            self.cursor = (self.cursor + 1) % len(self.menu)
+        elif key in (ncurses.KEY_ENTER, ord('\n'), ord('\r')):
+            fn = self.menu[list(self.menu.keys())[self.cursor]]
+            if fn is not None:
+                fn()
+        elif key == ord('q'):
+            self.view.stop()
 
-        except KeyboardInterrupt:
-            exit()
+        return key
 
 
 class MainMenu(Menu):
@@ -104,26 +104,17 @@ class LoginMenu(Menu):
             self.s.connect(self.address)
         super().start()
 
-    def get_input(self) -> None:
-        try:
-            key = self.view.stdscr.getch()
-            # Only trigger for alphanumeric key presses
-            if key == ncurses.KEY_UP:
-                self.cursor = max(self.cursor - 1, 0)
-            elif key == ncurses.KEY_DOWN:
-                self.cursor = min(self.cursor + 1, len(self.menu) - 1)
-            elif key in (ncurses.KEY_ENTER, ord('\n'), ord('\r')) and self.username != '' and self.password != '':
-                fn = self.menu[list(self.menu.keys())[self.cursor]]
-                if fn is not None:
-                    fn()
-            elif key == ord('q'):
-                self.view.stop()
-            elif key in range(32, 127):
-                self.handle_box()
-        except KeyboardInterrupt:
-            exit()
+    def get_input(self) -> int:
+        key = super().get_input()
+        if key in range(32, 127):
+            self.handle_box(chr(key))
+        return key
 
     def login(self):
+        if '' in (self.username, self.password):
+            self.view.title = "Username or password must not be blank"
+            return
+
         self.view.title = f"Attempted login in as {self.username} with password {self.password}"
         try:
             self.s.send(bytes(json.dumps({
@@ -139,12 +130,16 @@ class LoginMenu(Menu):
         except sock.error as e:
             self.view.title = str(e)
 
-    def handle_box(self) -> None:
+    def handle_box(self, first_key: chr) -> None:
         ncurses.curs_set(True)
         if self.cursor == 0:
-            self.username = self.view.usernamebox.edit(self.validate_textbox).strip()
+            self.view.win1.clear()
+            self.view.win1.addch(0, 0, first_key)
+            self.username = first_key + self.view.usernamebox.edit(self.validate_textbox).strip()
         elif self.cursor == 1:
-            self.password = self.view.passwordbox.edit(self.validate_textbox).strip()
+            self.view.win2.clear()
+            self.view.win2.addch(0, 0, first_key)
+            self.password = first_key + self.view.passwordbox.edit(self.validate_textbox).strip()
         ncurses.curs_set(False)
 
 
@@ -169,26 +164,17 @@ class RegisterMenu(Menu):
         self.s.connect(self.address)
         super().start()
 
-    def get_input(self) -> None:
-        try:
-            key = self.view.stdscr.getch()
-            # Only trigger for alphanumeric key presses
-            if key == ncurses.KEY_UP:
-                self.cursor = max(self.cursor - 1, 0)
-            elif key == ncurses.KEY_DOWN:
-                self.cursor = min(self.cursor + 1, len(self.menu) - 1)
-            elif key in (ncurses.KEY_ENTER, ord('\n'), ord('\r')) and self.username != '' and self.password != '' and self.confirmpassword != '':
-                fn = self.menu[list(self.menu.keys())[self.cursor]]
-                if fn is not None:
-                    fn()
-            elif key == ord('q'):
-                self.view.stop()
-            elif key in range(32, 127):
-                self.handle_box()
-        except KeyboardInterrupt:
-            exit()
+    def get_input(self) -> int:
+        key = super().get_input()
+        if key in range(32, 127):
+            self.handle_box(chr(key))
+        return key
 
     def register(self):
+        if '' in (self.username, self.password, self.confirmpassword):
+            self.view.title = "Field must not be blank"
+            return
+
         self.view.title = f"Attempted registration as {self.username} with password {self.password}"
 
         if self.password != self.confirmpassword:
@@ -205,14 +191,20 @@ class RegisterMenu(Menu):
         except sock.error as e:
             self.view.title = str(e)
 
-    def handle_box(self) -> None:
+    def handle_box(self, first_key: chr) -> None:
         ncurses.curs_set(True)
         if self.cursor == 0:
-            self.username = self.view.usernamebox.edit(self.validate_textbox).strip()
+            self.view.win1.clear()
+            self.view.win1.addch(0, 0, first_key)
+            self.username = first_key + self.view.usernamebox.edit(self.validate_textbox).strip()
         elif self.cursor == 1:
-            self.password = self.view.passwordbox.edit(self.validate_textbox).strip()
+            self.view.win2.clear()
+            self.view.win2.addch(0, 0, first_key)
+            self.password = first_key + self.view.passwordbox.edit(self.validate_textbox).strip()
         elif self.cursor == 2:
-            self.confirmpassword = self.view.confirmpasswordbox.edit(self.validate_textbox).strip()
+            self.view.win3.clear()
+            self.view.win3.addch(0, 0, first_key)
+            self.confirmpassword = first_key + self.view.confirmpasswordbox.edit(self.validate_textbox).strip()
         ncurses.curs_set(False)
 
 
@@ -236,7 +228,11 @@ class Game(Controller):
         self.view = GameView(self)
 
     def connect(self) -> None:
-        # self.s.connect(self.address)
+        try:
+            self.s.connect(self.address)
+        except sock.error as e:
+            # Most likely safe to ignore because socket should be already connected
+            print(e, sys.stderr)
         message: str = ""
         while True:
             try:
