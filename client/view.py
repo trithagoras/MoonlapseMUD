@@ -289,6 +289,40 @@ class GameView(View):
         else:
             window.addstr(0, 2, f"{s} ", ncurses.color_pair(3))
 
+    @staticmethod
+    def addstr(win: Window, y: int, x: int, s: str, bordered=True, wrap_at_x_pos=False):
+        height, width = win.getmaxyx()
+        array = []
+
+        padding = 2 if bordered else 1
+
+        if wrap_at_x_pos:
+            while x + len(s) > width - padding:
+                array.append(s[:width - padding - x])
+                s = s[width - padding - x:]
+            array.append(s[:width - padding - x])
+        else:
+            if x + len(s) > width - padding:
+                array.append(s[:width - padding - x])
+                s = s[width - padding - x:]
+
+            while 2 + len(s) > width - padding:
+                array.append(s[:width - padding - 2])
+                s = s[width - padding - 2:]
+
+            array.append(s[:width - padding - 2])
+
+        if y + len(array) > height - 1:
+            raise Exception("String overflows window vertically.")
+        else:
+            if wrap_at_x_pos:
+                for row in range(len(array)):
+                    win.addstr(y + row, x, array[row])
+            else:
+                win.addstr(y, x, array[0])
+                for row in range(len(array) - 1):
+                    win.addstr(y + row + 1, padding, array[row + 1])
+
 
 class Window2Focus:
     HELP = ["Help", ""]
