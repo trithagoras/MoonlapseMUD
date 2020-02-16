@@ -1,10 +1,7 @@
 import socket as sock
 import json
 import sys
-import time
 from threading import Thread
-from typing import *
-import curses.textpad as textpad
 from view import *
 import curses as ncurses
 
@@ -89,8 +86,7 @@ class LoginMenu(Menu):
 
         super().__init__({
             "Username": self.login,
-            "Password": self.login,
-            "Remember me": None
+            "Password": self.login
         })
 
         self.view = LoginView(self)
