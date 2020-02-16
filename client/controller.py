@@ -96,7 +96,12 @@ class LoginMenu(Menu):
         self.view = LoginView(self)
 
     def start(self):
-        self.s.connect(self.address)
+        try:
+            self.s.connect(self.address)
+        except sock.error:
+            # Socket probably closed, retry connection
+            self.s: sock.socket = sock.socket(sock.AF_INET, sock.SOCK_STREAM)
+            self.s.connect(self.address)
         super().start()
 
     def get_input(self) -> None:
@@ -120,7 +125,7 @@ class LoginMenu(Menu):
 
     def login(self):
         self.view.title = f"Attempted login in as {self.username} with password {self.password}"
-        try:
+        if True:#try:
             self.s.send(bytes(json.dumps({
                 'a': 'login',
                 'p': self.username,
@@ -131,8 +136,8 @@ class LoginMenu(Menu):
             game.start()
             self.start()
 
-        except sock.error as e:
-            self.view.title = str(e)
+        # except sock.error as e:
+        #     self.view.title = str(e)
 
     def handle_box(self) -> None:
         ncurses.curs_set(True)
@@ -190,15 +195,15 @@ class RegisterMenu(Menu):
             self.view.title = "Passwords do not match!"
             return
 
-        try:
+        if True:#try:
             self.s.send(bytes(json.dumps({
                 'a': 'register',
                 'p': self.username,
                 'p2': self.password
             }) + ';', 'utf-8'))
 
-        except sock.error as e:
-            self.view.title = str(e)
+        # except sock.error as e:
+        #     self.view.title = str(e)
 
     def handle_box(self) -> None:
         ncurses.curs_set(True)
@@ -250,6 +255,13 @@ class Game(Controller):
         self.tick_rate = data['t']
 
     def disconnect(self) -> None:
+        try:
+            # Action: move, Payload: direction
+            self.s.send(bytes(json.dumps({
+                'a': 'bye'
+            }) + ';', 'utf-8'))
+        except sock.error as e:
+            print(e, file=sys.stderr)
         self.s.close()
 
     def start(self) -> None:

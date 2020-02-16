@@ -146,6 +146,9 @@ class TcpServer:
     def listen(self, player_id) -> None:
         while True:
             for room in self.rooms:
+                player: Player = room.players[player_id]
+                if player is None:
+                    return
                 room.listen(player_id)
 
     def update_clients(self) -> None:

@@ -30,10 +30,11 @@ class Room:
             self.players.append(None)
 
     def kick(self, player_id: int):
+        username = self.players[player_id].username
         self.players[player_id].disconnect()
-        self.tcpsrv.log.log(time.time(), f"Player {player_id} has departed.")
+        self.tcpsrv.log.log(time.time(), f"{username} has departed.")
         self.players[player_id] = None
-        print(f"Kicked player {player_id}")
+        print(f"Kicked {username}")
 
     def spawn(self, player: Player):
         player_id: int = -1
@@ -116,6 +117,10 @@ class Room:
                 payload = payload.replace(';', '\\;')
                 payload = payload.replace('\\\\;', '\\;')
                 self.tcpsrv.log.log(time.time(), f"{player.username} says: {payload}")
+
+            elif action == 'bye':
+                self.kick(player_id)
+                return
 
         except Exception as e:
             print(e, file=sys.stderr)
