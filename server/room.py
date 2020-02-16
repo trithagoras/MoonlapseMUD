@@ -45,10 +45,10 @@ class Room:
         if player_id == -1:
             player.client_socket.send(bytes('full;', 'utf-8'))
             player.client_socket.close()
-            print(f"Connection from {player.address} rejected.")
+            print(f"Connection from {player.client_socket} rejected.")
 
         else:
-            print(f"Connection from {player.address}. Assigning to player {player_id}")
+            print(f"Connection from {player.client_socket}. Assigning to player {player_id}")
             self.tcpsrv.log.log(time.time(), f"{player.username} has arrived.")
             init_data = {
                 'id': player_id,
@@ -60,7 +60,14 @@ class Room:
 
             player.client_socket.send(bytes(json.dumps(init_data) + ';', 'utf-8'))
             player.init_data(init_data)
-            player.spawn_player()
+
+            init_pos = self.tcpsrv.database.get_player_pos(player)
+            player.spawn_player(init_pos)
+
+            if init_pos == (None, None):
+                pos = player.state['pos']
+                self.tcpsrv.database.update_player_pos(player, pos['x'], pos['y'])
+
             self.players[player_id] = player
             Thread(target=self.tcpsrv.listen, args=(player_id,), daemon=True).start()
             
@@ -101,6 +108,8 @@ class Room:
                     pos['y'] += 1
                 if payload == 3 and pos['x'] - 1 > 0 and [pos['x'] - 1, pos['y']] not in self.walls:
                     pos['x'] -= 1
+
+                self.tcpsrv.database.update_player_pos(player, pos['x'], pos['y'])
 
             # Chat
             elif action == 'c':

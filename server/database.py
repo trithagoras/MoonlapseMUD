@@ -1,6 +1,8 @@
 import json
 import psycopg2
 import datetime
+from player import Player
+from typing import *
 
 
 class Database:
@@ -49,8 +51,8 @@ class Database:
         entityid = self.curs.fetchone()[0]
 
         self.curs.execute(f"""
-            INSERT INTO players (entityid, userid, name, locationid) 
-            VALUES ({entityid}, {userid}, '{username}', 1);
+            INSERT INTO players (entityid, userid, name, character)
+            VALUES ({entityid}, {userid}, '{username}', '@');
         """)
 
         self.conn.commit()
@@ -86,5 +88,40 @@ class Database:
             END;
         """)
         result = self.curs.fetchone()[0]
+        print(f"Result: {result}")
+        return result
+
+    def update_player_pos(self, player: Player, x: int, y: int) -> None:
+        print(f"Updating player position ({player.username})...", end='')
+        self.curs.execute(f"""
+            UPDATE entities
+            SET position = '{x}, {y}'
+            WHERE id IN (
+                SELECT p.entityid
+                FROM players AS p
+                INNER JOIN users AS u 
+                ON p.userid = u.id and u.username = '{player.username}' 
+            )
+        """)
+        self.conn.commit()
+        print(f"Done! New position: ({x}, {y}).")
+
+    def get_player_pos(self, player: Player) -> Tuple[int, int]:
+        print(f"Getting player position ({player.username})...", end='')
+        self.curs.execute(f"""
+            SELECT position[0], position[1]
+            FROM entities
+            where id IN (
+                SELECT p.entityid
+                FROM players as p 
+                INNER JOIN users AS u 
+                ON p.userid = u.id AND u.username = '{player.username}'
+            )
+        """)
+        x, y = self.curs.fetchone()
+        if (x, y) != (None, None):
+            result = (int(x), int(y))
+        else:
+            result = (x, y)
         print(f"Result: {result}")
         return result

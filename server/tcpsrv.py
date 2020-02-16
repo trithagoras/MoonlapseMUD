@@ -8,7 +8,6 @@ from room import Room
 from player import Player
 from log import Log
 from threading import Thread
-import random
 
 
 class TcpServer:
@@ -111,9 +110,10 @@ class TcpServer:
                         if self.database.password_correct(username, password):
                             print("Password matched!")
 
-                            player: Player = Player(client_socket, address, username)
+                            player: Player = Player(client_socket, username)
 
-                            # Try to spawn the new player into the next available room
+                            # TODO: Allow player to spawn in their last known room
+                            # Try to spawn the player into the next available room
                             for room in self.rooms:
                                 try:
                                     room.spawn(player)

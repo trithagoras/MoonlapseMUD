@@ -2,11 +2,9 @@ import random
 import sys
 from typing import *
 
-
 class Player:
-    def __init__(self, client_socket, address, username):
+    def __init__(self, client_socket,  username: str):
         self.client_socket = client_socket
-        self.address = address
         self.username = username
 
     def init_data(self, data) -> None:
@@ -25,11 +23,12 @@ class Player:
             'c': player_char
         }
 
-    def spawn_player(self) -> None:
-        while True:
-            pos: List[int, int] = [random.randint(1, self.map_width - 2), random.randint(1, self.map_height - 2)]
-            if pos not in self.walls:
-                break
+    def spawn_player(self, pos) -> None:
+        if pos == (None, None):
+            while True:
+                pos: List[int, int] = [random.randint(1, self.map_width - 2), random.randint(1, self.map_height - 2)]
+                if pos not in self.walls:
+                    break
 
         self.state['pos'] = {
             'x': pos[0],
