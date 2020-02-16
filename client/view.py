@@ -1,8 +1,5 @@
 import curses as ncurses
 from curses import textpad
-from typing import *
-
-from curses_helper import Window, Curses
 import time
 
 
@@ -12,11 +9,11 @@ class View:
 
         # Init window sizes
         self.height, self.width = (43, 106)
-        self.stdscr: Optional[Window] = None
+        self.stdscr = None
 
         self.running = True
 
-    def display(self, stdscr: Window):
+    def display(self, stdscr):
         self.stdscr = stdscr
 
         # Start colors in curses
@@ -72,9 +69,9 @@ class LoginView(MenuView):
         self.password: str = ''
         super().__init__(controller)
 
-    def display(self, stdscr: Window):
-        self.win1: Window = stdscr.subwin(1, 20, 6, 20)
-        self.win2: Window = stdscr.subwin(1, 20, 9, 20)
+    def display(self, stdscr):
+        self.win1 = stdscr.subwin(1, 20, 6, 20)
+        self.win2 = stdscr.subwin(1, 20, 9, 20)
 
         self.usernamebox = textpad.Textbox(self.win1)
         self.passwordbox = textpad.Textbox(self.win2)
@@ -98,10 +95,10 @@ class RegisterView(MenuView):
         self.confirmpassword: str = ''
         super().__init__(controller)
 
-    def display(self, stdscr: Window):
-        self.win1: Window = stdscr.subwin(1, 20, 6, 30)
-        self.win2: Window = stdscr.subwin(1, 20, 9, 30)
-        self.win3: Window = stdscr.subwin(1, 20, 12, 30)
+    def display(self, stdscr):
+        self.win1 = stdscr.subwin(1, 20, 6, 30)
+        self.win2 = stdscr.subwin(1, 20, 9, 30)
+        self.win3 = stdscr.subwin(1, 20, 12, 30)
 
         self.usernamebox = textpad.Textbox(self.win1)
         self.passwordbox = textpad.Textbox(self.win2)
@@ -137,14 +134,14 @@ class GameView(View):
         self.chatwin_height, self.chatwin_width = (1, self.win3_width - 8)
         self.chatwin_y, self.chatwin_x = (self.win3_y + self.win3_height - self.chatwin_height - 1, self.win3_x + 7)
 
-    def display(self, stdscr: Window):
+    def display(self, stdscr):
         stdscr.timeout(round(1000 / self.game.tick_rate))
 
         # Init windows
-        self.win1: Window = stdscr.subwin(self.win1_height, self.win1_width, self.win1_y, self.win1_x)
-        self.win2: Window = stdscr.subwin(self.win2_height, self.win2_width, self.win2_y, self.win2_x)
-        self.win3: Window = stdscr.subwin(self.win3_height, self.win3_width, self.win3_y, self.win3_x)
-        self.chatwin: Window = stdscr.subwin(self.chatwin_height, self.chatwin_width, self.chatwin_y, self.chatwin_x)
+        self.win1 = stdscr.subwin(self.win1_height, self.win1_width, self.win1_y, self.win1_x)
+        self.win2 = stdscr.subwin(self.win2_height, self.win2_width, self.win2_y, self.win2_x)
+        self.win3 = stdscr.subwin(self.win3_height, self.win3_width, self.win3_y, self.win3_x)
+        self.chatwin = stdscr.subwin(self.chatwin_height, self.chatwin_width, self.chatwin_y, self.chatwin_x)
 
         # Window 2 and focus
         self.focus = 1
@@ -312,14 +309,14 @@ class GameView(View):
         return s
 
     @staticmethod
-    def title(window: Window, s: str, focus=False):
+    def title(window, s: str, focus=False):
         if focus is False:
             window.addstr(0, 2, f"{s} ")
         else:
             window.addstr(0, 2, f"{s} ", ncurses.color_pair(3))
 
     @staticmethod
-    def addstr(win: Window, y: int, x: int, s: str, bordered=True, wrap_at_x_pos=False):
+    def addstr(win, y: int, x: int, s: str, bordered=True, wrap_at_x_pos=False):
         height, width = win.getmaxyx()
         array = []
 
