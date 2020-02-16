@@ -18,12 +18,12 @@ def main() -> None:
 
     ui_error: Optional[str] = None
 
-    if True:#try:
+    try:
         mainmenu = MainMenu(hostname, port)
         mainmenu.start()
 
-    #except Exception as e:
-    #    ui_error = f"Error: Connection refused. {e}"
+    except Exception as e:
+        ui_error = f"Error: Connection refused. {e}"
 
     if ui_error:
         print(ui_error, file=sys.stderr)
