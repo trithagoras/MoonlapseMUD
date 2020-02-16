@@ -4,6 +4,7 @@ import sys
 from threading import Thread
 from view import *
 import curses as ncurses
+from typing import *
 
 
 class Controller:
