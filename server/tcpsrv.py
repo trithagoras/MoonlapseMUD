@@ -85,7 +85,8 @@ class TcpServer:
                     if data[-1] == ';':
                         break
 
-            except socket.error:
+            except Exception as e:
+                print(e, file=sys.stderr)
                 client_socket.close()
                 break
 

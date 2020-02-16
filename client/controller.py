@@ -222,6 +222,8 @@ class Game(Controller):
         self.s: sock.socket = s
         self.address: Tuple[str, int] = address
 
+        self.connected = False
+
         self.player_id: int = 0
         self.game_data: dict = {}
         self.walls: list = []
@@ -254,6 +256,8 @@ class Game(Controller):
         self.walls = data['walls']
         self.tick_rate = data['t']
 
+        self.connected = True
+
     def disconnect(self) -> None:
         try:
             # Action: move, Payload: direction
@@ -263,6 +267,8 @@ class Game(Controller):
         except sock.error as e:
             print(e, file=sys.stderr)
         self.s.close()
+
+        self.connected = False
 
     def start(self) -> None:
         self.connect()
@@ -278,7 +284,7 @@ class Game(Controller):
 
     def load_data(self) -> None:
         message = ""
-        while True:
+        while self.connected:
             try:
                 message += self.s.recv(1).decode('utf-8')
                 if message[-1] == ";":
