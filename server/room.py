@@ -133,10 +133,11 @@ class Room:
             players.append(player.state if player else None)
 
         for player in self.players:
-            self.send(player, {
-                'p': players,
-                'l': self.tcpsrv.log.latest
-            })
+            if player is not None:
+                self.send(player, {
+                    'p': players,
+                    'l': self.tcpsrv.log.latest
+                })
 
     def send(self, player, data):
         if player:

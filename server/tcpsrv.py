@@ -22,7 +22,7 @@ class TcpServer:
 
         pwd: str = os.path.dirname(__file__)
         self.rooms: List[Optional[Room]] = [
-            Room(self, os.path.join(pwd, '..', 'maps', 'map.bmp.json'), 100)
+            Room(self, os.path.join(pwd, '..', 'maps', 'map.bmp.json'), 10)
         ]
 
     def start(self):
