@@ -35,7 +35,10 @@ class View:
             self.draw()
             self.stdscr.refresh()
 
-            self.controller.get_input()
+            try:
+                self.controller.get_input()
+            except KeyboardInterrupt:
+                exit()
 
     def draw(self) -> None:
         # Max terminal size
@@ -80,8 +83,8 @@ class LoginView(MenuView):
 
     def draw(self):
         try:
-            self.win1.addstr(0, 0, self.controller.username)
-            self.win2.addstr(0, 0, self.controller.password)
+            self.win1.addstr(0, 0, self.controller.username[1:])
+            self.win2.addstr(0, 0, self.controller.password[1:])
         except ncurses.error as e:
             self.title = str(e)
         super().draw()
@@ -96,9 +99,9 @@ class RegisterView(MenuView):
         super().__init__(controller)
 
     def display(self, stdscr: Window):
-        self.win1: Window = stdscr.subwin(1, 20, 6, 20)
-        self.win2: Window = stdscr.subwin(1, 20, 9, 20)
-        self.win3: Window = stdscr.subwin(1, 20, 12, 20)
+        self.win1: Window = stdscr.subwin(1, 20, 6, 30)
+        self.win2: Window = stdscr.subwin(1, 20, 9, 30)
+        self.win3: Window = stdscr.subwin(1, 20, 12, 30)
 
         self.usernamebox = textpad.Textbox(self.win1)
         self.passwordbox = textpad.Textbox(self.win2)
@@ -108,13 +111,13 @@ class RegisterView(MenuView):
 
     def draw(self):
         try:
-            self.win1.addstr(0, 0, self.controller.username)
-            self.win2.addstr(0, 0, self.controller.password)
-            self.win3.addstr(0, 0, self.controller.confirmpassword)
+            self.win1.addstr(0, 0, self.controller.username[1:])
+            self.win2.addstr(0, 0, self.controller.password[1:])
+            self.win3.addstr(0, 0, self.controller.confirmpassword[1:])
         except ncurses.error as e:
             self.title = str(e)
         super().draw()
-        self.stdscr.move(6 + self.controller.cursor * 3, 21)
+        self.stdscr.move(6 + self.controller.cursor * 3, 31)
 
 
 class GameView(View):
