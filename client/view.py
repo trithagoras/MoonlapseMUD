@@ -83,8 +83,8 @@ class LoginView(MenuView):
 
     def draw(self):
         try:
-            self.win1.addstr(0, 0, self.controller.username[1:])
-            self.win2.addstr(0, 0, self.controller.password[1:])
+            self.win1.addstr(0, 0, self.controller.username)
+            self.win2.addstr(0, 0, self.controller.password)
         except ncurses.error as e:
             self.title = str(e)
         super().draw()
@@ -111,9 +111,9 @@ class RegisterView(MenuView):
 
     def draw(self):
         try:
-            self.win1.addstr(0, 0, self.controller.username[1:])
-            self.win2.addstr(0, 0, self.controller.password[1:])
-            self.win3.addstr(0, 0, self.controller.confirmpassword[1:])
+            self.win1.addstr(0, 0, self.controller.username)
+            self.win2.addstr(0, 0, self.controller.password)
+            self.win3.addstr(0, 0, self.controller.confirmpassword)
         except ncurses.error as e:
             self.title = str(e)
         super().draw()

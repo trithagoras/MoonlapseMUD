@@ -135,11 +135,11 @@ class LoginMenu(Menu):
         if self.cursor == 0:
             self.view.win1.clear()
             self.view.win1.addch(0, 0, first_key)
-            self.username = first_key + self.view.usernamebox.edit(self.validate_textbox).strip()
+            self.username = self.view.usernamebox.edit(self.validate_textbox).strip()
         elif self.cursor == 1:
             self.view.win2.clear()
             self.view.win2.addch(0, 0, first_key)
-            self.password = first_key + self.view.passwordbox.edit(self.validate_textbox).strip()
+            self.password = self.view.passwordbox.edit(self.validate_textbox).strip()
         ncurses.curs_set(False)
 
 
@@ -196,15 +196,15 @@ class RegisterMenu(Menu):
         if self.cursor == 0:
             self.view.win1.clear()
             self.view.win1.addch(0, 0, first_key)
-            self.username = first_key + self.view.usernamebox.edit(self.validate_textbox).strip()
+            self.username = self.view.usernamebox.edit(self.validate_textbox).strip()
         elif self.cursor == 1:
             self.view.win2.clear()
             self.view.win2.addch(0, 0, first_key)
-            self.password = first_key + self.view.passwordbox.edit(self.validate_textbox).strip()
+            self.password = self.view.passwordbox.edit(self.validate_textbox).strip()
         elif self.cursor == 2:
             self.view.win3.clear()
             self.view.win3.addch(0, 0, first_key)
-            self.confirmpassword = first_key + self.view.confirmpasswordbox.edit(self.validate_textbox).strip()
+            self.confirmpassword = self.view.confirmpasswordbox.edit(self.validate_textbox).strip()
         ncurses.curs_set(False)
 
 
