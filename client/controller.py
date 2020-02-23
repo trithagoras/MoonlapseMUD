@@ -54,6 +54,38 @@ class Menu(Controller):
         return key
 
 
+"""
+A menu which requires a connection to the server to send and receive
+packets. Examples include a login menu or a register menu.
+"""
+class NetworkMenu(Menu):
+    def __init__(self, host: str, port: int, menu: dict):
+        super().__init__(menu)
+
+        self.addr = (host, port)
+        self.s = None
+
+    """
+    Attempts to connect to the network and start the menu. Returns an error
+    message if unsuccessful.
+    """
+    def start(self, attempt=0) -> str:
+        self.s: sock.socket = sock.socket(sock.AF_INET, sock.SOCK_STREAM)
+        try:
+            self.s.connect(self.addr)
+        except Exception as e:
+            if attempt < 3:
+                # Socket might have closed, open it again
+                self.start(attempt=attempt+1)
+            else:
+                # Something else is wrong, exit
+                print(e, file=sys.stderr)
+                self.view.stop()
+                return str(e)
+
+        super().start()
+
+
 class MainMenu(Menu):
     def __init__(self, host, port):
         super().__init__({
@@ -68,38 +100,32 @@ class MainMenu(Menu):
 
     def login(self):
         loginmenu = LoginMenu(self.host, self.port)
-        loginmenu.start()
+        err: str = loginmenu.start()
+        if err:
+            self.view.title = err
+            return
         self.start()
 
     def register(self):
         registermenu = RegisterMenu(self.host, self.port)
-        registermenu.start()
+        err: str = registermenu.start()
+        if err:
+            self.view.title = err
+            return
         self.start()
 
 
-class LoginMenu(Menu):
+class LoginMenu(NetworkMenu):
     def __init__(self, host, port):
         self.username: str = ''
         self.password: str = ''
 
-        self.s: sock.socket = sock.socket(sock.AF_INET, sock.SOCK_STREAM)
-        self.address = (host, port)
-
-        super().__init__({
+        super().__init__(host, port, {
             "Username": self.login,
             "Password": self.login
         })
 
         self.view = LoginView(self)
-
-    def start(self):
-        try:
-            self.s.connect(self.address)
-        except sock.error:
-            # Socket probably closed, retry connection
-            self.s: sock.socket = sock.socket(sock.AF_INET, sock.SOCK_STREAM)
-            self.s.connect(self.address)
-        super().start()
 
     def get_input(self) -> int:
         key = super().get_input()
@@ -120,7 +146,7 @@ class LoginMenu(Menu):
                 'p2': self.password
             }) + ';', 'utf-8'))
 
-            game = Game(self.s, self.address)
+            game = Game(self.s, self.addr)
             game.start()
             self.start()
 
@@ -140,26 +166,19 @@ class LoginMenu(Menu):
         ncurses.curs_set(False)
 
 
-class RegisterMenu(Menu):
+class RegisterMenu(NetworkMenu):
     def __init__(self, host, port):
         self.username: str = ''
         self.password: str = ''
         self.confirmpassword: str = ''
 
-        self.s: sock.socket = sock.socket(sock.AF_INET, sock.SOCK_STREAM)
-        self.address = (host, port)
-
-        super().__init__({
+        super().__init__(host, port, {
             "Username": self.register,
             "Password": self.register,
             "Confirm password": self.register
         })
 
         self.view = RegisterView(self)
-
-    def start(self):
-        self.s.connect(self.address)
-        super().start()
 
     def get_input(self) -> int:
         key = super().get_input()
@@ -206,10 +225,10 @@ class RegisterMenu(Menu):
 
 
 class Game(Controller):
-    def __init__(self, s: sock.socket, address: Tuple[str, int]):
+    def __init__(self, s: sock.socket, addr: Tuple[str, int]):
         super().__init__()
         self.s: sock.socket = s
-        self.address: Tuple[str, int] = address
+        self.addr: Tuple[str, int] = addr
 
         self.connected = False
 
@@ -226,7 +245,7 @@ class Game(Controller):
 
     def connect(self) -> None:
         try:
-            self.s.connect(self.address)
+            self.s.connect(self.addr)
         except sock.error as e:
             # Most likely safe to ignore because socket should be already connected
             print(e, sys.stderr)
