@@ -71,7 +71,7 @@ class Room:
 
             self.players[player_id] = player
             Thread(target=self.tcpsrv.listen, args=(player_id,), daemon=True).start()
-            
+
     def listen(self, player_id) -> None:
         player = self.players[player_id]
         data = ''
@@ -82,8 +82,9 @@ class Room:
                 if data[-1] == ';':
                     break
 
-        except socket.error:
+        except Exception as e:
             self.kick(player_id)
+            print(e, file=sys.stderr)
             return
 
         try:
@@ -124,6 +125,7 @@ class Room:
 
         except Exception as e:
             print(e, file=sys.stderr)
+            return
 
     def update_clients(self) -> None:
         players = []
