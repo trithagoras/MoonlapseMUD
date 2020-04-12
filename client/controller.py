@@ -3,8 +3,9 @@ import json
 import sys
 from threading import Thread
 from view import *
-import curses as ncurses
+import curses
 from typing import *
+import curses.ascii
 
 
 class Controller:
@@ -12,19 +13,10 @@ class Controller:
         self.view: View = View(self)
 
     def start(self):
-        ncurses.wrapper(self.view.display)
+        curses.wrapper(self.view.display)
 
     def get_input(self) -> None:
         pass
-
-    @staticmethod
-    def validate_textbox(k):
-        # https://docs.python.org/3/library/curses.html#module-curses
-        if k in (ord('\n'), ord('\r')):
-            return 7
-        if k == 127:
-            return 8
-        return k
 
 
 class Menu(Controller):
@@ -38,13 +30,13 @@ class Menu(Controller):
         key = self.view.stdscr.getch()
 
         # Movement
-        if key == ncurses.KEY_UP:
+        if key == curses.KEY_UP:
             self.cursor = max(self.cursor - 1, 0)
-        elif key == ncurses.KEY_DOWN:
+        elif key == curses.KEY_DOWN:
             self.cursor = min(self.cursor + 1, len(self.menu) - 1)
         elif key == ord('\t'):
             self.cursor = (self.cursor + 1) % len(self.menu)
-        elif key in (ncurses.KEY_ENTER, ord('\n'), ord('\r')):
+        elif key in (curses.KEY_ENTER, ord('\n'), ord('\r')):
             fn = self.menu[list(self.menu.keys())[self.cursor]]
             if fn is not None:
                 fn()
@@ -54,11 +46,11 @@ class Menu(Controller):
         return key
 
 
-"""
-A menu which requires a connection to the server to send and receive
-packets. Examples include a login menu or a register menu.
-"""
 class NetworkMenu(Menu):
+    """
+    A menu which requires a connection to the server to send and receive
+    packets. Examples include a login menu or a register menu.
+    """
     def __init__(self, host: str, port: int, menu: dict):
         super().__init__(menu)
 
@@ -129,8 +121,13 @@ class LoginMenu(NetworkMenu):
 
     def get_input(self) -> int:
         key = super().get_input()
-        if key in range(32, 127):
-            self.handle_box(chr(key))
+        if curses.ascii.isprint(key) or key in (curses.KEY_LEFT, curses.KEY_RIGHT):
+            if self.cursor == 0:
+                self.view.usernamebox.modal(first_key=key)
+                self.username = self.view.usernamebox.value
+            elif self.cursor == 1:
+                self.view.passwordbox.modal(first_key=key)
+                self.password = self.view.passwordbox.value
         return key
 
     def login(self):
@@ -153,18 +150,6 @@ class LoginMenu(NetworkMenu):
         except sock.error as e:
             self.view.title = str(e)
 
-    def handle_box(self, first_key: chr) -> None:
-        ncurses.curs_set(True)
-        if self.cursor == 0:
-            self.view.win1.clear()
-            self.view.win1.addch(0, 0, first_key)
-            self.username = self.view.usernamebox.edit(self.validate_textbox).strip()
-        elif self.cursor == 1:
-            self.view.win2.clear()
-            self.view.win2.addch(0, 0, first_key)
-            self.password = self.view.passwordbox.edit(self.validate_textbox).strip()
-        ncurses.curs_set(False)
-
 
 class RegisterMenu(NetworkMenu):
     def __init__(self, host, port):
@@ -182,8 +167,13 @@ class RegisterMenu(NetworkMenu):
 
     def get_input(self) -> int:
         key = super().get_input()
-        if key in range(32, 127):
-            self.handle_box(chr(key))
+        if curses.ascii.isprint(key) or key in (curses.KEY_LEFT, curses.KEY_RIGHT):
+            if self.cursor == 0:
+                self.view.usernamebox.modal(first_key=key)
+            elif self.cursor == 1:
+                self.view.passwordbox.modal(first_key=key)
+            elif self.cursor == 2:
+                self.view.confirmpasswordbox.modal(first_key=key)
         return key
 
     def register(self):
@@ -207,22 +197,6 @@ class RegisterMenu(NetworkMenu):
         except sock.error as e:
             self.view.title = str(e)
 
-    def handle_box(self, first_key: chr) -> None:
-        ncurses.curs_set(True)
-        if self.cursor == 0:
-            self.view.win1.clear()
-            self.view.win1.addch(0, 0, first_key)
-            self.username = self.view.usernamebox.edit(self.validate_textbox).strip()
-        elif self.cursor == 1:
-            self.view.win2.clear()
-            self.view.win2.addch(0, 0, first_key)
-            self.password = self.view.passwordbox.edit(self.validate_textbox).strip()
-        elif self.cursor == 2:
-            self.view.win3.clear()
-            self.view.win3.addch(0, 0, first_key)
-            self.confirmpassword = self.view.confirmpasswordbox.edit(self.validate_textbox).strip()
-        ncurses.curs_set(False)
-
 
 class Game(Controller):
     def __init__(self, s: sock.socket, addr: Tuple[str, int]):
@@ -240,7 +214,7 @@ class Game(Controller):
         self.tick_rate: int = -1
 
         # UI
-        self.chatbox: Optional[textpad.Textbox] = None
+        self.chatbox = None
         self.view = GameView(self)
 
     def connect(self) -> None:
@@ -316,17 +290,17 @@ class Game(Controller):
             key = self.view.stdscr.getch()
 
             # Movement
-            if key == ncurses.KEY_UP:
+            if key == curses.KEY_UP:
                 self.move(0)
-            elif key == ncurses.KEY_RIGHT:
+            elif key == curses.KEY_RIGHT:
                 self.move(1)
-            elif key == ncurses.KEY_DOWN:
+            elif key == curses.KEY_DOWN:
                 self.move(2)
-            elif key == ncurses.KEY_LEFT:
+            elif key == curses.KEY_LEFT:
                 self.move(3)
 
             # Changing window focus
-            elif key in [ord('1'), ord('2'), ord('3')]:
+            elif key in (ord('1'), ord('2'), ord('3')):
                 self.view.focus = int(chr(key))
 
             # Changing window 2 focus
@@ -344,9 +318,9 @@ class Game(Controller):
                 self.view.win2_focus = Window2Focus.JOURNAL
 
             # Chat
-            elif key in (ncurses.KEY_ENTER, ord('\n'), ord('\r')) and self.view.win3 is not None:
-                self.chatbox = textpad.Textbox(self.view.chatwin)
-                ncurses.curs_set(True)
+            elif key in (curses.KEY_ENTER, ord('\n'), ord('\r')) and self.view.chatbox is not None:
+                self.view.chatbox.modal()
+                self.chat(self.view.chatbox.value)
 
             elif key == ord('q'):
                 self.disconnect()
@@ -355,9 +329,6 @@ class Game(Controller):
         except KeyboardInterrupt:
            self.disconnect()
            exit()
-
-        if self.chatbox is not None:
-            self.handle_chatbox()
 
     def move(self, direction: int) -> None:
         try:
@@ -381,12 +352,3 @@ class Game(Controller):
             }) + ';', 'utf-8'))
         except sock.error:
             pass
-
-    def handle_chatbox(self) -> None:
-        # https://stackoverflow.com/questions/36121802/python-curses-make-enter-key-terminate-textbox
-        message: str = self.chatbox.edit(self.validate_textbox)
-        if len(message) > 0:
-            self.chat(message)
-        self.chatbox = None
-        self.view.chatwin.clear()
-        ncurses.curs_set(False)

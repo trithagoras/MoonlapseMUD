@@ -1,5 +1,5 @@
-import curses as ncurses
-from curses import textpad
+import curses_helper
+import curses
 import time
 
 
@@ -17,15 +17,15 @@ class View:
         self.stdscr = stdscr
 
         # Start colors in curses
-        ncurses.start_color()
+        curses.start_color()
 
         # Init color pairs
-        ncurses.init_pair(1, ncurses.COLOR_WHITE, ncurses.COLOR_BLACK)
-        ncurses.init_pair(2, ncurses.COLOR_BLACK, ncurses.COLOR_WHITE)
-        ncurses.init_pair(3, ncurses.COLOR_CYAN, ncurses.COLOR_BLACK)
-        ncurses.init_pair(4, ncurses.COLOR_RED, ncurses.COLOR_BLACK)
-        ncurses.init_pair(5, ncurses.COLOR_GREEN, ncurses.COLOR_BLACK)
-        ncurses.init_pair(6, ncurses.COLOR_MAGENTA, ncurses.COLOR_BLACK)
+        curses.init_pair(1, curses.COLOR_WHITE, curses.COLOR_BLACK)
+        curses.init_pair(2, curses.COLOR_BLACK, curses.COLOR_WHITE)
+        curses.init_pair(3, curses.COLOR_CYAN, curses.COLOR_BLACK)
+        curses.init_pair(4, curses.COLOR_RED, curses.COLOR_BLACK)
+        curses.init_pair(5, curses.COLOR_GREEN, curses.COLOR_BLACK)
+        curses.init_pair(6, curses.COLOR_MAGENTA, curses.COLOR_BLACK)
 
         while self.running:
             self.stdscr.erase()
@@ -67,22 +67,25 @@ class LoginView(MenuView):
     def __init__(self, controller):
         self.username: str = ''
         self.password: str = ''
+
+        # Textboxes are initialised once the controller passes stdscr to the display method.
+        self.usernamebox = None
+        self.passwordbox = None
+
         super().__init__(controller)
 
     def display(self, stdscr):
-        self.win1 = stdscr.subwin(1, 20, 6, 20)
-        self.win2 = stdscr.subwin(1, 20, 9, 20)
-
-        self.usernamebox = textpad.Textbox(self.win1)
-        self.passwordbox = textpad.Textbox(self.win2)
+        self.stdscr = stdscr
+        self.usernamebox = curses_helper.TextBox(stdscr, 6, 20, 20)
+        self.passwordbox = curses_helper.TextBox(stdscr, 9, 20, 20)
 
         super().display(stdscr)
 
     def draw(self):
         try:
-            self.win1.addstr(0, 0, self.controller.username)
-            self.win2.addstr(0, 0, self.controller.password)
-        except ncurses.error as e:
+            self.stdscr.addstr(6, 20, self.controller.username)
+            self.stdscr.addstr(9, 20, self.controller.password)
+        except curses.error as e:
             self.title = str(e)
         super().draw()
         self.stdscr.move(6 + self.controller.cursor * 3, 21)
@@ -93,25 +96,28 @@ class RegisterView(MenuView):
         self.username: str = ''
         self.password: str = ''
         self.confirmpassword: str = ''
+
+        # Textboxes are initialised once the controller passes stdscr to the display method.
+        self.usernamebox = None
+        self.passwordbox = None
+        self.confirmpassword = None
+
         super().__init__(controller)
 
     def display(self, stdscr):
-        self.win1 = stdscr.subwin(1, 20, 6, 30)
-        self.win2 = stdscr.subwin(1, 20, 9, 30)
-        self.win3 = stdscr.subwin(1, 20, 12, 30)
-
-        self.usernamebox = textpad.Textbox(self.win1)
-        self.passwordbox = textpad.Textbox(self.win2)
-        self.confirmpasswordbox = textpad.Textbox(self.win3)
+        self.stdscr = stdscr
+        self.usernamebox = curses_helper.TextBox(stdscr, 6, 30, 20)
+        self.passwordbox = curses_helper.TextBox(stdscr, 9, 30, 20)
+        self.confirmpasswordbox = curses_helper.TextBox(stdscr, 12, 30, 20)
 
         super().display(stdscr)
 
     def draw(self):
         try:
-            self.win1.addstr(0, 0, self.controller.username)
-            self.win2.addstr(0, 0, self.controller.password)
-            self.win3.addstr(0, 0, self.controller.confirmpassword)
-        except ncurses.error as e:
+            self.stdscr.addstr(6, 20, self.controller.username)
+            self.stdscr.addstr(9, 20, self.controller.password)
+            self.stdscr.addstr(12, 20, self.controller.confirmpassword)
+        except curses.error as e:
             self.title = str(e)
         super().draw()
         self.stdscr.move(6 + self.controller.cursor * 3, 31)
@@ -134,29 +140,33 @@ class GameView(View):
         self.chatwin_height, self.chatwin_width = (1, self.win3_width - 8)
         self.chatwin_y, self.chatwin_x = (self.win3_y + self.win3_height - self.chatwin_height - 1, self.win3_x + 7)
 
+        # Textboxes are initialised once the controller passes stdscr to the display method.
+        self.win1 = None
+        self.win2 = None
+        self.win3 = None
+        self.chatbox = None
+
+        # Window 2 and focus
+        self.focus = 1
+        self.win2_focus = Window2Focus.SKILLS
+
     def display(self, stdscr):
+        self.stdscr = stdscr
         stdscr.timeout(round(1000 / self.game.tick_rate))
 
         # Init windows
         self.win1 = stdscr.subwin(self.win1_height, self.win1_width, self.win1_y, self.win1_x)
         self.win2 = stdscr.subwin(self.win2_height, self.win2_width, self.win2_y, self.win2_x)
         self.win3 = stdscr.subwin(self.win3_height, self.win3_width, self.win3_y, self.win3_x)
-        self.chatwin = stdscr.subwin(self.chatwin_height, self.chatwin_width, self.chatwin_y, self.chatwin_x)
 
-        # Window 2 and focus
-        self.focus = 1
-        self.win2_focus = Window2Focus.SKILLS
-
+        self.chatbox = curses_helper.TextBox(stdscr, self.chatwin_y, self.chatwin_x, self.chatwin_width)
         super().display(stdscr)
-
-        # Position cursor
-        self.stdscr.move(self.chatwin_y, self.chatwin_x)
 
     def draw(self) -> None:
         super().draw()
 
         # Focus control labels
-        self.stdscr.hline(0, 0, ncurses.ACS_HLINE, self.width)
+        self.stdscr.hline(0, 0, curses.ACS_HLINE, self.width)
 
         control_title, control_string = "", ""
         if self.focus == 1:
@@ -275,7 +285,7 @@ class GameView(View):
         self.win2.addstr(20, 2, f"??????????    31/31 {self.progress_bar(3, 10)} (3,000/10,000)")
 
     def draw_log(self):
-        self.win3.hline(self.win3_height - 3, 1, ncurses.ACS_HLINE, self.win3_width - 2)
+        self.win3.hline(self.win3_height - 3, 1, curses.ACS_HLINE, self.win3_width - 2)
 
         # Fill the log
         if self.game.game_data['l'] and self.game.game_data['l'] != self.log_latest:
@@ -313,7 +323,7 @@ class GameView(View):
         if focus is False:
             window.addstr(0, 2, f"{s} ")
         else:
-            window.addstr(0, 2, f"{s} ", ncurses.color_pair(3))
+            window.addstr(0, 2, f"{s} ", curses.color_pair(3))
 
     @staticmethod
     def addstr(win, y: int, x: int, s: str, bordered=True, wrap_at_x_pos=False):
