@@ -104,7 +104,7 @@ class TcpServer:
                 if action == 'login':
                     username = payload
                     password = payload2
-                    print(f"Got username: {username} and password: {password}")
+                    print(f"Got username: {username.replace(' ', '_')} and password: {password.replace(' ', '_')}")
 
                     if self.database.user_exists(username):
                         print(f"Incoming login request from {username}...", end='')
