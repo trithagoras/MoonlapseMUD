@@ -49,7 +49,7 @@ class Menu(Controller):
 class NetworkMenu(Menu):
     """
     A menu which requires a connection to the server to send and receive
-    packets. Examples include a login menu or a register menu.
+    packets. Examples include a login menu or a registration menu.
     """
     def __init__(self, host: str, port: int, menu: dict):
         super().__init__(menu)
@@ -167,13 +167,16 @@ class RegisterMenu(NetworkMenu):
 
     def get_input(self) -> int:
         key = super().get_input()
-        if curses.ascii.isprint(key) or key in (curses.KEY_LEFT, curses.KEY_RIGHT):
+        if curses.ascii.isprint(key) or key in (curses.KEY_LEFT, curses.KEY_RIGHT, curses.KEY_DC):
             if self.cursor == 0:
                 self.view.usernamebox.modal(first_key=key)
+                self.username = self.view.usernamebox.value
             elif self.cursor == 1:
                 self.view.passwordbox.modal(first_key=key)
+                self.password = self.view.passwordbox.value
             elif self.cursor == 2:
                 self.view.confirmpasswordbox.modal(first_key=key)
+                self.confirmpassword = self.view.confirmpasswordbox.value
         return key
 
     def register(self):

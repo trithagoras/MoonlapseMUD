@@ -100,7 +100,7 @@ class RegisterView(MenuView):
         # Textboxes are initialised once the controller passes stdscr to the display method.
         self.usernamebox = None
         self.passwordbox = None
-        self.confirmpassword = None
+        self.confirmpasswordbox = None
 
         super().__init__(controller)
 
@@ -114,9 +114,9 @@ class RegisterView(MenuView):
 
     def draw(self):
         try:
-            self.stdscr.addstr(6, 20, self.controller.username)
-            self.stdscr.addstr(9, 20, self.controller.password)
-            self.stdscr.addstr(12, 20, self.controller.confirmpassword)
+            self.stdscr.addstr(6, 30, self.controller.username)
+            self.stdscr.addstr(9, 30, self.controller.password)
+            self.stdscr.addstr(12, 30, self.controller.confirmpassword)
         except curses.error as e:
             self.title = str(e)
         super().draw()
