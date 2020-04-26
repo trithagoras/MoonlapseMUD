@@ -8,6 +8,7 @@ from room import Room
 from player import Player
 from log import Log
 from threading import Thread
+import traceback
 
 
 class TcpServer:
@@ -42,8 +43,9 @@ class TcpServer:
                     self.sock.close()
                     exit()
 
-            except Exception as e:
-                print(e, file=sys.stderr)
+            except Exception:
+                print("Error: Traceback: ", file=sys.stderr)
+                print(traceback.format_exc(), file=sys.stderr)
                 pass
 
     def connect_socket(self):
@@ -59,8 +61,9 @@ class TcpServer:
     def connect_database(self):
         try:
             self.database.connect()
-        except Exception as e:
-            print(e, file=sys.stderr)
+        except Exception:
+            print("Error: Traceback: ", file=sys.stderr)
+            print(traceback.format_exc(), file=sys.stderr)
 
     def accept_clients(self) -> None:
         while True:
@@ -68,12 +71,14 @@ class TcpServer:
             try:
                 client_socket, address = self.sock.accept()
             except socket.error as e:
-                print(f"Socket error while accepting new client ({e})... Trying again.", file=sys.stderr)
+                print(f"Socket error while accepting new client ({e})... Trying again. Traceback: ", file=sys.stderr)
+                print(traceback.format_exc(), file=sys.stderr)
                 self.connect_socket()
                 time.sleep(1)
                 continue
-            except Exception as e:
-                print(e, file=sys.stderr)
+            except Exception:
+                print("Error: Traceback: ", file=sys.stderr)
+                print(traceback.format_exc(), file=sys.stderr)
                 continue
 
             # Check for login and register packets from the new client
@@ -85,8 +90,9 @@ class TcpServer:
                     if data[-1] == ';':
                         break
 
-            except Exception as e:
-                print(e, file=sys.stderr)
+            except Exception:
+                print("Error: Traceback: ", file=sys.stderr)
+                print(traceback.format_exc(), file=sys.stderr)
                 client_socket.close()
                 break
 
@@ -97,6 +103,8 @@ class TcpServer:
                 try:
                     payload2 = data['p2']
                 except KeyError:
+                    print(f"Error: KeyError finding key 'p2' in dictionary {data}. Traceback: ", file=sys.stderr)
+                    print(traceback.format_exc())
                     payload2 = ''
 
                 print(f"Received data from client {client_socket}: Action={action}, Payload={payload}:{payload2}")
@@ -118,8 +126,9 @@ class TcpServer:
                             for room in self.rooms:
                                 try:
                                     room.spawn(player)
-                                except Exception as e:
-                                    print(e, file=sys.stderr)
+                                except Exception:
+                                    print("Error: Traceback: ", file=sys.stderr)
+                                    print(traceback.format_exc(), file=sys.stderr)
                                     continue
                         else:
                             print("Incorrect password.")
@@ -140,8 +149,9 @@ class TcpServer:
                         self.database.register_player(username, password)
                         client_socket.close()
 
-            except Exception as e:
-                print(e, file=sys.stderr)
+            except Exception:
+                print("Error: Traceback: ", file=sys.stderr)
+                print(traceback.format_exc(), file=sys.stderr)
                 continue
 
     def listen(self, player_id) -> None:

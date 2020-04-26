@@ -6,6 +6,7 @@ from view import *
 import curses
 from typing import *
 import curses.ascii
+import traceback
 
 
 class Controller:
@@ -62,16 +63,20 @@ class NetworkMenu(Menu):
     message if unsuccessful.
     """
     def start(self, attempt=0) -> str:
+        max_attempts: int = 3
         self.s: sock.socket = sock.socket(sock.AF_INET, sock.SOCK_STREAM)
         try:
             self.s.connect(self.addr)
-        except Exception as e:
-            if attempt < 3:
+        except sock.error as e:
+            if attempt < max_attempts:
                 # Socket might have closed, open it again
                 self.start(attempt=attempt+1)
+                print(f"Error: Connection attempt {attempt}/{max_attempts} failed. Traceback: ", file=sys.stderr)
+                print(traceback.format_exc(), file=sys.stderr)
             else:
                 # Something else is wrong, exit
-                print(e, file=sys.stderr)
+                print(f"Error: Connection attempts reached max ({max_attempts}). Trackback: ", file=sys.stderr)
+                print(traceback.format_exc(), file=sys.stderr)
                 self.view.stop()
                 return str(e)
 
@@ -148,6 +153,8 @@ class LoginMenu(NetworkMenu):
             self.start()
 
         except sock.error as e:
+            print("Error: Socket error. Traceback: ", file=sys.stderr)
+            print(traceback.format_exc())
             self.view.title = str(e)
 
 
@@ -198,6 +205,8 @@ class RegisterMenu(NetworkMenu):
             }) + ';', 'utf-8'))
 
         except sock.error as e:
+            print("Error: Socket error. Traceback: ", file=sys.stderr)
+            print(traceback.format_exc())
             self.view.title = str(e)
 
 
@@ -223,15 +232,19 @@ class Game(Controller):
     def connect(self) -> None:
         try:
             self.s.connect(self.addr)
-        except sock.error as e:
+        except sock.error:
             # Most likely safe to ignore because socket should be already connected
-            print(e, sys.stderr)
+            print(f"Error: Connection refused. Traceback: ", file=sys.stderr)
+            print(traceback.format_exc(), file=sys.stderr)
         message: str = ""
         while True:
             try:
                 message += self.s.recv(1).decode('utf-8')
-            except Exception as e:
-                print(e, file=sys.stderr)
+            except sock.error as e:
+                print("Error: Error receiving message. Traceback: ", file=sys.stderr)
+                print(traceback.format_exc())
+                self.chat("I got an error receiving a message!")
+
             if message[-1] == ";":
                 if message[:-1] == 'full':
                     print('Session is full.')
@@ -254,6 +267,8 @@ class Game(Controller):
                 'a': 'bye'
             }) + ';', 'utf-8'))
         except sock.error as e:
+            print("Error: Socket error. Traceback: ", file=sys.stderr)
+            print(traceback.format_exc())
             print(e, file=sys.stderr)
         self.s.close()
 
@@ -286,6 +301,8 @@ class Game(Controller):
                         continue
                     message = ""
             except sock.error:
+                print("Error: Socket error. Traceback: ", file=sys.stderr)
+                print(traceback.format_exc())
                 message = ""
 
     def get_input(self) -> None:
@@ -341,7 +358,8 @@ class Game(Controller):
                 'p': direction
             }) + ';', 'utf-8'))
         except sock.error:
-            pass
+            print("Error: Socket error. Traceback: ", file=sys.stderr)
+            print(traceback.format_exc())
 
     def chat(self, message: str) -> None:
         # Sanitise semicolons
@@ -354,4 +372,5 @@ class Game(Controller):
                 'p': message
             }) + ';', 'utf-8'))
         except sock.error:
-            pass
+            print("Error: Socket error. Traceback: ", file=sys.stderr)
+            print(traceback.format_exc())

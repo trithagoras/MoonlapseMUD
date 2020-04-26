@@ -5,6 +5,7 @@ import time
 from threading import Thread
 from typing import *
 from player import Player
+import traceback
 
 
 class Room:
@@ -18,7 +19,8 @@ class Room:
         try:
             self.tcpsrv.connect_socket()
         except Exception as e:
-            print(e, file=sys.stderr)
+            print("Error: Traceback: ", file=sys.stderr)
+            print(traceback.format_exc(), file=sys.stderr)
 
         with open(room_map) as data:
             map_data = json.load(data)
@@ -82,9 +84,10 @@ class Room:
                 if data[-1] == ';':
                     break
 
-        except Exception as e:
+        except Exception:
             self.kick(player_id)
-            print(e, file=sys.stderr)
+            print("Error: Traceback: ", file=sys.stderr)
+            print(traceback.format_exc(), file=sys.stderr)
             return
 
         try:
@@ -94,6 +97,8 @@ class Room:
             try:
                 payload2 = data['p2']
             except KeyError:
+                print(f"Error: KeyError finding key 'p2' in dictionary {data}. Traceback: ", file=sys.stderr)
+                print(traceback.format_exc(), file=sys.stderr)
                 payload2 = ''
 
             print(f"Received data from player {player_id}: Action={action}, Payload={payload}:{payload2}")
@@ -123,8 +128,9 @@ class Room:
                 self.kick(player_id)
                 return
 
-        except Exception as e:
-            print(e, file=sys.stderr)
+        except Exception:
+            print("Error: Traceback: ", file=sys.stderr)
+            print(traceback.format_exc(), file=sys.stderr)
             return
 
     def update_clients(self) -> None:
@@ -146,6 +152,9 @@ class Room:
             try:
                 player.client_socket.send(bytes(json.dumps(data) + ";", 'utf-8'))
             except socket.error:
+                print("Error: Socket error. Traceback: ", file=sys.stderr)
+                print(traceback.format_exc(), file=sys.stderr)
                 self.kick(player.player_id)
-            except Exception as e:
-                print(e, file=sys.stderr)
+            except Exception:
+                print("Error: Traceback: ", file=sys.stderr)
+                print(traceback.format_exc(), file=sys.stderr)

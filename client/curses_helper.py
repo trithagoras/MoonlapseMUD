@@ -65,7 +65,7 @@ class TextBox:
 
         self.value = self.box.edit(self.validator)
         # I'm not sure why, but sometimes the value has a trailing space
-        if self.value[-1] == ' ':
+        if len(self.value) > 0 and self.value[-1] == ' ':
             self.value = self.value[: -1]
 
     def validator(self, key: int):

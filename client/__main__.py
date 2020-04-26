@@ -1,6 +1,7 @@
 import sys
 from typing import *
 from controller import MainMenu
+import traceback
 
 
 def handle_arguments() -> Tuple[str, int]:
@@ -46,8 +47,10 @@ def main() -> None:
         mainmenu = MainMenu(hostname, port)
         mainmenu.start()
 
-    except Exception as e:
-        print(f"Error: Connection refused. {e}", file=sys.stderr)
+    except Exception:
+        # Print the whole stacktrace
+        print(f"Error: Connection refused. Traceback: ", file=sys.stderr)
+        print(traceback.format_exc(), file=sys.stderr)
         sys.exit(1)
 
 

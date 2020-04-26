@@ -1,6 +1,7 @@
 import random
 import sys
 from typing import *
+import traceback
 
 class Player:
     def __init__(self, client_socket,  username: str):
@@ -38,5 +39,6 @@ class Player:
     def disconnect(self) -> None:
         try:
             self.client_socket.close()
-        except Exception as e:
-            print(e, file=sys.stderr)
+        except Exception:
+            print("Error: Traceback: ", file=sys.stderr)
+            print(traceback.format_exc(), file=sys.stderr)

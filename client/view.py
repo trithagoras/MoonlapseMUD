@@ -82,11 +82,8 @@ class LoginView(MenuView):
         super().display(stdscr)
 
     def draw(self):
-        try:
-            self.stdscr.addstr(6, 20, self.controller.username)
-            self.stdscr.addstr(9, 20, self.controller.password)
-        except curses.error as e:
-            self.title = str(e)
+        self.stdscr.addstr(6, 20, self.controller.username)
+        self.stdscr.addstr(9, 20, self.controller.password)
         super().draw()
         self.stdscr.move(6 + self.controller.cursor * 3, 20)
 
@@ -113,12 +110,9 @@ class RegisterView(MenuView):
         super().display(stdscr)
 
     def draw(self):
-        try:
-            self.stdscr.addstr(6, 30, self.controller.username)
-            self.stdscr.addstr(9, 30, self.controller.password)
-            self.stdscr.addstr(12, 30, self.controller.confirmpassword)
-        except curses.error as e:
-            self.title = str(e)
+        self.stdscr.addstr(6, 30, self.controller.username)
+        self.stdscr.addstr(9, 30, self.controller.password)
+        self.stdscr.addstr(12, 30, self.controller.confirmpassword)
         super().draw()
         self.stdscr.move(6 + self.controller.cursor * 3, 30)
 
