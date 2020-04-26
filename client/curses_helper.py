@@ -50,17 +50,18 @@ class TextBox:
         self.win.move(0, len(self.value))
         curs_x = self.win.getyx()[1]
 
-        if curses.ascii.isprint(first_key):
-            # Add first letter and move cursor right
-            self.win.addch(0, curs_x, chr(first_key))
-            self.win.move(0, curs_x + 1)
-        elif first_key == curses.KEY_DC and len(self.value) > 0:
-            # Delete first letter and move cursor at beginning
-            self.win.addstr(0, 0, self.value[1:])
-            self.win.move(0, 0)
-        elif first_key == curses.KEY_LEFT:
-            # Move cursor left
-            self.win.move(0, curs_x - 1)
+        if first_key is not None:
+            if curses.ascii.isprint(first_key):
+                # Add first letter and move cursor right
+                self.win.addch(0, curs_x, chr(first_key))
+                self.win.move(0, curs_x + 1)
+            elif first_key == curses.KEY_DC and len(self.value) > 0:
+                # Delete first letter and move cursor at beginning
+                self.win.addstr(0, 0, self.value[1:])
+                self.win.move(0, 0)
+            elif first_key == curses.KEY_LEFT:
+                # Move cursor left
+                self.win.move(0, curs_x - 1)
 
         self.value = self.box.edit(self.validator)
         # I'm not sure why, but sometimes the value has a trailing space
