@@ -321,7 +321,7 @@ class Game(Controller):
                 self.view.win2_focus = Window2Focus.JOURNAL
 
             # Chat
-            elif key in (curses.KEY_ENTER, ord('\n'), ord('\r')) and self.view.chatbox is not None:
+            elif key in (curses.KEY_ENTER, curses.ascii.LF, curses.ascii.CR) and self.view.chatbox is not None:
                 self.view.chatbox.modal()
                 self.chat(self.view.chatbox.value)
 
