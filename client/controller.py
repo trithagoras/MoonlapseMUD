@@ -34,9 +34,9 @@ class Menu(Controller):
             self.cursor = max(self.cursor - 1, 0)
         elif key == curses.KEY_DOWN:
             self.cursor = min(self.cursor + 1, len(self.menu) - 1)
-        elif key == ord('\t'):
+        elif key == curses.ascii.TAB:
             self.cursor = (self.cursor + 1) % len(self.menu)
-        elif key in (curses.KEY_ENTER, ord('\n'), ord('\r')):
+        elif key in (curses.ascii.LF, curses.ascii.CR, curses.ascii.BEL, curses.KEY_ENTER):
             fn = self.menu[list(self.menu.keys())[self.cursor]]
             if fn is not None:
                 fn()
@@ -121,7 +121,7 @@ class LoginMenu(NetworkMenu):
 
     def get_input(self) -> int:
         key = super().get_input()
-        if curses.ascii.isprint(key) or key in (curses.KEY_LEFT, curses.KEY_RIGHT):
+        if curses.ascii.isprint(key) or key in (curses.KEY_LEFT, curses.KEY_RIGHT, curses.KEY_DC):
             if self.cursor == 0:
                 self.view.usernamebox.modal(first_key=key)
                 self.username = self.view.usernamebox.value
