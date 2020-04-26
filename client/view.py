@@ -88,7 +88,7 @@ class LoginView(MenuView):
         except curses.error as e:
             self.title = str(e)
         super().draw()
-        self.stdscr.move(6 + self.controller.cursor * 3, 21)
+        self.stdscr.move(6 + self.controller.cursor * 3, 20)
 
 
 class RegisterView(MenuView):
@@ -120,7 +120,7 @@ class RegisterView(MenuView):
         except curses.error as e:
             self.title = str(e)
         super().draw()
-        self.stdscr.move(6 + self.controller.cursor * 3, 31)
+        self.stdscr.move(6 + self.controller.cursor * 3, 30)
 
 
 class GameView(View):
