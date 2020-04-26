@@ -1,120 +1,7 @@
 import curses_helper
 import curses
 import time
-
-
-class View:
-    def __init__(self, controller):
-        self.controller = controller
-
-        # Init window sizes
-        self.height, self.width = (43, 106)
-        self.stdscr = None
-
-        self.running = True
-
-    def display(self, stdscr):
-        self.stdscr = stdscr
-
-        # Start colors in curses
-        curses.start_color()
-
-        # Init color pairs
-        curses.init_pair(1, curses.COLOR_WHITE, curses.COLOR_BLACK)
-        curses.init_pair(2, curses.COLOR_BLACK, curses.COLOR_WHITE)
-        curses.init_pair(3, curses.COLOR_CYAN, curses.COLOR_BLACK)
-        curses.init_pair(4, curses.COLOR_RED, curses.COLOR_BLACK)
-        curses.init_pair(5, curses.COLOR_GREEN, curses.COLOR_BLACK)
-        curses.init_pair(6, curses.COLOR_MAGENTA, curses.COLOR_BLACK)
-
-        while self.running:
-            self.stdscr.erase()
-            self.draw()
-            self.stdscr.refresh()
-
-            try:
-                self.controller.get_input()
-            except KeyboardInterrupt:
-                exit()
-
-    def draw(self) -> None:
-        # Max terminal size
-        if self.stdscr.getmaxyx() < (self.height, self.width):
-            self.stdscr.addstr(0, 0, f"Must be {self.height} rows x {self.width} cols")
-
-    def stop(self) -> None:
-        self.running = False
-
-
-class MenuView(View):
-    def __init__(self, controller, title: str = None):
-        super().__init__(controller)
-        self.title = title
-
-    def draw(self) -> None:
-        super().draw()
-        for i in range(len(self.controller.menu)):
-            string = list(self.controller.menu.keys())[i]
-            if i == self.controller.cursor:
-                string += ' *'
-            self.stdscr.addstr(6 + i * 3, 5, string)
-
-        if self.title is not None:
-            self.stdscr.addstr(5, 5, self.title)
-
-
-class LoginView(MenuView):
-    def __init__(self, controller):
-        self.username: str = ''
-        self.password: str = ''
-
-        # Textboxes are initialised once the controller passes stdscr to the display method.
-        self.usernamebox = None
-        self.passwordbox = None
-
-        super().__init__(controller)
-
-    def display(self, stdscr):
-        self.stdscr = stdscr
-        self.usernamebox = curses_helper.TextBox(stdscr, 6, 20, 20)
-        self.passwordbox = curses_helper.TextBox(stdscr, 9, 20, 20)
-
-        super().display(stdscr)
-
-    def draw(self):
-        self.stdscr.addstr(6, 20, self.controller.username)
-        self.stdscr.addstr(9, 20, self.controller.password)
-        super().draw()
-        self.stdscr.move(6 + self.controller.cursor * 3, 20)
-
-
-class RegisterView(MenuView):
-    def __init__(self, controller):
-        self.username: str = ''
-        self.password: str = ''
-        self.confirmpassword: str = ''
-
-        # Textboxes are initialised once the controller passes stdscr to the display method.
-        self.usernamebox = None
-        self.passwordbox = None
-        self.confirmpasswordbox = None
-
-        super().__init__(controller)
-
-    def display(self, stdscr):
-        self.stdscr = stdscr
-        self.usernamebox = curses_helper.TextBox(stdscr, 6, 30, 20)
-        self.passwordbox = curses_helper.TextBox(stdscr, 9, 30, 20)
-        self.confirmpasswordbox = curses_helper.TextBox(stdscr, 12, 30, 20)
-
-        super().display(stdscr)
-
-    def draw(self):
-        self.stdscr.addstr(6, 30, self.controller.username)
-        self.stdscr.addstr(9, 30, self.controller.password)
-        self.stdscr.addstr(12, 30, self.controller.confirmpassword)
-        super().draw()
-        self.stdscr.move(6 + self.controller.cursor * 3, 30)
+from .view import View
 
 
 class GameView(View):
@@ -355,10 +242,10 @@ class GameView(View):
 
 
 class Window2Focus:
-    HELP = ["Help", ""]
-    SKILLS = ["Skills", "CONTROLS"]
-    INVENTORY = ["Inventory", "[D] Drop  [E] Equip  ..."]
-    SPELLBOOK = ["Spellbook", ""]
-    GUILD = ["Guild", ""]
-    JOURNAL = ["Journal", ""]
+    HELP = ("Help", "")
+    SKILLS = ("Skills", "CONTROLS")
+    INVENTORY = ("Inventory", "(D) Drop  (E) Equip  ...")
+    SPELLBOOK = ("Spellbook", "")
+    GUILD = ("Guild", "")
+    JOURNAL = ("Journal", "")
     # ...
