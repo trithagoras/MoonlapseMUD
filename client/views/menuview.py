@@ -1,4 +1,3 @@
-import curses_helper
 import curses
 import time
 from .view import View

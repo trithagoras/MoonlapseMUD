@@ -1,4 +1,4 @@
-import curses_helper
+from ..curses_helper import TextBox
 import curses
 import time
 from .view import View
@@ -40,7 +40,7 @@ class GameView(View):
         self.win2 = stdscr.subwin(self.win2_height, self.win2_width, self.win2_y, self.win2_x)
         self.win3 = stdscr.subwin(self.win3_height, self.win3_width, self.win3_y, self.win3_x)
 
-        self.chatbox = curses_helper.TextBox(stdscr, self.chatwin_y, self.chatwin_x, self.chatwin_width)
+        self.chatbox = TextBox(stdscr, self.chatwin_y, self.chatwin_x, self.chatwin_width)
         super().display(stdscr)
 
     def draw(self) -> None:

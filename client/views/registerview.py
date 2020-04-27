@@ -1,4 +1,4 @@
-import curses_helper
+from ..curses_helper import TextBox
 import curses
 import time
 from .menuview import MenuView
@@ -19,9 +19,9 @@ class RegisterView(MenuView):
 
     def display(self, stdscr):
         self.stdscr = stdscr
-        self.usernamebox = curses_helper.TextBox(stdscr, 6, 30, 20)
-        self.passwordbox = curses_helper.TextBox(stdscr, 9, 30, 20)
-        self.confirmpasswordbox = curses_helper.TextBox(stdscr, 12, 30, 20)
+        self.usernamebox = TextBox(stdscr, 6, 30, 20)
+        self.passwordbox = TextBox(stdscr, 9, 30, 20)
+        self.confirmpasswordbox = TextBox(stdscr, 12, 30, 20)
 
         super().display(stdscr)
 

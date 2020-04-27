@@ -1,7 +1,22 @@
 import sys
 from typing import *
-from controller import MainMenu
 import traceback
+
+# Add client to path
+import os
+from pathlib import Path # if you haven't already done so
+file = Path(__file__).resolve()
+parent, root = file.parent, file.parents[1]
+sys.path.append(str(root))
+
+# Remove client from path
+try:
+    sys.path.remove(str(parent))
+except ValueError:
+    print("Error: Removing parent from path, already gone. Traceback: ")
+    print(traceback.format_exc())
+
+from client.controllers.mainmenu import MainMenu
 
 
 def handle_arguments() -> Tuple[str, int]:
