@@ -1,9 +1,9 @@
-from .menu import Menu
-from .loginmenu import LoginMenu
-from .registermenu import RegisterMenu
-from ..views.menuview import MenuView
 from ..views.loginview import LoginView
+from ..views.menuview import MenuView
 from ..views.registerview import RegisterView
+from .loginmenu import LoginMenu
+from .menu import Menu
+from .registermenu import RegisterMenu
 
 
 class MainMenu(Menu):

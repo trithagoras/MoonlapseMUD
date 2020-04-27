@@ -1,6 +1,8 @@
 import curses
-from .controller import Controller
+
 from ..views.menuview import MenuView
+from .controller import Controller
+
 
 class Menu(Controller):
     def __init__(self, menu):

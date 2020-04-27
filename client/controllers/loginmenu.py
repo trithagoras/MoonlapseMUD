@@ -1,11 +1,12 @@
 import curses
-import socket as sock
-import traceback
 import json
+import socket as sock
 import sys
-from .networkmenu import NetworkMenu
-from .game import Game
+import traceback
+
 from ..views.loginview import LoginView
+from .game import Game
+from .networkmenu import NetworkMenu
 
 
 class LoginMenu(NetworkMenu):

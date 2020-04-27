@@ -1,11 +1,12 @@
-import socket as sock
-import traceback
-import sys
+import curses
 import json
+import socket as sock
+import sys
+import time
+import traceback
 from threading import Thread
 from typing import *
-import time
-import curses
+
 from ..views.gameview import GameView
 from .controller import Controller
 

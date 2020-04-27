@@ -1,6 +1,7 @@
 import curses
-import time
+
 from .view import View
+
 
 class MenuView(View):
     def __init__(self, controller, title: str = None):

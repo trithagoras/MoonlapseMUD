@@ -1,12 +1,12 @@
-import socket as sock
-import json
-import sys
-from threading import Thread
 import curses
-from typing import *
 import curses.ascii
-import traceback
+import json
+import socket as sock
+import sys
 import time
+import traceback
+from threading import Thread
+from typing import *
 
 from ..views import *
 
@@ -20,9 +20,3 @@ class Controller:
 
     def get_input(self) -> None:
         pass
-
-
-
-
-
-

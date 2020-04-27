@@ -1,6 +1,7 @@
-from ..curses_helper import TextBox
 import curses
 import time
+
+from ..curses_helper import TextBox
 from .view import View
 
 

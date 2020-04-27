@@ -1,10 +1,11 @@
 import curses
-import socket as sock
-import traceback
 import json
+import socket as sock
 import sys
-from .networkmenu import NetworkMenu
+import traceback
+
 from ..views.registerview import RegisterView
+from .networkmenu import NetworkMenu
 
 
 class RegisterMenu(NetworkMenu):

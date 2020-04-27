@@ -1,6 +1,4 @@
 import curses
-import time
-
 
 class View:
     def __init__(self, controller):

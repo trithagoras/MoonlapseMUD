@@ -1,7 +1,9 @@
 import socket as sock
-import traceback
 import sys
+import traceback
+
 from .menu import Menu
+
 
 class NetworkMenu(Menu):
     """
