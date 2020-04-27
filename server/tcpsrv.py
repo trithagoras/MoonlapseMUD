@@ -90,11 +90,11 @@ class TcpServer:
                     if data[-1] == ';':
                         break
 
-            except Exception:
-                print("Error: Traceback: ", file=sys.stderr)
+            except IndexError:
+                print("Error: No data. Traceback: ", file=sys.stderr)
                 print(traceback.format_exc(), file=sys.stderr)
                 client_socket.close()
-                break
+                continue
 
             try:
                 data = json.loads(data[:-1])
