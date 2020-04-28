@@ -109,7 +109,7 @@ class Database:
         return result
 
     def update_player_pos(self, player: models.Player, x: int, y: int) -> None:
-        print(f"Updating player position ({player.username})...", end='')
+        print(f"Updating player position ({player.get_username()})...", end='')
         self.curs.execute(f"""
             UPDATE entities
             SET position = '{x}, {y}'
@@ -117,14 +117,14 @@ class Database:
                 SELECT p.entityid
                 FROM players AS p
                 INNER JOIN users AS u 
-                ON p.userid = u.id and u.username = '{player.username}' 
+                ON p.userid = u.id and u.username = '{player.get_username()}' 
             )
         """)
         self.conn.commit()
         print(f"Done! New position: ({x}, {y}).")
 
     def get_player_pos(self, player: models.Player) -> Tuple[int, int]:
-        print(f"Getting player position ({player.username})...", end='')
+        print(f"Getting player position ({player.get_username()})...", end='')
         self.curs.execute(f"""
             SELECT position[0], position[1]
             FROM entities
@@ -132,7 +132,7 @@ class Database:
                 SELECT p.entityid
                 FROM players as p 
                 INNER JOIN users AS u 
-                ON p.userid = u.id AND u.username = '{player.username}'
+                ON p.userid = u.id AND u.username = '{player.get_username()}'
             )
         """)
         x, y = self.curs.fetchone()

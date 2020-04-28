@@ -4,35 +4,46 @@ from typing import *
 import traceback
 
 class Player:
-    def __init__(self, client_socket,  username: str):
-        self.client_socket = client_socket
-        self.username = username
-        self.player_id: Optional[int] = None
-        self.player_char: Optional[chr] = None
-        self.position: Optional[List[int, int]] = None
-        self.room = None
+    def __init__(self):
+        self._username: Optional[str] = None
+        self._id: Optional[int] = None
+        self._char: Optional[chr] = None
+        self._position: Optional[List[int, int]] = None
 
-    def init_data(self, player_id) -> None:
-        self.player_id = player_id
+    def assign_id(self, player_id) -> None:
+        self._id = player_id
 
-        ids: List[chr] = ['#', '@', '&', '+', '%', '$', '£']
+        choices: List[chr] = ['#', '@', '&', '+', '%', '$', '£']
+        self._char: chr = choices[self._id]
+        if self._id + 1 > len(choices):
+            self._char = 65 + self._id - len(choices)
 
-        self.player_char: chr = ids[self.player_id]
-        if self.player_id + 1 > len(ids):
-            self.player_char = 65 + self.player_id - len(ids)
-
-    def spawn_player(self, position: List[int], room) -> None:
-        self.position = position
-        self.room = room
-        if self.position == (None, None):
+    def assign_location(self, position: List[int], room) -> None:
+        self._position = position
+        if self._position == (None, None):
             while True:
-                self.position = [random.randint(1, self.room.height), random.randint(1, self.room.width)]
-                if self.position not in self.room.walls:
+                self._position = [random.randint(1, room.height), random.randint(1, room.width)]
+                if self._position not in room.walls:
                     break
 
-    def disconnect(self) -> None:
-        try:
-            self.client_socket.close()
-        except Exception:
-            print("Error: Traceback: ", file=sys.stderr)
-            print(traceback.format_exc(), file=sys.stderr)
+    def assign_username(self, username: str) -> None:
+        self._username = username
+
+    def get_username(self) -> str:
+        return self._username
+
+    def get_id(self) -> int:
+        return self._id
+
+    def get_position(self) -> Tuple[int]:
+        return self._position
+
+    def move(self, direction: chr):
+        if direction == 'u':
+            self._position[0] -= 1
+        elif direction == 'd':
+            self._position[0] += 1
+        elif direction == 'l':
+            self._position[1] -= 1
+        else:
+            self._position[1] += 1

@@ -102,13 +102,11 @@ class TcpServer:
                         if self.database.password_correct(username, password):
                             print("Password matched!")
 
-                            player: models.Player = models.Player(client_socket, username)
-
                             # TODO: Allow player to spawn in their last known room
                             # Try to spawn the player into the next available room
                             for room in self.rooms:
                                 try:
-                                    room.spawn(player)
+                                    room.spawn(client_socket, username)
                                 except Exception:
                                     print("Error: Traceback: ", file=sys.stderr)
                                     print(traceback.format_exc(), file=sys.stderr)

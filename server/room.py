@@ -27,7 +27,7 @@ from networking import models
 class Room:
     def __init__(self, tcpsrv, room_map, capacity):
         self.walls: set = set()
-        self.players: List[Optional[models.Player]] = []
+        self.player_sockets: Dict[models.Player, socket.socket] = {}
         self.capacity = capacity
 
         self.tcpsrv = tcpsrv
@@ -43,101 +43,94 @@ class Room:
             self.walls = map_data['walls']
             self.width, self.height = map_data['size']
 
-        # Create player spots in game object
-        for index in range(0, self.capacity):
-            self.players.append(None)
 
-    def kick(self, player_id: int, reason='Not given'):
-        player = self.players[player_id]
-        if player is not None:
-            player.disconnect()
-            username = self.players[player_id].username
-            self.tcpsrv.log.log(time.time(), f"{username} has departed. Reason: {reason}")
-            print(f"Kicked {username}. Reason: {reason}")
-        else:
-            self.tcpsrv.log.log(time.time(), f"Player {player_id} has departed. Reason: {reason}")
-            print(f"Kicked player {player_id}. Reason: {reason}")
-        self.players[player_id] = None
+    def kick(self, player: models.Player, reason='Not given'):
+            self.player_sockets[player].close()
+            self.tcpsrv.log.log(time.time(), f"{player.get_username()} has departed. Reason: {reason}")
+            print(f"Kicked {player.get_username()}. Reason: {reason}")
 
-    def spawn(self, player: models.Player):
-        print("Trying to spawn player:", player)
-        player_id: int = -1
-        for index in range(self.capacity):
-            if self.players[index] is None:
-                player_id = index
-                break
-        print("Assigned player", player, "id", player_id)
-        if player_id == -1:
+    def spawn(self, client_socket: socket.socket, username: str):
+        print("Trying to spawn player...")
+
+        player: models.Player = models.Player()
+        player.assign_username(username)
+        print(f"Assigned username: {username}")
+
+        if len(self.player_sockets) >= self.capacity:
             self.send(player, pack.ServerRoomFullPacket())
-            player.client_socket.close()
-            print(f"Connection from {player.client_socket} rejected.")
+            client_socket.close()
+            print(f"Connection from {player} rejected.")
             return
 
-        else:
-            print(f"Connection from {player.client_socket}. Assigning to player {player_id}")
-            self.tcpsrv.log.log(time.time(), f"{player.username} has arrived.")
+        player_id: int = len(self.player_sockets)
+        player.assign_id(player_id)
 
-            self.send(player, pack.ServerRoomPlayerPacket(player))
-            player.player_id = player_id
-            self.send(player, pack.ServerRoomSizePacket(self.height, self.width))
-            self.send(player, pack.ServerRoomGeometryPacket(self.walls))
-            self.send(player, pack.ServerRoomTickRatePacket(self.tcpsrv.tick_rate))
-    
-            init_pos = self.tcpsrv.database.get_player_pos(player)
-            player.spawn_player(init_pos, self)
+        print(f"Connection from {player}. Assigned player id: {player_id}")
+        self.tcpsrv.log.log(time.time(), f"{player.get_username()} has arrived.")
 
-            if init_pos == (None, None):
-                pos = player.position
-                self.tcpsrv.database.update_player_pos(player, pos[0], pos[1])
+        init_pos = self.tcpsrv.database.get_player_pos(player)
+        player.assign_location(init_pos, self)
 
-            self.players[player_id] = player
-            Thread(target=self.tcpsrv.listen, args=(player,), daemon=True).start()
+        if init_pos == (None, None):
+            pos = player.get_position()
+            self.tcpsrv.database.update_player_pos(player, pos[0], pos[1])
+
+        self.player_sockets[player] = client_socket
+
+        self.send(player, pack.ServerRoomPlayerPacket(player))
+        self.send(player, pack.ServerRoomSizePacket(self.height, self.width))
+        self.send(player, pack.ServerRoomGeometryPacket(self.walls))
+        self.send(player, pack.ServerRoomTickRatePacket(self.tcpsrv.tick_rate))
+        
+        Thread(target=self.tcpsrv.listen, args=(player,), daemon=True).start()
 
     def listen(self, player: models.Player) -> None:
         print(f"Waiting for data from player {player}...")
         if player is None:
             print("Player not found. Stop listening.")
             return
-        print(f"Got player: {player.username}. ")
+        print(f"Got player: {player.get_username()}. ")
         
-        packet: pack.Packet = pack.receivepacket(player.client_socket)
+        packet: pack.Packet = pack.receivepacket(self.player_sockets[player])
 
         print(f"Received data from player {player}: {packet}")
 
         # Move
         if isinstance(packet, pack.MovePacket):
-            pos = player.position
+            pos: Tuple[int] = player.get_position()
             dir = packet.payloads[0].value
-            if dir == 'u' and pos[0] - 1 > 0 and [pos[0] - 1, pos[1]] not in self.walls:
-                pos[0] -= 1
-            if dir == 'r' and pos[1] + 1 < self.width - 1 and [pos[0], pos[1] + 1] not in self.walls:
-                pos[1] += 1
-            if dir == 'd' and pos[0] + 1 < self.height - 1 and [pos[0] + 1, pos[1]] not in self.walls:
-                pos[0] += 1
-            if dir == 'l' and pos[1] - 1 > 0 and [pos[0], pos[1] - 1] not in self.walls:
-                pos[1] -= 1
+            dest: List[int] = [pos[0] + (dir == 'd') - (dir == 'u'), pos[1] + (dir == 'r') - (dir == 'l')]
+           
+            if within_bounds(dest) and dest not in self.walls:
+                player.move(dir)
+           
             self.tcpsrv.database.update_player_pos(player, pos[0], pos[1])
+
         # Chat
         elif isinstance(packet, pack.ChatPacket):
-            self.tcpsrv.log.log(time.time(), f"{player.username} says: {packet.payloads[0].value}")
+            self.tcpsrv.log.log(time.time(), f"{player.get_username()} says: {packet.payloads[0].value}")
+        
         # Disconnect
         elif isinstance(packet, pack.DisconnectPacket):
             self.kick(player, reason="Player said goodbye.")
             return
 
+    def within_bounds(self, coords: List[int]) -> bool:
+        return 0 <= coords[0] < self.height and 0 <= coords[1] < self.width
+
     def update_clients(self) -> None:
-        for player in self.players:
+        for player in self.player_sockets:
             if player is not None:
                 self.send(player, pack.ServerLogPacket(self.tcpsrv.log.latest))
 
     def send(self, player: models.Player, packet: pack.Packet):
         if player:
             try:
-                pack.sendpacket(player.client_socket, packet)
+                pack.sendpacket(self.player_sockets[player], packet)
             except socket.error:
                 print("Error: Socket error. Traceback: ", file=sys.stderr)
                 print(traceback.format_exc(), file=sys.stderr)
-                self.kick(player.player_id, reason=f"Server couldn't send packet {packet} to client socket.")
+                self.kick(player.get_id(), reason=f"Server couldn't send packet {packet} to client socket.")
             except Exception:
                 print("Error: Traceback: ", file=sys.stderr)
                 print(traceback.format_exc(), file=sys.stderr)

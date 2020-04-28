@@ -76,16 +76,16 @@ class Game(Controller):
             packet: Packet = pack.receivepacket(self.s)
 
             if isinstance(packet, pack.ServerRoomSizePacket):
-                # print(f"Got size payload: {packet.payloads}")
+                print(f"Got size payload: {packet.payloads}")
                 self.size = [packet.payloads[0].value, packet.payloads[1].value]
             elif isinstance(packet, pack.ServerRoomPlayerPacket):
-                # print(f"Got player payload: {packet.payloads[0]}")
+                print(f"Got player payload: {packet.payloads[0]}")
                 self.player = packet.payloads[0].value
             elif isinstance(packet, pack.ServerRoomGeometryPacket):
-                # print(f"Got geometry payload: {packet.payloads[0]}")
+                print(f"Got geometry payload: {packet.payloads[0]}")
                 self.walls = packet.payloads[0].value
             elif isinstance(packet, pack.ServerRoomTickRatePacket):
-                # print(f"Got tick_rate payload: {packet.payloads[0]}")
+                print(f"Got tick_rate payload: {packet.payloads[0]}")
                 self.tick_rate = packet.payloads[0].value
         
         # Get volatile data such as player positions, etc.
