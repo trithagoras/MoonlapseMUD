@@ -14,7 +14,7 @@ class Payload:
         return self.value
 
     def __repr__(self):
-        return str(self.value)
+        return f"(Payload: {self.value})"
 
 
 class StdPayload(Payload):

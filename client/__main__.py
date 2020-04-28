@@ -35,7 +35,7 @@ def handle_arguments() -> Tuple[str, int]:
     :return: The hostname and/or port specified in the command line arguments, otherwise ('moonlapse.net', 8081).
     """
     hostname: str = 'moonlapse.net'
-    port: int = 8081
+    port: int = 42523
 
     # sys.argv will return something like ['client', 'localhost', 8081]
     n_args: int = len(sys.argv)

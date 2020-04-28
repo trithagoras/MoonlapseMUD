@@ -91,8 +91,10 @@ class TcpServer:
                 print(f"Received data from client {client_socket}: {packet}")
 
                 if isinstance(packet, pack.LoginPacket):
-                    username: str = packet.payloads[0]
-                    password: str = packet.payloads[1]
+                    print("PAYLOAD="+str(packet.payloads[0]))
+                    print("VALUE="+packet.payloads[0].value)
+                    username: str = packet.payloads[0].value
+                    password: str = packet.payloads[1].value
                     print(f"Got username: {username} and password: {password}")
 
                     if self.database.user_exists(username):
@@ -118,8 +120,8 @@ class TcpServer:
                         client_socket.close()
 
                 elif isinstance(packet, pack.RegisterPacket):
-                    username = packet.payloads[0]
-                    password = packet.payloads[1]
+                    username = packet.payloads[0].value
+                    password = packet.payloads[1].value
                     print(f"Got username: {username} and password: {password}")
 
                     if self.database.user_exists(username):

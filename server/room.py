@@ -110,18 +110,19 @@ class Room:
         # Move
         if isinstance(packet, pack.MovePacket):
             pos = player.position
-            if packet.payloads[0] == 'u' and pos[0] - 1 > 0 and [pos[0] - 1, pos[1]] not in self.walls:
+            dir = packet.payloads[0].value
+            if dir == 'u' and pos[0] - 1 > 0 and [pos[0] - 1, pos[1]] not in self.walls:
                 pos[0] -= 1
-            if packet.payloads == 'r' and pos[1] + 1 < self.width - 1 and [pos[0], pos[1] + 1] not in self.walls:
+            if dir == 'r' and pos[1] + 1 < self.width - 1 and [pos[0], pos[1] + 1] not in self.walls:
                 pos[1] += 1
-            if packet.payloads == 'd' and pos[0] + 1 < self.height - 1 and [pos[0] + 1, pos[1]] not in self.walls:
+            if dir == 'd' and pos[0] + 1 < self.height - 1 and [pos[0] + 1, pos[1]] not in self.walls:
                 pos[0] += 1
-            if packet.payloads == 'l' and pos[1] - 1 > 0 and [pos[0], pos[1] - 1] not in self.walls:
+            if dir == 'l' and pos[1] - 1 > 0 and [pos[0], pos[1] - 1] not in self.walls:
                 pos[1] -= 1
             self.tcpsrv.database.update_player_pos(player, pos[0], pos[1])
         # Chat
         elif isinstance(packet, pack.ChatPacket):
-            self.tcpsrv.log.log(time.time(), f"{player.username} says: {packet.payloads[0]}")
+            self.tcpsrv.log.log(time.time(), f"{player.username} says: {packet.payloads[0].value}")
         # Disconnect
         elif isinstance(packet, pack.DisconnectPacket):
             self.kick(player_id, reason="Player said goodbye.")

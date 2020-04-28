@@ -23,7 +23,7 @@ class Packet:
 
 
 class LoginPacket(Packet):
-    def __init__(self, username: str = None, password: str = None, *payloads):
+    def __init__(self, username, password: str):
         pusername = Payload(username)
         ppassword = Payload(password)
         super().__init__(pusername, ppassword)
@@ -108,16 +108,25 @@ class ServerRoomTickRatePacket(Packet):
         super().__init__(Payload(tickrate))
 
 def sendpacket(s: sock.socket, packet: Packet) -> None:
-    s.send(bytes(packet.serialize() + ';', 'utf-8'))
+    data: str = packet.serialize() + ';'
+    nbytes: int = len(data)
+    s.send(bytes(str(nbytes) + data, 'utf-8'))
 
 
 def receivepacket(s: sock.socket) -> Packet:
-    data: str = ''
-    while True:
-        data += s.recv(1024).decode('utf-8')
+    # data should look something like this
+    # 35{'a': 'Packet', 'p0': 'Something'};
 
-        if data[-1] == ';':
-            break
+    # Get the size of the data first
+    sizestr: str = ' '
+    while sizestr[-1] != '{':
+        sizestr += s.recv(1).decode('utf-8')
+    size: int = int(sizestr[:-1])
+    print(f"Got size: {size}")
+
+    # Get the next data to size
+    data: str = '{' + s.recv(size - 1).decode('utf-8')
+
     print(f"Got data: {data[:-1]}")
     return constructpacket(json.loads(data[:-1]))
 
@@ -131,7 +140,7 @@ def constructpacket(obj_dict: Dict[str, str]) -> Packet:
             action = value
         elif key[0] == 'p':
             index: int = int(key[1:])
-            payloads.insert(index, Payload(value))
+            payloads.insert(index, value)
     
     # Use reflection to construct the specific packet type we're looking for
     specificPacketClassName:str = action
