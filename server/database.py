@@ -1,8 +1,25 @@
 import json
 import psycopg2
 import datetime
-from player import Player
 from typing import *
+import traceback
+import sys
+
+# Add server to path
+import os
+from pathlib import Path # if you haven't already done so
+file = Path(__file__).resolve()
+parent, root = file.parent, file.parents[1]
+sys.path.append(str(root))
+
+# Remove server from path
+try:
+    sys.path.remove(str(parent))
+except ValueError:
+    print("Error: Removing parent from path, already gone. Traceback: ")
+    print(traceback.format_exc())
+
+from networking import models
 
 
 class Database:
@@ -91,7 +108,7 @@ class Database:
         print(f"Result: {result}")
         return result
 
-    def update_player_pos(self, player: Player, x: int, y: int) -> None:
+    def update_player_pos(self, player: models.Player, x: int, y: int) -> None:
         print(f"Updating player position ({player.username})...", end='')
         self.curs.execute(f"""
             UPDATE entities
@@ -106,7 +123,7 @@ class Database:
         self.conn.commit()
         print(f"Done! New position: ({x}, {y}).")
 
-    def get_player_pos(self, player: Player) -> Tuple[int, int]:
+    def get_player_pos(self, player: models.Player) -> Tuple[int, int]:
         print(f"Getting player position ({player.username})...", end='')
         self.curs.execute(f"""
             SELECT position[0], position[1]

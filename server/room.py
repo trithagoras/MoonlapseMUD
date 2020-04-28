@@ -4,7 +4,6 @@ import sys
 import time
 from threading import Thread
 from typing import *
-from player import Player
 import traceback
 
 # Add server to path
@@ -22,12 +21,13 @@ except ValueError:
     print(traceback.format_exc())
 
 from networking import packet as pack
+from networking import models
 
 
 class Room:
     def __init__(self, tcpsrv, room_map, capacity):
         self.walls: set = set()
-        self.players: List[Optional[Player]] = []
+        self.players: List[Optional[models.Player]] = []
         self.capacity = capacity
 
         self.tcpsrv = tcpsrv
@@ -59,7 +59,7 @@ class Room:
             print(f"Kicked player {player_id}. Reason: {reason}")
         self.players[player_id] = None
 
-    def spawn(self, player: Player):
+    def spawn(self, player: models.Player):
         print("Trying to spawn player:", player)
         player_id: int = -1
         for index in range(self.capacity):
@@ -77,13 +77,11 @@ class Room:
             print(f"Connection from {player.client_socket}. Assigning to player {player_id}")
             self.tcpsrv.log.log(time.time(), f"{player.username} has arrived.")
 
-            print("Trying to send init data to client")
-            self.send(player, pack.ServerRoomPlayerIdPacket(player_id))
+            self.send(player, pack.ServerRoomPlayerPacket(player))
             player.player_id = player_id
             self.send(player, pack.ServerRoomSizePacket(self.height, self.width))
             self.send(player, pack.ServerRoomGeometryPacket(self.walls))
             self.send(player, pack.ServerRoomTickRatePacket(self.tcpsrv.tick_rate))
-            print("AFAIK I've sent everything")
     
             init_pos = self.tcpsrv.database.get_player_pos(player)
             player.spawn_player(init_pos, self)
@@ -93,11 +91,10 @@ class Room:
                 self.tcpsrv.database.update_player_pos(player, pos[0], pos[1])
 
             self.players[player_id] = player
-            Thread(target=self.tcpsrv.listen, args=(player_id,), daemon=True).start()
+            Thread(target=self.tcpsrv.listen, args=(player,), daemon=True).start()
 
-    def listen(self, player_id) -> None:
-        print(f"Waiting for data from player {player_id}...")
-        player = self.players[player_id]
+    def listen(self, player: models.Player) -> None:
+        print(f"Waiting for data from player {player}...")
         if player is None:
             print("Player not found. Stop listening.")
             return
@@ -105,7 +102,7 @@ class Room:
         
         packet: pack.Packet = pack.receivepacket(player.client_socket)
 
-        print(f"Received data from player {player_id}: {packet}")
+        print(f"Received data from player {player}: {packet}")
 
         # Move
         if isinstance(packet, pack.MovePacket):
@@ -125,7 +122,7 @@ class Room:
             self.tcpsrv.log.log(time.time(), f"{player.username} says: {packet.payloads[0].value}")
         # Disconnect
         elif isinstance(packet, pack.DisconnectPacket):
-            self.kick(player_id, reason="Player said goodbye.")
+            self.kick(player, reason="Player said goodbye.")
             return
 
     def update_clients(self) -> None:
@@ -133,7 +130,7 @@ class Room:
             if player is not None:
                 self.send(player, pack.ServerLogPacket(self.tcpsrv.log.latest))
 
-    def send(self, player: Player, packet: pack.Packet):
+    def send(self, player: models.Player, packet: pack.Packet):
         if player:
             try:
                 pack.sendpacket(player.client_socket, packet)

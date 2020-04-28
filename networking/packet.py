@@ -2,8 +2,10 @@ from typing import *
 import json
 import socket as sock
 import traceback
+import pickle
 
-from .payload import *   
+from .payload import *
+from .models import *
 
 
 class Packet:
@@ -80,9 +82,9 @@ class ServerRoomFullPacket(Packet):
         super().__init__()
 
 
-class ServerRoomPlayerIdPacket(Packet):
-    def __init__(self, playerId: int):
-        super().__init__(Payload(playerId))
+class ServerRoomPlayerPacket(Packet):
+    def __init__(self, player: Player):
+        super().__init__(Payload(player))
 
 
 class ServerRoomGeometryPacket(Packet):
@@ -108,9 +110,14 @@ class ServerRoomTickRatePacket(Packet):
         super().__init__(Payload(tickrate))
 
 def sendpacket(s: sock.socket, packet: Packet) -> None:
-    data: str = packet.serialize() + ';'
-    nbytes: int = len(data)
-    s.send(bytes(str(nbytes) + data, 'utf-8'))
+    try:
+        data: str = packet.serialize() + ';'
+        nbytes: int = len(data)
+        s.send(bytes(str(nbytes) + data, 'utf-8'))
+    except TypeError:
+        print("Bro you tried pickling a socket...")
+        print(s)
+        print(packet)
 
 
 def receivepacket(s: sock.socket) -> Packet:
@@ -122,12 +129,10 @@ def receivepacket(s: sock.socket) -> Packet:
     while sizestr[-1] != '{':
         sizestr += s.recv(1).decode('utf-8')
     size: int = int(sizestr[:-1])
-    print(f"Got size: {size}")
 
     # Get the next data to size
     data: str = '{' + s.recv(size - 1).decode('utf-8')
 
-    print(f"Got data: {data[:-1]}")
     return constructpacket(json.loads(data[:-1]))
 
 
@@ -140,7 +145,8 @@ def constructpacket(obj_dict: Dict[str, str]) -> Packet:
             action = value
         elif key[0] == 'p':
             index: int = int(key[1:])
-            payloads.insert(index, value)
+            payloadbytes = bytes.fromhex(value)
+            payloads.insert(index, pickle.loads(payloadbytes))
     
     # Use reflection to construct the specific packet type we're looking for
     specificPacketClassName:str = action

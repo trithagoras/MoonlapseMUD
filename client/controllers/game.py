@@ -8,6 +8,7 @@ from threading import Thread
 from typing import *
 
 from networking import packet as pack
+from networking import models
 from ..views.gameview import GameView
 from .controller import Controller
 
@@ -21,7 +22,7 @@ class Game(Controller):
         self.connected = False
 
         # Game data
-        self.player_id: Optional[int] = None
+        self.player: Optional[models.Player] = None
         self.walls: Optional[List[List[int, int]]] = None
         self.size: Optional[Tuple[int, int]] = None
         self.tick_rate: Optional[int] = None
@@ -62,7 +63,7 @@ class Game(Controller):
         Thread(target=self.load_game_data, daemon=True).start()
 
         # Don't draw with game data until it's been received
-        while None in (self.size, self.player_id, self.walls, self.tick_rate):
+        while None in (self.size, self.player, self.walls, self.tick_rate):
             time.sleep(0.2)
 
         # Start the view's display thread
@@ -71,23 +72,22 @@ class Game(Controller):
     def load_game_data(self) -> None:
         print("Getting data...")
         # Get initial room data if not already done
-        while None in (self.size, self.player_id, self.walls, self.tick_rate):
+        while None in (self.size, self.player, self.walls, self.tick_rate):
             packet: Packet = pack.receivepacket(self.s)
 
             if isinstance(packet, pack.ServerRoomSizePacket):
-                print(f"Got size payload: {packet.payloads}")
+                # print(f"Got size payload: {packet.payloads}")
                 self.size = [packet.payloads[0].value, packet.payloads[1].value]
-            elif isinstance(packet, pack.ServerRoomPlayerIdPacket):
-                print(f"Got player_id payload: {packet.payloads[0]}")
-                self.player_id = packet.payloads[0].value
+            elif isinstance(packet, pack.ServerRoomPlayerPacket):
+                # print(f"Got player payload: {packet.payloads[0]}")
+                self.player = packet.payloads[0].value
             elif isinstance(packet, pack.ServerRoomGeometryPacket):
-                print(f"Got geometry payload: {packet.payloads[0]}")
+                # print(f"Got geometry payload: {packet.payloads[0]}")
                 self.walls = packet.payloads[0].value
             elif isinstance(packet, pack.ServerRoomTickRatePacket):
-                print(f"Got tick_rate payload: {packet.payloads[0]}")
+                # print(f"Got tick_rate payload: {packet.payloads[0]}")
                 self.tick_rate = packet.payloads[0].value
         
-        print("Got initial data")
         # Get volatile data such as player positions, etc.
         packet: Packet = pack.receivepacket(self.s)
 

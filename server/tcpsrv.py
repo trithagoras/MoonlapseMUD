@@ -5,11 +5,11 @@ import time
 import os
 from typing import *
 from room import Room
-from player import Player
 from log import Log
 from threading import Thread
 import traceback
 
+from networking import models
 from networking import packet as pack
 
 class TcpServer:
@@ -102,7 +102,7 @@ class TcpServer:
                         if self.database.password_correct(username, password):
                             print("Password matched!")
 
-                            player: Player = Player(client_socket, username)
+                            player: models.Player = models.Player(client_socket, username)
 
                             # TODO: Allow player to spawn in their last known room
                             # Try to spawn the player into the next available room
@@ -139,13 +139,10 @@ class TcpServer:
         print("Oops... No longer listening to client data...", file=sys.stderr)
 
 
-    def listen(self, player_id) -> None:
+    def listen(self, player: models.Player) -> None:
         while True:
             for room in self.rooms:
-                player: Player = room.players[player_id]
-                if player is None:
-                    continue
-                room.listen(player_id)
+                room.listen(player)
 
     def update_clients(self) -> None:
         for room in self.rooms:

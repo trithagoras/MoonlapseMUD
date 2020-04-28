@@ -1,5 +1,5 @@
 from typing import *
-import json
+import pickle
 
 
 class Payload:
@@ -11,7 +11,7 @@ class Payload:
             self.value: str = value.replace(';', '\\;')
 
     def serialize(self):
-        return self.value
+        return pickle.dumps(self.value).hex()
 
     def __repr__(self):
         return f"(Payload: {self.value})"
