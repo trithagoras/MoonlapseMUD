@@ -14,7 +14,7 @@ class NetworkMenu(Menu):
         super().__init__(menu)
 
         self.addr = (host, port)
-        self.s = None
+        self.s: sock.socket = None
 
     """
     Attempts to connect to the network and start the menu. Returns an error

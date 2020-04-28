@@ -7,6 +7,22 @@ from typing import *
 from player import Player
 import traceback
 
+# Add server to path
+import os
+from pathlib import Path # if you haven't already done so
+file = Path(__file__).resolve()
+parent, root = file.parent, file.parents[1]
+sys.path.append(str(root))
+
+# Remove server from path
+try:
+    sys.path.remove(str(parent))
+except ValueError:
+    print("Error: Removing parent from path, already gone. Traceback: ")
+    print(traceback.format_exc())
+
+from networking import packet as pack
+
 
 class Room:
     def __init__(self, tcpsrv, room_map, capacity):
@@ -31,130 +47,99 @@ class Room:
         for index in range(0, self.capacity):
             self.players.append(None)
 
-    def kick(self, player_id: int):
-        username = self.players[player_id].username
-        self.players[player_id].disconnect()
-        self.tcpsrv.log.log(time.time(), f"{username} has departed.")
+    def kick(self, player_id: int, reason='Not given'):
+        player = self.players[player_id]
+        if player is not None:
+            player.disconnect()
+            username = self.players[player_id].username
+            self.tcpsrv.log.log(time.time(), f"{username} has departed. Reason: {reason}")
+            print(f"Kicked {username}. Reason: {reason}")
+        else:
+            self.tcpsrv.log.log(time.time(), f"Player {player_id} has departed. Reason: {reason}")
+            print(f"Kicked player {player_id}. Reason: {reason}")
         self.players[player_id] = None
-        print(f"Kicked {username}")
 
     def spawn(self, player: Player):
+        print("Trying to spawn player:", player)
         player_id: int = -1
         for index in range(self.capacity):
             if self.players[index] is None:
                 player_id = index
                 break
-
+        print("Assigned player", player, "id", player_id)
         if player_id == -1:
-            player.client_socket.send(bytes('full;', 'utf-8'))
+            self.send(player, pack.ServerRoomFullPacket())
             player.client_socket.close()
             print(f"Connection from {player.client_socket} rejected.")
+            return
 
         else:
             print(f"Connection from {player.client_socket}. Assigning to player {player_id}")
             self.tcpsrv.log.log(time.time(), f"{player.username} has arrived.")
-            init_data = {
-                'id': player_id,
-                'w': self.width,
-                'h': self.height,
-                'walls': self.walls,
-                't': self.tcpsrv.tick_rate
-            }
 
-            player.client_socket.send(bytes(json.dumps(init_data) + ';', 'utf-8'))
-            player.init_data(init_data)
-
+            print("Trying to send init data to client")
+            self.send(player, pack.ServerRoomPlayerIdPacket(player_id))
+            player.player_id = player_id
+            self.send(player, pack.ServerRoomSizePacket(self.height, self.width))
+            self.send(player, pack.ServerRoomGeometryPacket(self.walls))
+            self.send(player, pack.ServerRoomTickRatePacket(self.tcpsrv.tick_rate))
+            print("AFAIK I've sent everything")
+    
             init_pos = self.tcpsrv.database.get_player_pos(player)
-            player.spawn_player(init_pos)
+            player.spawn_player(init_pos, self)
 
             if init_pos == (None, None):
-                pos = player.state['pos']
-                self.tcpsrv.database.update_player_pos(player, pos['x'], pos['y'])
+                pos = player.position
+                self.tcpsrv.database.update_player_pos(player, pos[0], pos[1])
 
             self.players[player_id] = player
             Thread(target=self.tcpsrv.listen, args=(player_id,), daemon=True).start()
 
     def listen(self, player_id) -> None:
+        print(f"Waiting for data from player {player_id}...")
         player = self.players[player_id]
-        data = ''
-        try:
-            while True:
-                data += player.client_socket.recv(1024).decode('utf-8')
-
-                if data[-1] == ';':
-                    break
-
-        except Exception:
-            self.kick(player_id)
-            print("Error: Traceback: ", file=sys.stderr)
-            print(traceback.format_exc(), file=sys.stderr)
+        if player is None:
+            print("Player not found. Stop listening.")
             return
+        print(f"Got player: {player.username}. ")
+        
+        packet: pack.Packet = pack.receivepacket(player.client_socket)
 
-        try:
-            data = json.loads(data[:-1])
-            action: str = data['a']
-            payload: str = data['p']
-            try:
-                payload2 = data['p2']
-            except KeyError:
-                print(f"Error: KeyError finding key 'p2' in dictionary {data}. Traceback: ", file=sys.stderr)
-                print(traceback.format_exc(), file=sys.stderr)
-                payload2 = ''
+        print(f"Received data from player {player_id}: {packet}")
 
-            print(f"Received data from player {player_id}: Action={action}, Payload={payload}:{payload2}")
-
-            pos = player.state['pos']
-
-            # Move
-            if action == 'm':
-                if payload == 0 and pos['y'] - 1 > 0 and [pos['x'], pos['y'] - 1] not in self.walls:
-                    pos['y'] -= 1
-                if payload == 1 and pos['x'] + 1 < self.width - 1 and [pos['x'] + 1, pos['y']] not in self.walls:
-                    pos['x'] += 1
-                if payload == 2 and pos['y'] + 1 < self.height - 1 and [pos['x'], pos['y'] + 1] not in self.walls:
-                    pos['y'] += 1
-                if payload == 3 and pos['x'] - 1 > 0 and [pos['x'] - 1, pos['y']] not in self.walls:
-                    pos['x'] -= 1
-
-                self.tcpsrv.database.update_player_pos(player, pos['x'], pos['y'])
-
-            # Chat
-            elif action == 'c':
-                payload = payload.replace(';', '\\;')
-                payload = payload.replace('\\\\;', '\\;')
-                self.tcpsrv.log.log(time.time(), f"{player.username} says: {payload}")
-
-            elif action == 'bye':
-                self.kick(player_id)
-                return
-
-        except Exception:
-            print("Error: Traceback: ", file=sys.stderr)
-            print(traceback.format_exc(), file=sys.stderr)
+        # Move
+        if isinstance(packet, pack.MovePacket):
+            pos = player.position
+            if packet.payloads[0] == 'u' and pos[0] - 1 > 0 and [pos[0] - 1, pos[1]] not in self.walls:
+                pos[0] -= 1
+            if packet.payloads == 'r' and pos[1] + 1 < self.width - 1 and [pos[0], pos[1] + 1] not in self.walls:
+                pos[1] += 1
+            if packet.payloads == 'd' and pos[0] + 1 < self.height - 1 and [pos[0] + 1, pos[1]] not in self.walls:
+                pos[0] += 1
+            if packet.payloads == 'l' and pos[1] - 1 > 0 and [pos[0], pos[1] - 1] not in self.walls:
+                pos[1] -= 1
+            self.tcpsrv.database.update_player_pos(player, pos[0], pos[1])
+        # Chat
+        elif isinstance(packet, pack.ChatPacket):
+            self.tcpsrv.log.log(time.time(), f"{player.username} says: {packet.payloads[0]}")
+        # Disconnect
+        elif isinstance(packet, pack.DisconnectPacket):
+            self.kick(player_id, reason="Player said goodbye.")
             return
 
     def update_clients(self) -> None:
-        players = []
-
-        for index in range(0, len(self.players)):
-            player = self.players[index]
-            players.append(player.state if player else None)
-
         for player in self.players:
             if player is not None:
-                self.send(player, {
-                    'p': players,
-                    'l': self.tcpsrv.log.latest
-                })
+                self.send(player, pack.ServerLogPacket(self.tcpsrv.log.latest))
 
-    def send(self, player, data):
+    def send(self, player: Player, packet: pack.Packet):
         if player:
             try:
-                player.client_socket.send(bytes(json.dumps(data) + ";", 'utf-8'))
+                pack.sendpacket(player.client_socket, packet)
             except socket.error:
                 print("Error: Socket error. Traceback: ", file=sys.stderr)
                 print(traceback.format_exc(), file=sys.stderr)
-                self.kick(player.player_id)
+                self.kick(player.player_id, reason=f"Server couldn't send packet {packet} to client socket.")
             except Exception:
                 print("Error: Traceback: ", file=sys.stderr)
                 print(traceback.format_exc(), file=sys.stderr)

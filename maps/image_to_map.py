@@ -25,7 +25,7 @@ output = {
 for row in range(0, height):
   for column in range(0, width):
     if values[row * width + column] == 0:
-      output['walls'].append([column, row])
+      output['walls'].append([row, column])
 
 with open(f_out, 'w') as file:
     json.dump(output, file)

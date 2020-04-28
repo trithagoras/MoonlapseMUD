@@ -7,6 +7,7 @@ import traceback
 from threading import Thread
 from typing import *
 
+from networking import packet as pack
 from ..views.gameview import GameView
 from .controller import Controller
 
@@ -19,54 +20,33 @@ class Game(Controller):
 
         self.connected = False
 
-        self.player_id: int = 0
-        self.game_data: dict = {}
-        self.walls: list = []
-
-        self.size: Tuple[int, int] = (-1, -1)
-        self.tick_rate: int = -1
+        # Game data
+        self.player_id: Optional[int] = None
+        self.walls: Optional[List[List[int, int]]] = None
+        self.size: Optional[Tuple[int, int]] = None
+        self.tick_rate: Optional[int] = None
 
         # UI
         self.chatbox = None
         self.view = GameView(self)
 
     def connect(self) -> None:
+        print("Trying to connect...")
         try:
             self.s.connect(self.addr)
-        except sock.error:
+        except OSError:
             # Most likely safe to ignore because socket should be already connected
-            print(f"Error: Connection refused. Traceback: ", file=sys.stderr)
+            print(f"Error: Already connected. Traceback: ", file=sys.stderr)
             print(traceback.format_exc(), file=sys.stderr)
-        message: str = ""
-        while True:
-            try:
-                message += self.s.recv(1).decode('utf-8')
-            except sock.error as e:
-                print("Error: Error receiving message. Traceback: ", file=sys.stderr)
-                print(traceback.format_exc())
-                self.chat("I got an error receiving a message!")
-
-            if message[-1] == ";":
-                if message[:-1] == 'full':
-                    print('Session is full.')
-                    sys.exit()
-                else:
-                    data = json.loads(message[:-1])
-                    break
-
-        self.size = (data['h'], data['w'])
-        self.player_id = data['id']
-        self.walls = data['walls']
-        self.tick_rate = data['t']
+        except Exception:
+            print("Error: Unknown error. Traceback: ")
+            print(traceback.format_exc())
 
         self.connected = True
 
     def disconnect(self) -> None:
         try:
-            # Action: move, Payload: direction
-            self.s.send(bytes(json.dumps({
-                'a': 'bye'
-            }) + ';', 'utf-8'))
+            pack.sendpacket(pack.DisconnectPacket())
         except sock.error as e:
             print("Error: Socket error. Traceback: ", file=sys.stderr)
             print(traceback.format_exc())
@@ -79,32 +59,38 @@ class Game(Controller):
         self.connect()
 
         # Listen for game data in its own thread
-        Thread(target=self.load_data, daemon=True).start()
+        Thread(target=self.load_game_data, daemon=True).start()
 
-        # Don't use game data until it's been received
-        while self.game_data == {}:
+        # Don't draw with game data until it's been received
+        while None in (self.size, self.player_id, self.walls, self.tick_rate):
             time.sleep(0.2)
 
+        # Start the view's display thread
         super().start()
 
-    def load_data(self) -> None:
-        message = ""
-        while self.connected:
-            try:
-                message += self.s.recv(1).decode('utf-8')
-                if message[-1] == ";":
-                    if message[-2] != '\\':
-                        # Terminate, end of JSON clause
-                        self.game_data = json.loads(message[:-1])
-                    else:
-                        # Interpret as a literal
-                        message = message[:-3] + ';'
-                        continue
-                    message = ""
-            except sock.error:
-                print("Error: Socket error. Traceback: ", file=sys.stderr)
-                print(traceback.format_exc())
-                message = ""
+    def load_game_data(self) -> None:
+        print("Getting data...")
+        # Get initial room data if not already done
+        while None in (self.size, self.player_id, self.walls, self.tick_rate):
+            packet: Packet = pack.receivepacket(self.s)
+
+            if isinstance(packet, pack.ServerRoomSizePacket):
+                print(f"Got size: {packet.payloads}")
+                self.size = packet.payloads
+            elif isinstance(packet, pack.ServerRoomPlayerIdPacket):
+                print(f"Got player_id: {packet.payloads[0]}")
+                self.player_id = packet.payloads[0]
+            elif isinstance(packet, pack.ServerRoomGeometryPacket):
+                print(f"Got geometry: {packet.payloads[0]}")
+                geometry: Dict[str, List[List[int, int]]] = packet.payloads[0]
+                self.walls = geometry['walls']
+            elif isinstance(packet, pack.ServerRoomTickRatePacket):
+                print(f"Got tick_rate: {packet.payloads[0]}")
+                self.tick_rate = packet.payloads[0]
+        
+        print("Got initial data")
+        # Get volatile data such as player positions, etc.
+        packet: Packet = pack.receivepacket(self.s)
 
     def get_input(self) -> None:
         try:
@@ -112,13 +98,13 @@ class Game(Controller):
 
             # Movement
             if key == curses.KEY_UP:
-                self.move(0)
+                self.move('u')
             elif key == curses.KEY_RIGHT:
-                self.move(1)
+                self.move('r')
             elif key == curses.KEY_DOWN:
-                self.move(2)
+                self.move('d')
             elif key == curses.KEY_LEFT:
-                self.move(3)
+                self.move('l')
 
             # Changing window focus
             elif key in (ord('1'), ord('2'), ord('3')):
@@ -151,27 +137,16 @@ class Game(Controller):
            self.disconnect()
            exit()
 
-    def move(self, direction: int) -> None:
+    def move(self, direction: chr) -> None:
         try:
-            # Action: move, Payload: direction
-            self.s.send(bytes(json.dumps({
-                'a': 'm',
-                'p': direction
-            }) + ';', 'utf-8'))
+            pack.sendpacket(pack.MovePacket(direction))
         except sock.error:
             print("Error: Socket error. Traceback: ", file=sys.stderr)
             print(traceback.format_exc())
 
     def chat(self, message: str) -> None:
-        # Sanitise semicolons
-        message = message.replace(';', '\\;')
-
         try:
-            # Action: chat, Payload: message
-            self.s.send(bytes(json.dumps({
-                'a': 'c',
-                'p': message
-            }) + ';', 'utf-8'))
+            pack.sendpacket(pack.ChatPacket(message))
         except sock.error:
             print("Error: Socket error. Traceback: ", file=sys.stderr)
             print(traceback.format_exc())

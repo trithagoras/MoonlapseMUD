@@ -4,6 +4,7 @@ import socket as sock
 import sys
 import traceback
 
+from networking import packet as pack
 from ..views.registerview import RegisterView
 from .networkmenu import NetworkMenu
 
@@ -48,11 +49,7 @@ class RegisterMenu(NetworkMenu):
             return
 
         try:
-            self.s.send(bytes(json.dumps({
-                'a': 'register',
-                'p': self.username,
-                'p2': self.password
-            }) + ';', 'utf-8'))
+            pack.sendpacket(self.s, pack.RegisterPacket(self.username, self.password))
 
         except sock.error as e:
             print("Error: Socket error. Traceback: ", file=sys.stderr)

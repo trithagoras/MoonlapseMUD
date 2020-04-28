@@ -4,6 +4,7 @@ import socket as sock
 import sys
 import traceback
 
+from networking import packet as pack
 from ..views.loginview import LoginView
 from .game import Game
 from .networkmenu import NetworkMenu
@@ -39,11 +40,7 @@ class LoginMenu(NetworkMenu):
 
         self.view.title = f"Attempted login in as {self.username} with password {self.password}"
         try:
-            self.s.send(bytes(json.dumps({
-                'a': 'login',
-                'p': self.username,
-                'p2': self.password
-            }) + ';', 'utf-8'))
+            pack.sendpacket(self.s, pack.LoginPacket(self.username, self.password))
 
             game = Game(self.s, self.addr)
             game.start()

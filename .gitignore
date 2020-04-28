@@ -27,3 +27,8 @@ server/__pycache__/log.cpython-38.pyc
 server/__pycache__/player.cpython-38.pyc
 server/__pycache__/room.cpython-38.pyc
 server/__pycache__/tcpsrv.cpython-38.pyc
+server/__pycache__/__init__.cpython-38.pyc
+networking/__pycache__/payload.cpython-38.pyc
+networking/__pycache__/packet.cpython-38.pyc
+networking/__pycache__/__init__.cpython-38.pyc
+test

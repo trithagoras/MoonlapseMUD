@@ -10,6 +10,7 @@ from log import Log
 from threading import Thread
 import traceback
 
+from networking import packet as pack
 
 class TcpServer:
     def __init__(self, ip, port, database):
@@ -68,6 +69,8 @@ class TcpServer:
     def accept_clients(self) -> None:
         while True:
             # Establish connecting to the new client
+            print("Waiting to receive data from any client...")
+
             try:
                 client_socket, address = self.sock.accept()
             except socket.error as e:
@@ -82,37 +85,15 @@ class TcpServer:
                 continue
 
             # Check for login and register packets from the new client
-            data = ''
-            try:
-                while True:
-                    data += client_socket.recv(1024).decode('utf-8')
-
-                    if data[-1] == ';':
-                        break
-
-            except IndexError:
-                print("Error: No data. Traceback: ", file=sys.stderr)
-                print(traceback.format_exc(), file=sys.stderr)
-                client_socket.close()
-                continue
+            packet: pack.Packet = pack.receivepacket(client_socket)
 
             try:
-                data = json.loads(data[:-1])
-                action: str = data['a']
-                payload: str = data['p']
-                try:
-                    payload2 = data['p2']
-                except KeyError:
-                    print(f"Error: KeyError finding key 'p2' in dictionary {data}. Traceback: ", file=sys.stderr)
-                    print(traceback.format_exc())
-                    payload2 = ''
+                print(f"Received data from client {client_socket}: {packet}")
 
-                print(f"Received data from client {client_socket}: Action={action}, Payload={payload}:{payload2}")
-
-                if action == 'login':
-                    username = payload
-                    password = payload2
-                    print(f"Got username: {username.replace(' ', '_')} and password: {password.replace(' ', '_')}")
+                if isinstance(packet, pack.LoginPacket):
+                    username: str = packet.payloads[0]
+                    password: str = packet.payloads[1]
+                    print(f"Got username: {username} and password: {password}")
 
                     if self.database.user_exists(username):
                         print(f"Incoming login request from {username}...", end='')
@@ -136,9 +117,9 @@ class TcpServer:
                         print("No username match in database.")
                         client_socket.close()
 
-                elif action == 'register':
-                    username = payload
-                    password = payload2
+                elif isinstance(packet, pack.RegisterPacket):
+                    username = packet.payloads[0]
+                    password = packet.payloads[1]
                     print(f"Got username: {username} and password: {password}")
 
                     if self.database.user_exists(username):
@@ -153,6 +134,8 @@ class TcpServer:
                 print("Error: Traceback: ", file=sys.stderr)
                 print(traceback.format_exc(), file=sys.stderr)
                 continue
+        print("Oops... No longer listening to client data...", file=sys.stderr)
+
 
     def listen(self, player_id) -> None:
         while True:
