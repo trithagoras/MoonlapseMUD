@@ -49,7 +49,7 @@ class Game(Controller):
 
     def disconnect(self) -> None:
         try:
-            pack.sendpacket(pack.DisconnectPacket())
+            pack.sendpacket(self.s, pack.DisconnectPacket())
         except sock.error as e:
             print("Error: Socket error. Traceback: ", file=sys.stderr)
             print(traceback.format_exc())
@@ -144,14 +144,14 @@ class Game(Controller):
 
     def move(self, direction: chr) -> None:
         try:
-            pack.sendpacket(pack.MovePacket(direction))
+            pack.sendpacket(self.s, pack.MovePacket(direction))
         except sock.error:
             print("Error: Socket error. Traceback: ", file=sys.stderr)
             print(traceback.format_exc())
 
     def chat(self, message: str) -> None:
         try:
-            pack.sendpacket(pack.ChatPacket(message))
+            pack.sendpacket(self.s, pack.ChatPacket(message))
         except sock.error:
             print("Error: Socket error. Traceback: ", file=sys.stderr)
             print(traceback.format_exc())

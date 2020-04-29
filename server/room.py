@@ -21,6 +21,7 @@ except ValueError:
     print(traceback.format_exc())
 
 from networking import packet as pack
+from networking.payload import StdPayload as stdpay
 from networking import models
 
 
@@ -69,7 +70,7 @@ class Room:
         self.tcpsrv.log.log(time.time(), f"{player.get_username()} has arrived.")
 
         init_pos = self.tcpsrv.database.get_player_pos(player)
-        player.assign_location(init_pos, self)
+        player.assign_location(list(init_pos), self)
 
         if init_pos == (None, None):
             pos = player.get_position()
@@ -94,18 +95,27 @@ class Room:
         
         packet: pack.Packet = pack.receivepacket(self.player_sockets[player])
 
-        print(f"Received data from player {player}: {packet}")
-
         # Move
         if isinstance(packet, pack.MovePacket):
+            pay: stdpay = packet.payloads[0]
             pos: Tuple[int] = player.get_position()
             dir = packet.payloads[0].value
-            dest: List[int] = [pos[0] + (dir == 'd') - (dir == 'u'), pos[1] + (dir == 'r') - (dir == 'l')]
+            
+            # Calculate the desired desination
+            dest: List[int] = list(pos)
+            if pay == stdpay.MOVE_UP:
+                dest[0] -= 1
+            elif pay == stdpay.MOVE_RIGHT:
+                dest[1] += 1
+            elif pay == stdpay.MOVE_DOWN:
+                dest[0] += 1
+            elif pay == stdpay.MOVE_LEFT:
+                dest[1] -= 1
            
-            if within_bounds(dest) and dest not in self.walls:
-                player.move(dir)
-           
-            self.tcpsrv.database.update_player_pos(player, pos[0], pos[1])
+            if self.within_bounds(dest) and dest not in self.walls:
+                player.set_position(dest)
+
+            self.tcpsrv.database.update_player_pos(player, dest[0], dest[1])
 
         # Chat
         elif isinstance(packet, pack.ChatPacket):
@@ -121,20 +131,18 @@ class Room:
 
     def update_clients(self) -> None:
         for player in self.player_sockets:
-            if player is not None:
-                self.send(player, pack.ServerLogPacket(self.tcpsrv.log.latest))
-                for other in self.player_sockets:
-                    if other != player:
-                        self.send(player, pack.ServerRoomPlayerPacket(other))
+            self.send(player, pack.ServerLogPacket(self.tcpsrv.log.latest))
+            for other in self.player_sockets:
+                if other != player:
+                    self.send(player, pack.ServerRoomPlayerPacket(other))
 
     def send(self, player: models.Player, packet: pack.Packet):
-        if player:
-            try:
-                pack.sendpacket(self.player_sockets[player], packet)
-            except socket.error:
-                print("Error: Socket error. Traceback: ", file=sys.stderr)
-                print(traceback.format_exc(), file=sys.stderr)
-                self.kick(player.get_id(), reason=f"Server couldn't send packet {packet} to client socket.")
-            except Exception:
-                print("Error: Traceback: ", file=sys.stderr)
-                print(traceback.format_exc(), file=sys.stderr)
+        try:
+            pack.sendpacket(self.player_sockets[player], packet)
+        except socket.error:
+            print("Error: Socket error. Traceback: ", file=sys.stderr)
+            print(traceback.format_exc(), file=sys.stderr)
+            self.kick(player.get_id(), reason=f"Server couldn't send packet {packet} to client socket.")
+        except Exception:
+            print("Error: Traceback: ", file=sys.stderr)
+            print(traceback.format_exc(), file=sys.stderr)

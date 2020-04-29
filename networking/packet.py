@@ -55,8 +55,10 @@ class MovePacket(Packet):
             pdirection = StdPayload.MOVE_DOWN
         elif direction == 'l':
             pdirection = StdPayload.MOVE_LEFT
-        else:
+        elif direction == 'r':
             pdirection = StdPayload.MOVE_RIGHT 
+        else:
+            raise ValueError(f"direction {direction} must be one of 'u', 'd', 'l', 'r'")
 
         super().__init__(pdirection)
 
@@ -132,8 +134,7 @@ def receivepacket(s: sock.socket) -> Packet:
 
     # Get the next data to size
     data: str = '{' + s.recv(size - 1).decode('utf-8')
-
-    return constructpacket(json.loads(data[:-1]))
+    return constructpacket(json.loads(data[:-1]), debug=debug)
 
 
 def constructpacket(obj_dict: Dict[str, str]) -> Packet:
@@ -153,7 +154,6 @@ def constructpacket(obj_dict: Dict[str, str]) -> Packet:
     try:
         constructor: Type = globals()[specificPacketClassName]
         rPacket = constructor(*tuple(payloads))
-        rPacket.action = action
         return rPacket
     except KeyError:
         print(f"KeyError: {specificPacketClassName} is not a valid packet name. Stacktrace: ")

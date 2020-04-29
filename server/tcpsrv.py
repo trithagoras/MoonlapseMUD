@@ -38,9 +38,8 @@ class TcpServer:
 
             except KeyboardInterrupt:
                 for room in self.rooms:
-                    for player in room.players:
-                        if player is not None:
-                            player.disconnect()
+                    for s in room.player_sockets.values():
+                        s.disconnect()
                     self.sock.close()
                     exit()
 

@@ -16,9 +16,15 @@ class Payload:
     def __repr__(self):
         return f"(Payload: {self.value})"
 
+    def __eq__(self, obj):
+        print(f"Checking equality for {obj} and {self}", end='')
+        print(isinstance(obj, Payload), end=' ')
+        print(obj.value == self.value)
+        return isinstance(obj, Payload) and obj.value == self.value
+
 
 class StdPayload(Payload):
-    MOVE_UP = Payload("MOVE_UP")
-    MOVE_DOWN = Payload("MOVE_DOWN")
-    MOVE_LEFT = Payload("MOVE_LEFT")
-    MOVE_RIGHT = Payload("MOVE_RIGHT")
+    MOVE_UP = Payload("u")
+    MOVE_DOWN = Payload("d")
+    MOVE_LEFT = Payload("l")
+    MOVE_RIGHT = Payload("r")
