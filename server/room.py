@@ -77,6 +77,7 @@ class Room:
 
         self.player_sockets[player] = client_socket
 
+        # Send initial room data to the player connecting
         self.send(player, pack.ServerRoomPlayerPacket(player))
         self.send(player, pack.ServerRoomSizePacket(self.height, self.width))
         self.send(player, pack.ServerRoomGeometryPacket(self.walls))
@@ -122,6 +123,9 @@ class Room:
         for player in self.player_sockets:
             if player is not None:
                 self.send(player, pack.ServerLogPacket(self.tcpsrv.log.latest))
+                for other in self.player_sockets:
+                    if other != player:
+                        self.send(player, pack.ServerRoomPlayerPacket(other))
 
     def send(self, player: models.Player, packet: pack.Packet):
         if player:

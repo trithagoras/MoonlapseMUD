@@ -104,12 +104,10 @@ class GameView(View):
     def draw_map(self):
         sight_radius = 10
 
-        player = self.game.game_data['p'][self.game.player_id]
-
         for row in range(-sight_radius, sight_radius + 1):
             for col in range(-sight_radius, sight_radius + 1):
-
-                pos = (player['pos']['y'] + row, player['pos']['x'] + col)
+                player_pos: Tuple[int] = self.game.player.get_position()
+                pos = (player_pos[0] + row, player_pos[1] + col)
 
                 if self.coordinate_exists(pos[0], pos[1]):
                     # drawing walls
@@ -119,11 +117,10 @@ class GameView(View):
                         self.win1.addch(11 + row, 26 + col * 2, '·')
 
                     # drawing other players
-                    for index in range(0, len(self.game.game_data['p'])):
-                        other_player = self.game.game_data['p'][index]
-                        if other_player is not None and other_player is not player:
-                            if (other_player['pos']['y'], other_player['pos']['x']) == pos:
-                                self.win1.addch(11 + row, 26 + col * 2, '☺')
+                    for other in self.game.others:
+                        other_pos: Tuple[int] = other.get_position()
+                        if (other_pos[0], other_pos[1]) == pos:
+                            self.win1.addch(11 + row, 26 + col * 2, '☺')
 
         # drawing player to centre of screen
         self.win1.addch(11, 26, '☻')
@@ -170,9 +167,9 @@ class GameView(View):
         self.win3.hline(self.win3_height - 3, 1, curses.ACS_HLINE, self.win3_width - 2)
 
         # Fill the log
-        if self.game.game_data['l'] and self.game.game_data['l'] != self.log_latest:
-            self.log.update(self.game.game_data['l'])
-            self.log_latest = self.game.game_data['l']
+        if self.game.latest_log is not None and self.game.latest_log != self.log_latest:
+            self.log.update(self.game.latest_log)
+            self.log_latest = self.game.latest_log
 
         if self.log != {}:
             log_keys = list(self.log.keys())

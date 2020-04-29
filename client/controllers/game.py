@@ -23,9 +23,11 @@ class Game(Controller):
 
         # Game data
         self.player: Optional[models.Player] = None
+        self.others: Set[models.Player] = set()
         self.walls: Optional[List[List[int, int]]] = None
         self.size: Optional[Tuple[int, int]] = None
         self.tick_rate: Optional[int] = None
+        self.latest_log: Optional[str] = None
 
         # UI
         self.chatbox = None
@@ -90,6 +92,10 @@ class Game(Controller):
         
         # Get volatile data such as player positions, etc.
         packet: Packet = pack.receivepacket(self.s)
+        if isinstance(packet, pack.ServerRoomPlayerPacket):
+            self.others.add(packet.payloads[0].value)
+        elif isinstance(packet, pack.ServerLogPacket):
+            self.latest_log = packet.payloads[0].value
 
     def get_input(self) -> None:
         try:
