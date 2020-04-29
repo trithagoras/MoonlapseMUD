@@ -89,7 +89,19 @@ class Game(Controller):
             # Get volatile data such as player positions, etc.
             packet: Packet = pack.receivepacket(self.s)
             if isinstance(packet, pack.ServerRoomPlayerPacket):
-                self.others.add(packet.payloads[0].value)
+                p: Player = packet.payloads[0].value
+                pid: int = p.get_id()
+
+                if pid == self.player.get_id():
+                    self.player = p
+                elif pid in [other.get_id() for other in self.others]:
+                    for oid, o in [(other.get_id(), other) for other in self.others]:
+                        if pid == oid:
+                            self.others.remove(o)
+                            self.others.add(p)
+                else:
+                    self.others.add(p)
+
             elif isinstance(packet, pack.ServerLogPacket):
                 self.latest_log = packet.payloads[0].value
 

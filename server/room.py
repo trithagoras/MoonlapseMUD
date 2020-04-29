@@ -17,8 +17,7 @@ sys.path.append(str(root))
 try:
     sys.path.remove(str(parent))
 except ValueError:
-    print("Error: Removing parent from path, already gone. Traceback: ")
-    print(traceback.format_exc())
+    pass
 
 from networking import packet as pack
 from networking.payload import StdPayload as stdpay
@@ -42,12 +41,12 @@ class Room:
         with open(room_map) as data:
             map_data = json.load(data)
             self.walls = map_data['walls']
-            self.width, self.height = map_data['size']
+            self.height, self.width = map_data['size']
 
 
     def kick(self, player: models.Player, reason='Not given'):
             self.player_sockets[player].close()
-            del self.player_sockets[player]
+            self.player_sockets.pop(player)
             self.tcpsrv.log.log(f"{player.get_username()} has departed. Reason: {reason}")
             print(f"Kicked {player.get_username()}. Reason: {reason}")
 
@@ -85,60 +84,55 @@ class Room:
         self.send(player, pack.ServerRoomGeometryPacket(self.walls))
         self.send(player, pack.ServerRoomTickRatePacket(self.tcpsrv.tick_rate))
         
-        Thread(target=self.tcpsrv.listen, args=(player,), daemon=True).start()
+        Thread(target=self.listen, args=(player,), daemon=True).start()
 
     def listen(self, player: models.Player) -> None:
-        print(f"Waiting for data from player {player}...")
-        if player is None:
-            print("Player not found. Stop listening.")
-            return
-        
-        packet: pack.Packet = pack.receivepacket(self.player_sockets[player])
-        print("Received packet", packet)
+        while True:
+            packet: pack.Packet = pack.receivepacket(self.player_sockets[player])
+            print("Received packet", packet)
 
-        # Move
-        if isinstance(packet, pack.MovePacket):
-            pay: stdpay = packet.payloads[0]
-            pos: Tuple[int] = player.get_position()
-            dir = packet.payloads[0].value
+            # Move
+            if isinstance(packet, pack.MovePacket):
+                pay: stdpay = packet.payloads[0]
+                pos: Tuple[int] = player.get_position()
+                dir = packet.payloads[0].value
+                
+                # Calculate the desired desination
+                dest: List[int] = list(pos)
+                if pay == stdpay.MOVE_UP:
+                    dest[0] -= 1
+                elif pay == stdpay.MOVE_RIGHT:
+                    dest[1] += 1
+                elif pay == stdpay.MOVE_DOWN:
+                    dest[0] += 1
+                elif pay == stdpay.MOVE_LEFT:
+                    dest[1] -= 1
             
-            # Calculate the desired desination
-            dest: List[int] = list(pos)
-            if pay == stdpay.MOVE_UP:
-                dest[0] -= 1
-            elif pay == stdpay.MOVE_RIGHT:
-                dest[1] += 1
-            elif pay == stdpay.MOVE_DOWN:
-                dest[0] += 1
-            elif pay == stdpay.MOVE_LEFT:
-                dest[1] -= 1
-           
-            if self.within_bounds(dest) and dest not in self.walls:
-                player.set_position(dest)
+                if self.within_bounds(dest) and dest not in self.walls:
+                    player.set_position(dest)
 
-            self.tcpsrv.database.update_player_pos(player, dest[0], dest[1])
+                self.tcpsrv.database.update_player_pos(player, dest[0], dest[1])
 
-        # Chat
-        elif isinstance(packet, pack.ChatPacket):
-            self.tcpsrv.log.log(f"{player.get_username()} says: {packet.payloads[0].value}")
-        
-        # Disconnect
-        elif isinstance(packet, pack.DisconnectPacket):
-            self.kick(player, reason="Player said goodbye.")
-            return
+            # Chat
+            elif isinstance(packet, pack.ChatPacket):
+                self.tcpsrv.log.log(f"{player.get_username()} says: {packet.payloads[0].value}")
+            
+            # Disconnect
+            elif isinstance(packet, pack.DisconnectPacket):
+                self.kick(player, reason="Player said goodbye.")
+                return
 
     def within_bounds(self, coords: List[int]) -> bool:
         return 0 <= coords[0] < self.height and 0 <= coords[1] < self.width
 
 
     def update_clients(self) -> None:
-        for player in self.player_sockets:
+        for player in self.player_sockets.keys():
             self.send(player, pack.ServerLogPacket(self.tcpsrv.log.latest))
 
             # Send the latest player information
-            for other in self.player_sockets:
-                if other != player:
-                    self.send(player, pack.ServerRoomPlayerPacket(other))
+            for p in self.player_sockets.keys():
+                    self.send(player, pack.ServerRoomPlayerPacket(p))
 
 
     def send(self, player: models.Player, packet: pack.Packet):

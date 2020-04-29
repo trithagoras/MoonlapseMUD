@@ -50,9 +50,8 @@ class TcpServer:
 
     def connect_socket(self):
         print("Connecting to socket... ", end='')
-        if self.sock:
-            self.sock.close()
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.sock.bind((self.ip, self.port))
         self.sock.listen(16)
 
@@ -135,11 +134,6 @@ class TcpServer:
                 continue
         print("Oops... No longer listening to client data...", file=sys.stderr)
 
-
-    def listen(self, player: models.Player) -> None:
-        while True:
-            for room in self.rooms:
-                room.listen(player)
 
     def update_clients(self) -> None:
         for room in self.rooms:

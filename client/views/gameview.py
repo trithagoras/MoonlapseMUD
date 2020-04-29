@@ -111,7 +111,7 @@ class GameView(View):
 
                 if self.coordinate_exists(pos[0], pos[1]):
                     # drawing walls
-                    if [pos[1], pos[0]] in self.game.walls:
+                    if [pos[0], pos[1]] in self.game.walls:
                         self.win1.addch(11 + row, 26 + col * 2, '█')
                     else:
                         self.win1.addch(11 + row, 26 + col * 2, '·')

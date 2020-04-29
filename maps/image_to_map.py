@@ -19,7 +19,7 @@ values = list(blackAndWhite.getdata())
 
 output = {
   "walls": [],
-  "size": [width, height]
+  "size": [height, width]
 }
 
 for row in range(0, height):
