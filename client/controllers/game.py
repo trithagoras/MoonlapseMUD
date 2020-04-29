@@ -34,7 +34,7 @@ class Game(Controller):
         self.view = GameView(self)
 
     def connect(self) -> None:
-        print("Trying to connect...")
+        # print("Trying to connect...")
         try:
             self.s.connect(self.addr)
         except OSError:
@@ -62,7 +62,7 @@ class Game(Controller):
         self.connect()
 
         # Listen for game data in its own thread
-        Thread(target=self.load_game_data, daemon=True).start()
+        Thread(target=self.receive_data, daemon=True).start()
 
         # Don't draw with game data until it's been received
         while None in (self.size, self.player, self.walls, self.tick_rate):
@@ -71,31 +71,27 @@ class Game(Controller):
         # Start the view's display thread
         super().start()
 
-    def load_game_data(self) -> None:
-        print("Getting data...")
-        # Get initial room data if not already done
-        while None in (self.size, self.player, self.walls, self.tick_rate):
-            packet: Packet = pack.receivepacket(self.s)
+    def receive_data(self) -> None:
+        while True:
+            # Get initial room data if not already done
+            while None in (self.size, self.player, self.walls, self.tick_rate):
+                packet: Packet = pack.receivepacket(self.s)
 
-            if isinstance(packet, pack.ServerRoomSizePacket):
-                print(f"Got size payload: {packet.payloads}")
-                self.size = [packet.payloads[0].value, packet.payloads[1].value]
-            elif isinstance(packet, pack.ServerRoomPlayerPacket):
-                print(f"Got player payload: {packet.payloads[0]}")
-                self.player = packet.payloads[0].value
-            elif isinstance(packet, pack.ServerRoomGeometryPacket):
-                print(f"Got geometry payload: {packet.payloads[0]}")
-                self.walls = packet.payloads[0].value
-            elif isinstance(packet, pack.ServerRoomTickRatePacket):
-                print(f"Got tick_rate payload: {packet.payloads[0]}")
-                self.tick_rate = packet.payloads[0].value
-        
-        # Get volatile data such as player positions, etc.
-        packet: Packet = pack.receivepacket(self.s)
-        if isinstance(packet, pack.ServerRoomPlayerPacket):
-            self.others.add(packet.payloads[0].value)
-        elif isinstance(packet, pack.ServerLogPacket):
-            self.latest_log = packet.payloads[0].value
+                if isinstance(packet, pack.ServerRoomSizePacket):
+                    self.size = [packet.payloads[0].value, packet.payloads[1].value]
+                elif isinstance(packet, pack.ServerRoomPlayerPacket):
+                    self.player = packet.payloads[0].value
+                elif isinstance(packet, pack.ServerRoomGeometryPacket):
+                    self.walls = packet.payloads[0].value
+                elif isinstance(packet, pack.ServerRoomTickRatePacket):
+                    self.tick_rate = packet.payloads[0].value
+            
+            # Get volatile data such as player positions, etc.
+            packet: Packet = pack.receivepacket(self.s)
+            if isinstance(packet, pack.ServerRoomPlayerPacket):
+                self.others.add(packet.payloads[0].value)
+            elif isinstance(packet, pack.ServerLogPacket):
+                self.latest_log = packet.payloads[0].value
 
     def get_input(self) -> None:
         try:

@@ -17,9 +17,6 @@ class Payload:
         return f"(Payload: {self.value})"
 
     def __eq__(self, obj):
-        print(f"Checking equality for {obj} and {self}", end='')
-        print(isinstance(obj, Payload), end=' ')
-        print(obj.value == self.value)
         return isinstance(obj, Payload) and obj.value == self.value
 
 

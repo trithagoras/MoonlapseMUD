@@ -65,7 +65,7 @@ class MovePacket(Packet):
 
 class ChatPacket(Packet):
     def __init__(self, message: str):
-        pmessage: Payload(message)
+        pmessage: Payload = Payload(message)
         super().__init__(pmessage)
 
 
@@ -102,8 +102,8 @@ class ServerRoomGeometryPacket(Packet):
 
 class ServerRoomSizePacket(Packet):
     def __init__(self, height: int, width: int):
-        pheight = Payload(height)
-        pwidth = Payload(width)
+        pheight: Payload = Payload(height)
+        pwidth: Payload = Payload(width)
         super().__init__(pheight, pwidth)
 
 
@@ -112,14 +112,9 @@ class ServerRoomTickRatePacket(Packet):
         super().__init__(Payload(tickrate))
 
 def sendpacket(s: sock.socket, packet: Packet) -> None:
-    try:
-        data: str = packet.serialize() + ';'
-        nbytes: int = len(data)
-        s.send(bytes(str(nbytes) + data, 'utf-8'))
-    except TypeError:
-        print("Bro you tried pickling a socket...")
-        print(s)
-        print(packet)
+    data: str = packet.serialize() + ';'
+    nbytes: int = len(data)
+    s.send(bytes(str(nbytes) + data, 'utf-8'))
 
 
 def receivepacket(s: sock.socket) -> Packet:
@@ -134,7 +129,7 @@ def receivepacket(s: sock.socket) -> Packet:
 
     # Get the next data to size
     data: str = '{' + s.recv(size - 1).decode('utf-8')
-    return constructpacket(json.loads(data[:-1]), debug=debug)
+    return constructpacket(json.loads(data[:-1]))
 
 
 def constructpacket(obj_dict: Dict[str, str]) -> Packet:

@@ -10,8 +10,8 @@ class GameView(View):
         super().__init__(game)
 
         self.game = game
-        self.log: dict = {}
-        self.log_latest: dict = {}
+        self.log: Dict[float, str] = {}
+        self.latest_log: Dict[float, str] = {}
 
         self.win1_height, self.win1_width = (23, 53)
         self.win1_y, self.win1_x = (3, 0)
@@ -167,9 +167,9 @@ class GameView(View):
         self.win3.hline(self.win3_height - 3, 1, curses.ACS_HLINE, self.win3_width - 2)
 
         # Fill the log
-        if self.game.latest_log is not None and self.game.latest_log != self.log_latest:
+        if self.game.latest_log is not None and self.game.latest_log != self.latest_log:
             self.log.update(self.game.latest_log)
-            self.log_latest = self.game.latest_log
+            self.latest_log = self.game.latest_log
 
         if self.log != {}:
             log_keys = list(self.log.keys())

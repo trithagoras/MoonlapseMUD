@@ -1,18 +1,17 @@
 import time
 import os
+from typing import *
 
 
 class Log:
     def __init__(self):
-        self.state = {
-            'log': {}
-        }
-        self.latest = None
+        self.latest: Dict[float, str] = None
 
-    def log(self, timestamp: float, message: str):
+    def log(self, message: str):
         # Log times as seconds since 1-Jan-1970 (Unix time)
+        timestamp: float = time.time()
+
         self.latest = {timestamp: message}
-        self.state['log'].update(self.latest)
 
         logdir: str = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'logs')
         if not os.path.exists(logdir):

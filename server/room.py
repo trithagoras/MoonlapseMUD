@@ -47,7 +47,8 @@ class Room:
 
     def kick(self, player: models.Player, reason='Not given'):
             self.player_sockets[player].close()
-            self.tcpsrv.log.log(time.time(), f"{player.get_username()} has departed. Reason: {reason}")
+            del self.player_sockets[player]
+            self.tcpsrv.log.log(f"{player.get_username()} has departed. Reason: {reason}")
             print(f"Kicked {player.get_username()}. Reason: {reason}")
 
     def spawn(self, client_socket: socket.socket, username: str):
@@ -67,7 +68,7 @@ class Room:
         player.assign_id(player_id)
 
         print(f"Connection from {player}. Assigned player id: {player_id}")
-        self.tcpsrv.log.log(time.time(), f"{player.get_username()} has arrived.")
+        self.tcpsrv.log.log(f"{player.get_username()} has arrived.")
 
         init_pos = self.tcpsrv.database.get_player_pos(player)
         player.assign_location(list(init_pos), self)
@@ -91,9 +92,9 @@ class Room:
         if player is None:
             print("Player not found. Stop listening.")
             return
-        print(f"Got player: {player.get_username()}. ")
         
         packet: pack.Packet = pack.receivepacket(self.player_sockets[player])
+        print("Received packet", packet)
 
         # Move
         if isinstance(packet, pack.MovePacket):
@@ -119,7 +120,7 @@ class Room:
 
         # Chat
         elif isinstance(packet, pack.ChatPacket):
-            self.tcpsrv.log.log(time.time(), f"{player.get_username()} says: {packet.payloads[0].value}")
+            self.tcpsrv.log.log(f"{player.get_username()} says: {packet.payloads[0].value}")
         
         # Disconnect
         elif isinstance(packet, pack.DisconnectPacket):
@@ -129,12 +130,16 @@ class Room:
     def within_bounds(self, coords: List[int]) -> bool:
         return 0 <= coords[0] < self.height and 0 <= coords[1] < self.width
 
+
     def update_clients(self) -> None:
         for player in self.player_sockets:
             self.send(player, pack.ServerLogPacket(self.tcpsrv.log.latest))
+
+            # Send the latest player information
             for other in self.player_sockets:
                 if other != player:
                     self.send(player, pack.ServerRoomPlayerPacket(other))
+
 
     def send(self, player: models.Player, packet: pack.Packet):
         try:
@@ -142,7 +147,7 @@ class Room:
         except socket.error:
             print("Error: Socket error. Traceback: ", file=sys.stderr)
             print(traceback.format_exc(), file=sys.stderr)
-            self.kick(player.get_id(), reason=f"Server couldn't send packet {packet} to client socket.")
+            self.kick(player, reason=f"Server couldn't send packet {packet} to client socket.")
         except Exception:
             print("Error: Traceback: ", file=sys.stderr)
             print(traceback.format_exc(), file=sys.stderr)
