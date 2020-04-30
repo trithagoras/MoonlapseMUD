@@ -7,6 +7,7 @@ from typing import *
 from room import Room, RoomFullException
 from log import Log
 from threading import Thread
+from threading import Timer
 import traceback
 
 from networking import models
@@ -23,30 +24,29 @@ class TcpServer:
         self.tick_rate = 100
 
         pwd: str = os.path.dirname(__file__)
+        room_data_filename: str = os.path.join(pwd, '..', 'maps', 'map.bmp.json')
+        room_data: Optional[str] = None
+        with open(room_data_filename, 'r') as room_data_file:
+            room_data = json.load(room_data_file)
         self.rooms: List[Optional[Room]] = [
-            Room(self, os.path.join(pwd, '..', 'maps', 'map.bmp.json'), 10)
+            Room(self, room_data, 10)
         ]
 
     def start(self):
+        self.connect_socket()
         self.connect_database()
 
-        Thread(target=self.accept_clients, daemon=True).start()
-        while True:
-            try:
-                self.update_clients()
-                time.sleep(1 / self.tick_rate)
+        # Start threads
+        accept_thread: Thread = Thread(target=self.accept_clients)
+        accept_thread.start()
+        update_thread: Thread = Thread(target=self.update_clients)
+        update_thread.start()
 
-            except KeyboardInterrupt:
-                for room in self.rooms:
-                    for s in room.player_sockets.values():
-                        s.disconnect()
-                    self.sock.close()
-                    exit()
+        time.sleep(0.0001)
 
-            except Exception:
-                print("Error: Traceback: ", file=sys.stderr)
-                print(traceback.format_exc(), file=sys.stderr)
-                pass
+        # Wait for threads to finish
+        accept_thread.join()
+        update_thread.join()
 
     def connect_socket(self):
         print("Connecting to socket... ", end='')
@@ -71,15 +71,11 @@ class TcpServer:
 
             try:
                 client_socket, address = self.sock.accept()
-            except socket.error as e:
-                print(f"Socket error while accepting new client ({e})... Trying again. Traceback: ", file=sys.stderr)
+            except Exception:
+                print(f"Error while accepting new client... Trying again. Traceback: ", file=sys.stderr)
                 print(traceback.format_exc(), file=sys.stderr)
                 self.connect_socket()
                 time.sleep(1)
-                continue
-            except Exception:
-                print("Error: Traceback: ", file=sys.stderr)
-                print(traceback.format_exc(), file=sys.stderr)
                 continue
 
             # Check for login and register packets from the new client
@@ -135,5 +131,19 @@ class TcpServer:
 
 
     def update_clients(self) -> None:
-        for room in self.rooms:
-            room.update_clients()
+        while True:
+            try:
+                for room in self.rooms:
+                    room.update_clients()
+                time.sleep(1 / self.tick_rate)
+
+            except KeyboardInterrupt:
+                for room in self.rooms:
+                    for s in room.player_sockets.values():
+                        s.disconnect()
+                    self.sock.close()
+                    exit()
+
+            except Exception:
+                print("Error: Traceback: ", file=sys.stderr)
+                print(traceback.format_exc(), file=sys.stderr)

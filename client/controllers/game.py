@@ -151,11 +151,7 @@ class Game(Controller):
            exit()
 
     def move(self, direction: chr) -> None:
-        try:
-            pack.sendpacket(self.s, pack.MovePacket(direction))
-        except sock.error:
-            print("Error: Socket error. Traceback: ", file=sys.stderr)
-            print(traceback.format_exc())
+        pack.sendpacket(self.s, pack.MovePacket(direction))
 
     def chat(self, message: str) -> None:
         try:
