@@ -9,6 +9,7 @@ from log import Log
 from threading import Thread
 from threading import Timer
 import traceback
+import twisted
 
 from networking import models
 from networking import packet as pack
@@ -36,17 +37,14 @@ class TcpServer:
         self.connect_socket()
         self.connect_database()
 
-        # Start threads
-        accept_thread: Thread = Thread(target=self.accept_clients)
-        accept_thread.start()
-        update_thread: Thread = Thread(target=self.update_clients)
-        update_thread.start()
+        # Listen to incoming client connections on its own thread
+        Thread(target=self.accept_clients, daemon=True).start()
 
-        time.sleep(0.0001)
-
-        # Wait for threads to finish
-        accept_thread.join()
-        update_thread.join()
+        # Update each room's players' clients exactly on every server tick
+        for room in self.rooms:
+            update_tick_loop = twisted.internet.task.LoopingCall(room.update_clients)
+            update_tick_loop.start(1 / self.tick_rate)
+            twisted.internet.reactor.run()
 
     def connect_socket(self):
         print("Connecting to socket... ", end='')
@@ -129,21 +127,3 @@ class TcpServer:
                 continue
         print("Oops... No longer listening to client data...", file=sys.stderr)
 
-
-    def update_clients(self) -> None:
-        while True:
-            try:
-                for room in self.rooms:
-                    room.update_clients()
-                time.sleep(1 / self.tick_rate)
-
-            except KeyboardInterrupt:
-                for room in self.rooms:
-                    for s in room.player_sockets.values():
-                        s.disconnect()
-                    self.sock.close()
-                    exit()
-
-            except Exception:
-                print("Error: Traceback: ", file=sys.stderr)
-                print(traceback.format_exc(), file=sys.stderr)
