@@ -4,7 +4,7 @@ import sys
 import time
 import os
 from typing import *
-from room import Room
+from room import Room, RoomFullException
 from log import Log
 from threading import Thread
 import traceback
@@ -105,9 +105,8 @@ class TcpServer:
                             for room in self.rooms:
                                 try:
                                     room.spawn(client_socket, username)
-                                except Exception:
-                                    print("Error: Traceback: ", file=sys.stderr)
-                                    print(traceback.format_exc(), file=sys.stderr)
+                                except RoomFullException:
+                                    client_socket.close()
                                     continue
                         else:
                             print("Incorrect password.")

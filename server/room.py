@@ -27,8 +27,13 @@ from networking import models
 class Room:
     def __init__(self, tcpsrv, room_map, capacity):
         self.walls: set = set()
-        self.player_sockets: Dict[models.Player, socket.socket] = {}
         self.capacity = capacity
+
+        # Reserve a full map of empty players to reserved sockets
+        self.player_sockets: Dict[models.Player, socket.socket] = {}
+        for pid in range(self.capacity):
+            p = models.Player(pid)
+            self.player_sockets[p] = None
 
         self.tcpsrv = tcpsrv
 
@@ -45,50 +50,52 @@ class Room:
 
 
     def kick(self, player: models.Player, reason='Not given'):
+            # Free the player position
             self.player_sockets[player].close()
-            self.player_sockets.pop(player)
+            self.player_sockets[player] = None
             self.tcpsrv.log.log(f"{player.get_username()} has departed. Reason: {reason}")
             print(f"Kicked {player.get_username()}. Reason: {reason}")
 
     def spawn(self, client_socket: socket.socket, username: str):
         print("Trying to spawn player...")
 
-        player: models.Player = models.Player()
-        player.assign_username(username)
+        new_player: Optional[models.Player] = None
+        for reserved_player, reserved_socket in self.player_sockets.items():
+            if reserved_socket is None:
+                new_player = reserved_player
+
+        if new_player is None:
+            raise RoomFullException(f"room is at capacity {self.capacity}")
+        
+        new_player.assign_username(username)
         print(f"Assigned username: {username}")
 
-        if len(self.player_sockets) >= self.capacity:
-            self.send(player, pack.ServerRoomFullPacket())
-            client_socket.close()
-            print(f"Connection from {player} rejected.")
-            return
+        print(f"Connection from {new_player}. Assigned player id: {new_player.get_id()}")
+        self.tcpsrv.log.log(f"{new_player.get_username()} has arrived.")
 
-        player_id: int = len(self.player_sockets)
-        player.assign_id(player_id)
-
-        print(f"Connection from {player}. Assigned player id: {player_id}")
-        self.tcpsrv.log.log(f"{player.get_username()} has arrived.")
-
-        init_pos = self.tcpsrv.database.get_player_pos(player)
-        player.assign_location(list(init_pos), self)
+        init_pos = self.tcpsrv.database.get_player_pos(new_player)
+        new_player.assign_location(list(init_pos), self)
 
         if init_pos == (None, None):
-            pos = player.get_position()
-            self.tcpsrv.database.update_player_pos(player, pos[0], pos[1])
+            pos = new_player.get_position()
+            self.tcpsrv.database.update_player_pos(new_player, pos[0], pos[1])
 
-        self.player_sockets[player] = client_socket
+        print(f"Assigned position: {new_player.get_position()}")
+
+        self.player_sockets[new_player] = client_socket
 
         # Send initial room data to the player connecting
-        self.send(player, pack.ServerRoomPlayerPacket(player))
-        self.send(player, pack.ServerRoomSizePacket(self.height, self.width))
-        self.send(player, pack.ServerRoomGeometryPacket(self.walls))
-        self.send(player, pack.ServerRoomTickRatePacket(self.tcpsrv.tick_rate))
+        self.send(new_player, pack.ServerRoomPlayerPacket(new_player))
+        self.send(new_player, pack.ServerRoomSizePacket(self.height, self.width))
+        self.send(new_player, pack.ServerRoomGeometryPacket(self.walls))
+        self.send(new_player, pack.ServerRoomTickRatePacket(self.tcpsrv.tick_rate))
         
-        Thread(target=self.listen, args=(player,), daemon=True).start()
+        Thread(target=self.listen, args=(new_player,), daemon=True).start()
 
     def listen(self, player: models.Player) -> None:
+        sock: socket.socket = self.player_sockets[player]
         while True:
-            packet: pack.Packet = pack.receivepacket(self.player_sockets[player])
+            packet: pack.Packet = pack.receivepacket(sock)
             print("Received packet", packet)
 
             # Move
@@ -132,12 +139,16 @@ class Room:
 
             # Send the latest player information
             for p in self.player_sockets.keys():
+                if p is not None and p.ready():
                     self.send(player, pack.ServerRoomPlayerPacket(p))
 
 
     def send(self, player: models.Player, packet: pack.Packet):
         try:
             pack.sendpacket(self.player_sockets[player], packet)
+        except AttributeError:
+            # Player is reserved and has no connection
+            pass
         except socket.error:
             print("Error: Socket error. Traceback: ", file=sys.stderr)
             print(traceback.format_exc(), file=sys.stderr)
@@ -145,3 +156,7 @@ class Room:
         except Exception:
             print("Error: Traceback: ", file=sys.stderr)
             print(traceback.format_exc(), file=sys.stderr)
+
+
+class RoomFullException(Exception):
+    pass

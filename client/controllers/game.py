@@ -65,7 +65,7 @@ class Game(Controller):
         Thread(target=self.receive_data, daemon=True).start()
 
         # Don't draw with game data until it's been received
-        while None in (self.size, self.player, self.walls, self.tick_rate):
+        while not self.ready():
             time.sleep(0.2)
 
         # Start the view's display thread
@@ -74,7 +74,7 @@ class Game(Controller):
     def receive_data(self) -> None:
         while True:
             # Get initial room data if not already done
-            while None in (self.size, self.player, self.walls, self.tick_rate):
+            while not self.ready():
                 packet: Packet = pack.receivepacket(self.s)
 
                 if isinstance(packet, pack.ServerRoomSizePacket):
@@ -163,3 +163,8 @@ class Game(Controller):
         except sock.error:
             print("Error: Socket error. Traceback: ", file=sys.stderr)
             print(traceback.format_exc())
+
+    def ready(self) -> bool:
+        if self.player is None:
+            return False
+        return None not in (self.size, self.walls, self.tick_rate)

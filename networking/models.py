@@ -4,19 +4,25 @@ from typing import *
 import traceback
 
 class Player:
-    def __init__(self):
+    def __init__(self, player_id):
         self._username: Optional[str] = None
-        self._id: Optional[int] = None
-        self._char: Optional[chr] = None
         self._position: Optional[List[int]] = None
 
-    def assign_id(self, player_id) -> None:
+        self._id: Optional[int] = None
+        self._char: Optional[chr] = None
+        self._assign_id(player_id)
+
+    def ready(self) -> bool:
+        return None not in (self._username, self._position, self._id, self._char)
+
+    def _assign_id(self, player_id) -> None:
         self._id = player_id
 
         choices: List[chr] = ['#', '@', '&', '+', '%', '$', '£']
-        self._char: chr = choices[self._id]
-        if self._id + 1 > len(choices):
+        if self._id > len(choices) - 1:
             self._char = 65 + self._id - len(choices)
+        else:
+            self._char: chr = choices[self._id]
 
     def assign_location(self, position: List[int], room) -> None:
         if position == [None, None]:
