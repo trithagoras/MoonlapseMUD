@@ -32,10 +32,6 @@ class Database:
 
     def connect(self):
         print("Connecting to database... ", end='')
-        if self.conn:
-            self.conn.close()
-        if self.curs:
-            self.curs.close()
 
         self.conn = psycopg2.connect(
             user=self.cs['user'],
@@ -48,7 +44,7 @@ class Database:
         self.curs = self.conn.cursor()
 
         p = self.conn.get_dsn_parameters()
-        print(f"done: host={p['host']}, port={p['port']}, dbname={p['dbname']}, user={p['user']}")
+        print(f"Done.")
 
     def register_player(self, username, password):
         print(f"Attempting to register player to database: {username}:{password}...", end='')
@@ -76,7 +72,7 @@ class Database:
         print("Success!")
 
     def user_exists(self, username: str) -> bool:
-        print(f"Checking if user exists: {username}...", end='')
+        print(f"Checking if user {username} exists...", end='')
         self.curs.execute(f"""
             SELECT CASE 
                 WHEN EXISTS (
@@ -92,7 +88,7 @@ class Database:
         return result
 
     def password_correct(self, username: str, password: str) -> bool:
-        print(f"Checking if credentials: {username}:{password} are correct...", end='')
+        print(f"Checking if credentials {username}:{password} are correct...", end='')
         self.curs.execute(f"""
             SELECT CASE 
                 WHEN EXISTS (

@@ -29,7 +29,6 @@ class NetworkMenu(Menu):
             if attempt < max_attempts:
                 # Socket might have closed, open it again
                 self.start(attempt=attempt+1)
-                print(f"Error: Connection attempt {attempt}/{max_attempts} failed. Traceback: ", file=sys.stderr)
                 print(traceback.format_exc(), file=sys.stderr)
             else:
                 # Something else is wrong, exit
