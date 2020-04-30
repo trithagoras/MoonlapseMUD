@@ -9,7 +9,8 @@ from log import Log
 from threading import Thread
 from threading import Timer
 import traceback
-import twisted
+from twisted.internet import task
+from twisted.internet import reactor
 
 from networking import models
 from networking import packet as pack
@@ -42,9 +43,9 @@ class TcpServer:
 
         # Update each room's players' clients exactly on every server tick
         for room in self.rooms:
-            update_tick_loop = twisted.internet.task.LoopingCall(room.update_clients)
+            update_tick_loop = task.LoopingCall(room.update_clients)
             update_tick_loop.start(1 / self.tick_rate)
-            twisted.internet.reactor.run()
+            reactor.run()
 
     def connect_socket(self):
         print("Connecting to socket... ", end='')
