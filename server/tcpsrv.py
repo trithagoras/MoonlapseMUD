@@ -29,7 +29,7 @@ class TcpServer:
         self.sockets: List[socket.socket] = []
 
         self.log: Log = Log()
-        self.tick_rate: int = 100
+        self.tick_rate: int = 20
 
         pwd: str = os.path.dirname(__file__)
         room_data_filename: str = os.path.join(pwd, '..', 'maps', 'map.bmp.json')
@@ -50,14 +50,14 @@ class TcpServer:
         self._connect_socket()
         self.database.connect()
 
-        # Listen to incoming client connections on its own thread
-        Thread(target=self._accept_clients, daemon=True).start()
-
         # Update each room's players' clients exactly on every server tick
         for room in self.rooms:
             update_tick_loop = task.LoopingCall(room.update_clients)
-            update_tick_loop.start(1 / self.tick_rate)
+            update_tick_loop.start(1 / self.tick_rate, now=True)
             reactor.run()
+
+        # Listen to incoming client connections on its own thread
+        self._accept_clients()
 
     def _connect_socket(self) -> None:
         print("Connecting to socket... ", end='')
@@ -70,11 +70,11 @@ class TcpServer:
         print(f"Done.")
 
     def _accept_clients(self) -> None:
-        while self.sockets:
+        while True:
             print("Waiting for a socket ready to read...")
-            read_sockets, _, except_sockets = select.select(self.sockets, [], self.sockets)
+            readables, _, exceptionals = select.select(self.sockets, [], self.sockets)
 
-            for s in read_sockets:
+            for s in readables:
                 print("A socket is ready!")
                 if s == self.sock:
                     client_sock, client_addr = self.sock.accept()
@@ -82,14 +82,19 @@ class TcpServer:
                     print("Accepted a new client!")
                     self.sockets.append(client_sock)
                 else:
-                    self._handle_client(s)
+                    try:
+                        self._handle_client(s)
+                    except BlockingIOError:
+                        print("A socket might have already been closed. Ignoring...")
+                        continue
 
-            for s in except_sockets:
+            for s in exceptionals:
                 self.sockets.remove(s)
                 s.close()
+                print("A socket threw an exception and was closed!")
 
     def _handle_client(self, client_socket: socket.socket):
-        packet: pack.Packet = pack.receivepacket(client_socket)
+        packet: Optional[pack.Packet] = pack.receivepacket(client_socket)
 
         print(f"Received data from a client: {packet}")
 
@@ -107,7 +112,7 @@ class TcpServer:
                     # Try to spawn the player into the next available room
                     for room in self.rooms:
                         try:
-                            Thread(target=room.spawn(client_socket, username), daemon=True).start()
+                            room.spawn(client_socket, username)
                             print("Spawned player")
                         except RoomFullException:
                             client_socket.close()

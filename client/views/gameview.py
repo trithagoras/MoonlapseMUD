@@ -168,7 +168,7 @@ class GameView(View):
 
         # Fill the log
         if self.game.latest_log is not None and self.game.latest_log != self.latest_log:
-            self.log.update(self.game.latest_log)
+            self.log[time.time()] = self.game.latest_log
             self.latest_log = self.game.latest_log
 
         if self.log != {}:

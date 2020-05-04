@@ -105,7 +105,7 @@ class Database:
         return result
 
     def update_player_pos(self, player: models.Player, x: int, y: int) -> None:
-        print(f"Updating player position ({player.get_username()})...", end='')
+        # print(f"Updating player position ({player.get_username()})...", end='')
         self.curs.execute(f"""
             UPDATE entities
             SET position = '{x}, {y}'

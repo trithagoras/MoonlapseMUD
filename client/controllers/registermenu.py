@@ -1,21 +1,22 @@
 import curses
 import json
-import socket as sock
+import socket
 import sys
 import traceback
 
-from networking import packet as pack
+from networking import packet
 from ..views.registerview import RegisterView
-from .networkmenu import NetworkMenu
+from .menu import Menu
 
 
-class RegisterMenu(NetworkMenu):
-    def __init__(self, host, port):
+class RegisterMenu(Menu):
+    def __init__(self, s: socket.socket):
+        self.s: socket.socket = s
         self.username: str = ''
         self.password: str = ''
         self.confirmpassword: str = ''
 
-        super().__init__(host, port, {
+        super().__init__({
             "Username": self.register,
             "Password": self.register,
             "Confirm password": self.register
@@ -48,10 +49,4 @@ class RegisterMenu(NetworkMenu):
             self.view.title = "Passwords do not match!"
             return
 
-        try:
-            pack.sendpacket(self.s, pack.RegisterPacket(self.username, self.password))
-
-        except sock.error as e:
-            print("Error: Socket error. Traceback: ", file=sys.stderr)
-            print(traceback.format_exc())
-            self.view.title = str(e)
+        packet.send(packet.RegisterPacket(self.username, self.password), self.s)

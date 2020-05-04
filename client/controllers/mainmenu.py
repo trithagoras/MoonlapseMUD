@@ -4,22 +4,28 @@ from ..views.registerview import RegisterView
 from .loginmenu import LoginMenu
 from .menu import Menu
 from .registermenu import RegisterMenu
-
+from networking import packet
+import socket
 
 class MainMenu(Menu):
-    def __init__(self, host, port):
+    def __init__(self, s: socket.socket):
         super().__init__({
             "Login": self.login,
             "Register": self.register
         })
 
-        self.host = host
-        self.port = port
+        self.s: socket.socket = s
 
-        self.view = MenuView(self, f"Welcome to {host}:{port}")
+        self.view = MenuView(self, f"Welcome to MoonlapseMUD")
+
+        p: packet.Packet = packet.receive(self.s)
+        if isinstance(p, packet.WelcomePacket):
+            motd: str = p.payloads[0].value
+        self.view.title = motd
+
 
     def login(self):
-        loginmenu = LoginMenu(self.host, self.port)
+        loginmenu = LoginMenu(self.s)
         err: str = loginmenu.start()
         if err:
             self.view.title = err
@@ -27,7 +33,7 @@ class MainMenu(Menu):
         self.start()
 
     def register(self):
-        registermenu = RegisterMenu(self.host, self.port)
+        registermenu = RegisterMenu(self.s)
         err: str = registermenu.start()
         if err:
             self.view.title = err

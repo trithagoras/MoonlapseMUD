@@ -1,21 +1,22 @@
 import curses
 import json
-import socket as sock
+import socket
 import sys
 import traceback
 
-from networking import packet as pack
+from networking import packet
 from ..views.loginview import LoginView
 from .game import Game
-from .networkmenu import NetworkMenu
+from .menu import Menu
 
 
-class LoginMenu(NetworkMenu):
-    def __init__(self, host, port):
+class LoginMenu(Menu):
+    def __init__(self, s: socket.socket):
+        self.s: socket.socket = s
         self.username: str = ''
         self.password: str = ''
 
-        super().__init__(host, port, {
+        super().__init__({
             "Username": self.login,
             "Password": self.login
         })
@@ -39,14 +40,8 @@ class LoginMenu(NetworkMenu):
             return
 
         self.view.title = f"Attempted login in as {self.username} with password {self.password}"
-        try:
-            pack.sendpacket(self.s, pack.LoginPacket(self.username, self.password))
+        packet.send(packet.LoginPacket(self.username, self.password), self.s)
 
-            game = Game(self.s, self.addr)
-            game.start()
-            self.start()
-
-        except sock.error as e:
-            print("Error: Socket error. Traceback: ", file=sys.stderr)
-            print(traceback.format_exc())
-            self.view.title = str(e)
+        game = Game(self.s)
+        game.start()
+        self.start()
