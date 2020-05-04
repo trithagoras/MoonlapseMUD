@@ -1,6 +1,7 @@
 from twisted.protocols.basic import NetstringReceiver, IncompleteNetstring, NetstringParseError
 from twisted.internet.protocol import Factory
 from twisted.internet.protocol import Protocol
+from twisted.internet.defer import Deferred
 from twisted.internet import reactor
 from typing import *
 import time
@@ -31,6 +32,7 @@ class Moonlapse(NetstringReceiver):
         self.database: Database = database
         self.users: Dict[str, 'Moonlapse'] = users
         self.username: str = None
+        self.password: str = None
         self.player: models.Player = None
         self.state: function = self._GETLOGIN
 
@@ -74,33 +76,42 @@ class Moonlapse(NetstringReceiver):
         if not isinstance(p, packet.LoginPacket):
             return
         
-        username: str = p.payloads[0].value
-        password: str = p.payloads[1].value
-        if username in self.users.keys():
+        self.username: str = p.payloads[0].value
+        self.password: str = p.payloads[1].value
+        
+        self.database.user_exists(self.username).addCallback(self.check_user_exists)
+
+    def check_user_exists(self, result):
+        if self.username in self.users.keys() or False in result:
             self.sendPacket(packet.DenyPacket("user already connected"))
             return
-        if not self.database.user_exists(username):
-            self.sendPacket(packet.DenyPacket("user does not exist"))
-            return
-        if not self.database.password_correct(username, password):
+        
+        self.database.password_correct(self.username, self.password).addCallback(self.check_password_correct)
+
+    def check_password_correct(self, result):
+        if False in result:
             self.sendPacket(packet.DenyPacket("incorrect password for user"))
             return
 
         self.sendPacket(packet.OkPacket())
-        self.username = username
-        self.users[username] = self
+        self.users[self.username] = self
 
         for name, protocol in self.users.items():
             protocol.sendPacket(packet.ChatPacket(f"{self.username} has arrived!"))
 
         self.player = models.Player(len(self.users))
         self.player.assign_username(self.username)
-        init_pos = self.database.get_player_pos(self.player)
+        
+        self.database.get_player_pos(self.player).addCallback(self.get_player_init_pos)
+
+    def get_player_init_pos(self, result):
+        print("get_player_init_pos ->", result)
+        init_pos = result[0]
         self.player.assign_location(list(init_pos), self.room_data['walls'], *self.room_data['size'])
 
         if init_pos == (None, None):
             pos = self.player.get_position()
-            self.database.update_player_pos(self.player, pos[0], pos[1])
+            self.database.update_player_pos(self.player, pos[0], pos[1]).addCallback(self.dboperation_done)
 
         self.sendPacket(packet.ServerRoomSizePacket(*self.room_data['size']))
         self.sendPacket(packet.ServerRoomPlayerPacket(self.player))
@@ -108,6 +119,12 @@ class Moonlapse(NetstringReceiver):
         self.sendPacket(packet.ServerRoomTickRatePacket(100))
 
         self.state = self._PLAY
+
+    def dboperation_done(self, result):
+        print("Done")
+
+    def proceed_to_game(self, username: str):
+        pass
 
     def chat(self, p: packet.ChatPacket):
         message: str = f"{self.username} says: {p.payloads[0].value}"
@@ -133,7 +150,8 @@ class Moonlapse(NetstringReceiver):
 
         if self._within_bounds(dest) and dest not in self.room_data['walls']:
             player.set_position(dest)
-            self.database.update_player_pos(player, dest[0], dest[1])
+            d: Deferred = self.database.update_player_pos(player, dest[0], dest[1])
+            d.addCallback(self.dboperation_done)
 
             for name, protocol in self.users.items():
                 protocol.sendPacket(packet.ServerRoomPlayerPacket(player))

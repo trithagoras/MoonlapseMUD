@@ -49,6 +49,11 @@ class LoginPacket(Packet):
         ppassword = Payload(password)
         super().__init__(pusername, ppassword)
 
+class RegisterPacket(Packet):
+    def __init__(self, username, password: str):
+        pusername = Payload(username)
+        ppassword = Payload(password)
+        super().__init__(pusername, ppassword)
 
 class ChatPacket(Packet):
     def __init__(self, message: str):

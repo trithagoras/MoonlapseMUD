@@ -43,11 +43,10 @@ class Database:
 
         print(f"Done.")
 
-    @inlineCallbacks
-    def register_player(self, username: str, password: str) -> None:
-        print(f"Attempting to register player to database: {username}:{password}...", end='')
+    def register_player(self, username: str, password: str) -> Deferred:
+        print(f"Attempting to register player to database: {username}:{password}...")
         now: str = str(datetime.datetime.utcnow())
-        yield self.dbpool.runOperation(f"""=
+        return self.dbpool.runOperation(f"""=
             INSERT INTO users (username, password)
             VALUES ('{username}', '{password}');
 
@@ -61,12 +60,10 @@ class Database:
             WHERE u.username = '{username}'
             AND e.lastupdated = '{now}';
         """)
-        print("Done.")
 
-    @inlineCallbacks
-    def user_exists(self, username: str) -> bool:
-        print(f"Checking if user {username} exists...", end='')
-        result: bool = yield self.dbpool.runQuery(f"""
+    def user_exists(self, username: str) -> Deferred:
+        print(f"Checking if user {username} exists...")
+        return self.dbpool.runQuery(f"""
             SELECT CASE 
                 WHEN EXISTS (
                     SELECT NULL
@@ -76,13 +73,10 @@ class Database:
                   ELSE FALSE
             END;
         """)
-        print("Done")
-        return result
 
-    @inlineCallbacks
-    def password_correct(self, username: str, password: str) -> bool:
-        print(f"Checking if credentials {username}:{password} are correct...", end='')
-        result: bool = yield self.dbpool.runQuery(f"""
+    def password_correct(self, username: str, password: str) -> Deferred:
+        print(f"Checking if credentials {username}:{password} are correct...")
+        return self.dbpool.runQuery(f"""
             SELECT CASE 
                 WHEN EXISTS (
                     SELECT NULL
@@ -93,8 +87,6 @@ class Database:
                   ELSE FALSE
             END;
         """)
-        print("Done.")
-        return result
 
     def update_player_pos(self, player: models.Player, y: int, x: int) -> Deferred:
         print(f"Updating player position ({player.get_username()})...")
@@ -109,10 +101,9 @@ class Database:
             )
         """)
 
-    @inlineCallbacks
-    def get_player_pos(self, player: models.Player) -> Tuple[int]:
+    def get_player_pos(self, player: models.Player) -> Deferred:
         print(f"Getting player position ({player.get_username()})...", end='')
-        result: Tuple[int] = yield self.dbpool.runQuery(f"""
+        return self.dbpool.runQuery(f"""
             SELECT position[0], position[1]
             FROM entities
             where id IN (
@@ -122,5 +113,3 @@ class Database:
                 ON p.userid = u.id AND u.username = '{player.get_username()}'
             )
         """)
-        print("Done.")
-        return result
