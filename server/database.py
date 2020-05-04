@@ -81,7 +81,7 @@ class Database:
 
     @inlineCallbacks
     def password_correct(self, username: str, password: str) -> bool:
-        print(f"Checking if credentials {username}:{password} are correct...")
+        print(f"Checking if credentials {username}:{password} are correct...", end='')
         result: bool = yield self.dbpool.runQuery(f"""
             SELECT CASE 
                 WHEN EXISTS (
@@ -109,9 +109,10 @@ class Database:
             )
         """)
 
-    def get_player_pos(self, player: models.Player) -> Deferred:
+    @inlineCallbacks
+    def get_player_pos(self, player: models.Player) -> Tuple[int]:
         print(f"Getting player position ({player.get_username()})...", end='')
-        return self.dbpool.runQuery(f"""
+        result: Tuple[int] = yield self.dbpool.runQuery(f"""
             SELECT position[0], position[1]
             FROM entities
             where id IN (
@@ -121,3 +122,5 @@ class Database:
                 ON p.userid = u.id AND u.username = '{player.get_username()}'
             )
         """)
+        print("Done.")
+        return result
