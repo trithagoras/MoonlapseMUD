@@ -34,7 +34,7 @@ class Moonlapse(NetstringReceiver):
         self.username: str = None
         self.password: str = None
         self.player: models.Player = None
-        self.state: function = self._GETLOGIN
+        self.state: function = self._GETENTRY
 
         pwd: str = os.path.dirname(__file__)
         room_data_filename: str = os.path.join(pwd, '..', 'maps', 'map.bmp.json')
@@ -72,21 +72,29 @@ class Moonlapse(NetstringReceiver):
         elif isinstance(p, packet.ChatPacket):
             self.chat(p)
 
-    def _GETLOGIN(self, p: packet.LoginPacket):
-        if not isinstance(p, packet.LoginPacket):
-            return
-        
+    def _GETENTRY(self, p: Union[packet.LoginPacket, packet.RegisterPacket]):
         self.username: str = p.payloads[0].value
         self.password: str = p.payloads[1].value
-        
-        self.database.user_exists(self.username).addCallback(self.check_user_exists)
 
-    def check_user_exists(self, result):
+        if isinstance(p, packet.LoginPacket):
+            self.database.user_exists(self.username).addCallback(self.login_check_user_exists)
+        
+        elif isinstance(p, packet.RegisterPacket):
+            self.database.user_exists(self.username).addCallback(self.register_check_user_exists)
+
+    def login_check_user_exists(self, result):
         if self.username in self.users.keys() or False in result:
             self.sendPacket(packet.DenyPacket("user already connected"))
             return
         
         self.database.password_correct(self.username, self.password).addCallback(self.check_password_correct)
+
+    def register_check_user_exists(self, result):
+        if self.username in self.users.keys() or True in result:
+            self.sendPacket(packet.DenyPacket("user already registered"))
+            return
+        
+        self.database.register_player(self.username, self.password).addCallback(self.dboperation_done)
 
     def check_password_correct(self, result):
         if False in result:

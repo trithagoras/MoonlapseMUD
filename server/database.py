@@ -46,7 +46,7 @@ class Database:
     def register_player(self, username: str, password: str) -> Deferred:
         print(f"Attempting to register player to database: {username}:{password}...")
         now: str = str(datetime.datetime.utcnow())
-        return self.dbpool.runOperation(f"""=
+        return self.dbpool.runOperation(f"""
             INSERT INTO users (username, password)
             VALUES ('{username}', '{password}');
 
