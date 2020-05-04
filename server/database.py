@@ -52,7 +52,7 @@ class Database:
             VALUES ('Player', '{now}');
 
             INSERT INTO players (entityid, userid, name, character)
-            SELECT u.id, e.id, '{username}', '@'
+            SELECT e.id, u.id, '{username}', '@'
             FROM users AS u
             CROSS JOIN entities AS e
             WHERE u.username = '{username}'
