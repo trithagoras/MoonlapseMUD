@@ -184,6 +184,11 @@ def receive(s: socket.socket):
         else:
             data: bytes = s.recv(int(length))
 
+            # Perhaps all the data is not received yet
+            while len(data) < int(length):
+                nextLength = int(length) - len(data)
+                data += s.recv(nextLength)
+
             # Read off the trailing comma
             s.recv(1)
 
