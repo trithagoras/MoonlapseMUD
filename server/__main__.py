@@ -126,6 +126,10 @@ class Moonlapse(NetstringReceiver):
         self.sendPacket(packet.ServerRoomGeometryPacket(self.room_data['walls']))
         self.sendPacket(packet.ServerRoomTickRatePacket(100))
 
+        # Send yourself to all the other players (including yourself, why not?)
+        for name, protocol in self.users.items():
+            protocol.sendPacket(packet.ServerRoomPlayerPacket(self.player))
+
         self.state = self._PLAY
 
     def dboperation_done(self, result):
@@ -172,7 +176,7 @@ class Moonlapse(NetstringReceiver):
 
     def sendPacket(self, p: packet.Packet):
         self.transport.write(p.tobytes())
-        # print(f"Sent packet {p}")
+        print(f"Sent data", p.tobytes())
 
 
 class MoonlapseFactory(Factory):
