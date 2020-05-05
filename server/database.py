@@ -7,20 +7,6 @@ from typing import *
 import traceback
 import sys
 
-# Add server to path
-import os
-from pathlib import Path # if you haven't already done so
-file = Path(__file__).resolve()
-parent, root = file.parent, file.parents[1]
-sys.path.append(str(root))
-
-# Remove server from path
-try:
-    sys.path.remove(str(parent))
-except ValueError:
-    print("Error: Removing parent from path, already gone. Traceback: ")
-    print(traceback.format_exc())
-
 from networking import models
 
 
@@ -32,7 +18,7 @@ class Database:
             self.cs = json.load(f)
 
     def connect(self):
-        print("Connecting to database... ", end='')
+        # print("Connecting to database... ", end='')
 
         self.dbpool = adbapi.ConnectionPool('psycopg2', 
             user=self.cs['user'],
@@ -41,10 +27,10 @@ class Database:
             port=self.cs['port'],
             database=self.cs['database'])
 
-        print(f"Done.")
+        # print(f"Done.")
 
     def register_player(self, username: str, password: str) -> Deferred:
-        print(f"Attempting to register player to database: {username}:{password}...")
+        # print(f"Attempting to register player to database: {username}:{password}...")
         now: str = str(datetime.datetime.utcnow())
         return self.dbpool.runOperation(f"""
             INSERT INTO users (username, password)
@@ -62,7 +48,7 @@ class Database:
         """)
 
     def user_exists(self, username: str) -> Deferred:
-        print(f"Checking if user {username} exists...")
+        # print(f"Checking if user {username} exists...")
         return self.dbpool.runQuery(f"""
             SELECT CASE 
                 WHEN EXISTS (
@@ -75,7 +61,7 @@ class Database:
         """)
 
     def password_correct(self, username: str, password: str) -> Deferred:
-        print(f"Checking if credentials {username}:{password} are correct...")
+        # print(f"Checking if credentials {username}:{password} are correct...")
         return self.dbpool.runQuery(f"""
             SELECT CASE 
                 WHEN EXISTS (
@@ -89,7 +75,7 @@ class Database:
         """)
 
     def update_player_pos(self, player: models.Player, y: int, x: int) -> Deferred:
-        print(f"Updating player position ({player.get_username()})...")
+        # print(f"Updating player position ({player.get_username()})...")
         return self.dbpool.runOperation(f"""
             UPDATE entities
             SET position = '{y}, {x}'
@@ -102,7 +88,7 @@ class Database:
         """)
 
     def get_player_pos(self, player: models.Player) -> Deferred:
-        print(f"Getting player position ({player.get_username()})...", end='')
+        # print(f"Getting player position ({player.get_username()})...", end='')
         return self.dbpool.runQuery(f"""
             SELECT position[0], position[1]
             FROM entities

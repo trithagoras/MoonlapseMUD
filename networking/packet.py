@@ -108,6 +108,11 @@ class ServerRoomPlayerPacket(Packet):
         super().__init__(Payload(player))
 
 
+class HelloPacket(Packet):
+    def __init__(self, player: Player):
+        super().__init__(Payload(player))
+
+
 class ServerRoomGeometryPacket(Packet):
     """
         Something like {

@@ -8,7 +8,7 @@ import traceback
 from threading import Thread
 from typing import *
 
-from ..views import *
+from client.views import View
 
 
 class Controller:

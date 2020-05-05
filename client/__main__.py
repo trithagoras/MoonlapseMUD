@@ -3,19 +3,13 @@ from typing import *
 import traceback
 import socket
 
-# Add client to path
+# Required to import top level modules
 import os
-from pathlib import Path # if you haven't already done so
+from pathlib import Path
 file = Path(__file__).resolve()
 parent, root = file.parent, file.parents[1]
 sys.path.append(str(root))
 
-# Remove client from path
-try:
-    sys.path.remove(str(parent))
-except ValueError:
-    print("Error: Removing parent from path, already gone. Traceback: ")
-    print(traceback.format_exc())
 
 from client.controllers.mainmenu import MainMenu
 
@@ -36,7 +30,7 @@ def handle_arguments() -> Tuple[str, int]:
     :return: The hostname and/or port specified in the command line arguments, otherwise ('moonlapse.net', 8081).
     """
     hostname: str = 'moonlapse.net'
-    port: int = 8081
+    port: int = 42523
 
     # sys.argv will return something like ['client', 'localhost', 8123]
     n_args: int = len(sys.argv)
