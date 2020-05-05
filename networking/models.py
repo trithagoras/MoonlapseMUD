@@ -24,11 +24,11 @@ class Player:
         else:
             self._char: chr = choices[self._id]
 
-    def assign_location(self, position: List[int], room) -> None:
+    def assign_location(self, position: List[int], walls: List[List[int]], max_height: int, max_width: int) -> None:
         if position == [None, None]:
             while True:
-                self._position = [random.randint(1, room.height), random.randint(1, room.width)]
-                if self._position not in room.walls:
+                self._position = [random.randint(1, max_height), random.randint(1, max_width)]
+                if self._position not in walls:
                     break
         else:
             self._position = [position[0], position[1]]

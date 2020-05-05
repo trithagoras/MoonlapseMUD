@@ -1,6 +1,6 @@
 from typing import *
 import json
-import socket as sock
+import socket
 import traceback
 import pickle
 
@@ -9,19 +9,38 @@ from .models import *
 
 
 class Packet:
+    MAX_LENGTH: int = 2 ** 63 - 1
+        
     def __init__(self, *payloads: Payload):
         self.action: str = type(self).__name__
         self.payloads: Tuple[Payload] = payloads
 
-    def serialize(self) -> str:
+    def tobytes(self) -> str:
         serialize_dict: Dict[str, str] = {}
         serialize_dict['a'] = self.action
         for i in range(len(self.payloads)):
             serialize_dict[f'p{i}'] = self.payloads[i].serialize()
-        return json.dumps(serialize_dict)
+        datastr: str = json.dumps(serialize_dict, separators=(',', ':'))
+        lengthstr: str = str(len(datastr))
+        return str.encode(lengthstr + ':' + datastr + ',', 'utf-8')
+
     
     def __repr__(self) -> str:
         return f"{self.action}: {self.payloads}"
+
+
+class OkPacket(Packet):
+    pass
+
+
+class DenyPacket(Packet):
+    def __init__(self, reason: str = "unspecified"):
+        super().__init__(Payload(reason))
+
+
+class WelcomePacket(Packet):
+    def __init__(self, motd: str = "Welcome to MoonlapseMUD"):
+        super().__init__(Payload(motd))
 
 
 class LoginPacket(Packet):
@@ -31,24 +50,25 @@ class LoginPacket(Packet):
         super().__init__(pusername, ppassword)
 
 
-class RegisterPacket(Packet):
-    def __init__(self, username: str, password: str):
-        pusername = Payload(username)
-        ppassword = Payload(password)
-        super().__init__(pusername, ppassword)
+class ChatPacket(Packet):
+    def __init__(self, message: str):
+        pmessage: Payload = Payload(message[:80])
+        super().__init__(pmessage)
 
 
 class MovePacket(Packet):
-    def __init__(self, direction: chr):
+    def __init__(self, player: Player, direction: chr):
         """
-        A packet which takes a direction with intention to move an object in that direction.
+        A packet which takes a direction with intention to move a player in that direction.
         Accepted directions include: 'u' (up), 'd' (down), 'l' (left), 'r' (right, default).
 
+        :param player:    The player with the intention to move.
         :param direction: The direction to move in. Should be one of 'u', 'd', 'l', 'r'. If 
                           it is not one of those values, the default resulting direction is 
                           right.
         """
-        pdirection: Payload = None
+        pplayer: Payload = Payload(player)
+        pdirection: StdPayload = None
         if direction == 'u':
             pdirection = StdPayload.MOVE_UP
         elif direction == 'd':
@@ -60,13 +80,7 @@ class MovePacket(Packet):
         else:
             raise ValueError(f"direction {direction} must be one of 'u', 'd', 'l', 'r'")
 
-        super().__init__(pdirection)
-
-
-class ChatPacket(Packet):
-    def __init__(self, message: str):
-        pmessage: Payload = Payload(message)
-        super().__init__(pmessage)
+        super().__init__(pplayer, pdirection)
 
 
 class DisconnectPacket(Packet):
@@ -111,28 +125,17 @@ class ServerRoomTickRatePacket(Packet):
     def __init__(self, tickrate: int):
         super().__init__(Payload(tickrate))
 
-def sendpacket(s: sock.socket, packet: Packet) -> None:
-    data: str = packet.serialize() + ';'
-    nbytes: int = len(data)
-    s.send(bytes(str(nbytes) + data, 'utf-8'))
 
+def frombytes(data: bytes) -> Packet:
+    """
+    Constructs a proper packet type from bytes encoding a utf-8 string formatted like so:
+    {"a":"PacketClassName","p0":"A payload","p1":"Another payload"}
 
-def receivepacket(s: sock.socket) -> Packet:
-    # data should look something like this
-    # 35{'a': 'Packet', 'p0': 'Something'};
+    The payload is automatically pickled and converted to a hex string in order to be sent over 
+    the network. This allows you to send and receive all picklable Python objects.
+    """
+    obj_dict: Dict[str, str] = json.loads(data)
 
-    # Get the size of the data first
-    sizestr: str = ' '
-    while sizestr[-1] != '{':
-        sizestr += s.recv(1).decode('utf-8')
-    size: int = int(sizestr[:-1])
-
-    # Get the next data to size
-    data: str = '{' + s.recv(size - 1).decode('utf-8')
-    return constructpacket(json.loads(data[:-1]))
-
-
-def constructpacket(obj_dict: Dict[str, str]) -> Packet:
     action: Optional[str] = None
     payloads: List[Optional[Payload]] = []
     for key in obj_dict:
@@ -153,3 +156,35 @@ def constructpacket(obj_dict: Dict[str, str]) -> Packet:
     except KeyError:
         print(f"KeyError: {specificPacketClassName} is not a valid packet name. Stacktrace: ")
         print(traceback.format_exc())
+
+def send(p: Packet, s: socket.socket) -> str:
+    failure = s.sendall(p.tobytes())
+    if failure is not None:
+        print("Failed to send all data", file=sys.stderr)
+        send(p, s)
+    return p.tobytes()
+    
+
+def receive(s: socket.socket):
+    length: bytes = b''
+    json: bytes = b''
+    for i in range(len(str(Packet.MAX_LENGTH))):
+        c: bytes = s.recv(1)
+        if c != b':':
+            try:
+                int(c)
+            except ValueError:
+                raise PacketParseError(f"Error reading packet length. So far got {length} but next digit came in as {c}")
+            length += c
+        else:
+            data: bytes = s.recv(int(length))
+
+            # Read off the trailing comma
+            s.recv(1)
+
+            return frombytes(data)
+
+    raise PacketParseError("Error reading packet length. Too long.")
+
+class PacketParseError(Exception):
+    pass

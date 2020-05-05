@@ -22,6 +22,8 @@ except ValueError:
 from networking import packet as pack
 from networking.payload import StdPayload as stdpay
 from networking import models
+import select
+import queue
 
 
 class Room:
@@ -51,14 +53,9 @@ class Room:
             p = models.Player(pid)
             self.player_sockets[p] = None
 
-    def _kick(self, player: models.Player, reason: str = 'Not given') -> None:
-            # Free the player position
-            self.player_sockets[player].close()
-            self.player_sockets[player] = None
-
-            # Log the event
-            self.tcpsrv.log.log(f"{player.get_username()} has departed. Reason: {reason}")
-            print(f"Kicked {player.get_username()}. Reason: {reason}")
+        # Keep a packet queue for each player socket so that they can be sent 
+        # when the socket is ready for writing
+        self.socket_queues: Dict[socket.socket, queue.Queue[pack.Packet]] = {}
 
     def spawn(self, client_socket: socket.socket, username: str) -> None:
         """
@@ -94,53 +91,50 @@ class Room:
 
         self.player_sockets[new_player] = client_socket
 
-        # Send initial room data to the player connecting
-        self.send(new_player, pack.ServerRoomPlayerPacket(new_player))
-        self.send(new_player, pack.ServerRoomSizePacket(self.height, self.width))
-        self.send(new_player, pack.ServerRoomGeometryPacket(self.walls))
-        self.send(new_player, pack.ServerRoomTickRatePacket(self.tcpsrv.tick_rate))
+        # Enqueue initial room data to the player connecting
+        self._enqueue(new_player, pack.ServerRoomPlayerPacket(new_player))
+        self._enqueue(new_player, pack.ServerRoomSizePacket(self.height, self.width))
+        self._enqueue(new_player, pack.ServerRoomGeometryPacket(self.walls))
+        self._enqueue(new_player, pack.ServerRoomTickRatePacket(self.tcpsrv.tick_rate))
 
         self.tcpsrv.log.log(f"{new_player.get_username()} has arrived.")
         
-        # Begin the loop of handling the new player's requests in a separate thread
-        Thread(target=self._handle_player, args=(new_player,), daemon=True).start()
+    def _handle_packet(self, packet: pack.Packet, sendingPlayer: models.Player) -> None:
+        print(f"Received packet {packet} from player {sendingPlayer}")
 
-    def _handle_player(self, player: models.Player) -> None:
-        sock: socket.socket = self.player_sockets[player]
-        while True:
-            packet: pack.Packet = pack.receivepacket(sock)
-            print("Received packet", packet)
+        if packet is None:
+            return
 
-            # Move
-            if isinstance(packet, pack.MovePacket):
-                pay: stdpay = packet.payloads[0]
-                pos: Tuple[int] = player.get_position()
-                dir = packet.payloads[0].value
-                
-                # Calculate the desired desination
-                dest: List[int] = list(pos)
-                if pay == stdpay.MOVE_UP:
-                    dest[0] -= 1
-                elif pay == stdpay.MOVE_RIGHT:
-                    dest[1] += 1
-                elif pay == stdpay.MOVE_DOWN:
-                    dest[0] += 1
-                elif pay == stdpay.MOVE_LEFT:
-                    dest[1] -= 1
+        # Move
+        if isinstance(packet, pack.MovePacket):
+            pay: stdpay = packet.payloads[0]
+            pos: Tuple[int] = sendingPlayer.get_position()
+            dir = packet.payloads[0].value
             
-                if self._within_bounds(dest) and dest not in self.walls:
-                    player.set_position(dest)
+            # Calculate the desired desination
+            dest: List[int] = list(pos)
+            if pay == stdpay.MOVE_UP:
+                dest[0] -= 1
+            elif pay == stdpay.MOVE_RIGHT:
+                dest[1] += 1
+            elif pay == stdpay.MOVE_DOWN:
+                dest[0] += 1
+            elif pay == stdpay.MOVE_LEFT:
+                dest[1] -= 1
+        
+            if self._within_bounds(dest) and dest not in self.walls:
+                sendingPlayer.set_position(dest)
 
-                self.tcpsrv.database.update_player_pos(player, dest[0], dest[1])
+            self.tcpsrv.database.update_player_pos(sendingPlayer, dest[0], dest[1])
 
-            # Chat
-            elif isinstance(packet, pack.ChatPacket):
-                self.tcpsrv.log.log(f"{player.get_username()} says: {packet.payloads[0].value}")
-            
-            # Disconnect
-            elif isinstance(packet, pack.DisconnectPacket):
-                self._kick(player, reason="Player said goodbye.")
-                return
+        # Chat
+        elif isinstance(packet, pack.ChatPacket):
+            self.tcpsrv.log.log(f"{sendingPlayer.get_username()} says: {packet.payloads[0].value}")
+        
+        # Disconnect
+        elif isinstance(packet, pack.DisconnectPacket):
+            self._kick(sendingPlayer, reason="Player said goodbye.")
+            return
 
     def _within_bounds(self, coords: List[int]) -> bool:
         return 0 <= coords[0] < self.height and 0 <= coords[1] < self.width
@@ -150,28 +144,77 @@ class Room:
         Sends information to each client controlling a player in this room.
         This information can be used by the client to update their displays.
         """
-        for player in self.player_sockets.keys():
-            self.send(player, pack.ServerLogPacket(self.tcpsrv.log.latest))
+        if not self._get_readysockets():
+            print("No clients ready to update")
+            return
+        
+        # Keep track of which player sockets are ready to read from, write to, or throw exceptions
+        readySockets: List[socket.socket] = self._get_readysockets()
+        queueSockets: List[socket.socket] = self.socket_queues.keys()
+        readables, writeables, exceptionals = select.select(readySockets, queueSockets, readySockets, 1 / self.tcpsrv.tick_rate)
 
-            # Send the latest player information
+        for s in readables:
+            sendingPlayer = self._get_player_from_socket(s)
+
+            # Queue the player information about the room and listen for their requests
+            self._enqueue(sendingPlayer, pack.ServerLogPacket(self.tcpsrv.log.latest))
+
+            # Enqueue the latest player information
             for p in self.player_sockets.keys():
                 if p is not None and p.ready():
-                    self.send(player, pack.ServerRoomPlayerPacket(p))
+                    self._enqueue(sendingPlayer, pack.ServerRoomPlayerPacket(p))
 
+            readpacket: Optional[pack.Packet] = pack.receivepacket(s)
+            self._handle_packet(readpacket, sendingPlayer)
+        
+        for s in writeables:
+            try:
+                nextPacket: pack.Packet = self.socket_queues[s].get_nowait()
+            except queue.Empty:
+                self.socket_queues.pop(s)
+            else:
+                pack.sendpacket(s, nextPacket)
 
-    def send(self, player: models.Player, packet: pack.Packet):
+        for s in exceptionals:
+            self._kick(self._get_player_from_socket(s))
+
+    def _enqueue(self, player: models.Player, packet: pack.Packet):
+        s: socket.socket = self.player_sockets[player]
+        if s is None:
+            return  
         try:
-            pack.sendpacket(self.player_sockets[player], packet)
-        except AttributeError:
-            # Player is reserved and has no connection
-            pass
-        except socket.error:
-            print("Error: Socket error. Traceback: ", file=sys.stderr)
-            print(traceback.format_exc(), file=sys.stderr)
-            self._kick(player, reason=f"Server couldn't send packet {packet} to client socket.")
-        except Exception:
-            print("Error: Traceback: ", file=sys.stderr)
-            print(traceback.format_exc(), file=sys.stderr)
+            self.socket_queues[s].put(packet)
+        except KeyError:
+            self.socket_queues[s] = queue.Queue()
+            self.socket_queues[s].put(packet)
+        print(f"Enqueued player {player.get_username()} with packet {packet}.")
+
+    def _get_readysockets(self) -> List[socket.socket]:
+        return [s for s in self.player_sockets.values() if s is not None]
+
+    def _kick(self, player: models.Player, reason: str = 'Not given') -> None:
+            playersocket = self.player_sockets[player]
+
+            # Discard of the player's queued packets
+            try:
+                self.socket_queues.pop(playersocket)
+            except KeyError:
+                pass
+
+            # Free the player position
+            self.player_sockets[player].close()
+            self.player_sockets[player] = None
+
+            # Log the event
+            self.tcpsrv.log.log(f"{player.get_username()} has departed. Reason: {reason}")
+            print(f"Kicked {player.get_username()}. Reason: {reason}")
+
+    def _get_player_from_socket(self, playerSocket: socket.socket) -> models.Player:
+        for p, s in self.player_sockets.items():
+            if s == playerSocket:
+                return p
+
+        raise ValueError(f"socket {playerSocket} does not belong to a player in this room")
 
 
 class RoomFullException(Exception):

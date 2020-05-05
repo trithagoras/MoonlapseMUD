@@ -7,19 +7,16 @@ import traceback
 from threading import Thread
 from typing import *
 
-from networking import packet as pack
+from networking import packet
 from networking import models
 from ..views.gameview import GameView
 from .controller import Controller
 
 
 class Game(Controller):
-    def __init__(self, s: sock.socket, addr: Tuple[str, int]):
+    def __init__(self, s: sock.socket):
         super().__init__()
         self.s: sock.socket = s
-        self.addr: Tuple[str, int] = addr
-
-        self.connected = False
 
         # Game data
         self.player: Optional[models.Player] = None
@@ -33,34 +30,7 @@ class Game(Controller):
         self.chatbox = None
         self.view = GameView(self)
 
-    def connect(self) -> None:
-        # print("Trying to connect...")
-        try:
-            self.s.connect(self.addr)
-        except OSError:
-            # Most likely safe to ignore because socket should be already connected
-            print(f"Error: Already connected. Traceback: ", file=sys.stderr)
-            print(traceback.format_exc(), file=sys.stderr)
-        except Exception:
-            print("Error: Unknown error. Traceback: ")
-            print(traceback.format_exc())
-
-        self.connected = True
-
-    def disconnect(self) -> None:
-        try:
-            pack.sendpacket(self.s, pack.DisconnectPacket())
-        except sock.error as e:
-            print("Error: Socket error. Traceback: ", file=sys.stderr)
-            print(traceback.format_exc())
-            print(e, file=sys.stderr)
-        self.s.close()
-
-        self.connected = False
-
     def start(self) -> None:
-        self.connect()
-
         # Listen for game data in its own thread
         Thread(target=self.receive_data, daemon=True).start()
 
@@ -68,28 +38,28 @@ class Game(Controller):
         while not self.ready():
             time.sleep(0.2)
 
-        # Start the view's display thread
+        # Start the view's display loop
         super().start()
 
     def receive_data(self) -> None:
         while True:
             # Get initial room data if not already done
             while not self.ready():
-                packet: Packet = pack.receivepacket(self.s)
+                p: packet.Packet = packet.receive(self.s)
 
-                if isinstance(packet, pack.ServerRoomSizePacket):
-                    self.size = [packet.payloads[0].value, packet.payloads[1].value]
-                elif isinstance(packet, pack.ServerRoomPlayerPacket):
-                    self.player = packet.payloads[0].value
-                elif isinstance(packet, pack.ServerRoomGeometryPacket):
-                    self.walls = packet.payloads[0].value
-                elif isinstance(packet, pack.ServerRoomTickRatePacket):
-                    self.tick_rate = packet.payloads[0].value
+                if isinstance(p, packet.ServerRoomSizePacket):
+                    self.size = [p.payloads[0].value, p.payloads[1].value]
+                elif isinstance(p, packet.ServerRoomPlayerPacket):
+                    self.player = p.payloads[0].value
+                elif isinstance(p, packet.ServerRoomGeometryPacket):
+                    self.walls = p.payloads[0].value
+                elif isinstance(p, packet.ServerRoomTickRatePacket):
+                    self.tick_rate = p.payloads[0].value
             
             # Get volatile data such as player positions, etc.
-            packet: Packet = pack.receivepacket(self.s)
-            if isinstance(packet, pack.ServerRoomPlayerPacket):
-                p: Player = packet.payloads[0].value
+            p: packet.Packet = packet.receive(self.s)
+            if isinstance(p, packet.ServerRoomPlayerPacket):
+                p: Player = p.payloads[0].value
                 pid: int = p.get_id()
 
                 if pid == self.player.get_id():
@@ -102,8 +72,21 @@ class Game(Controller):
                 else:
                     self.others.add(p)
 
-            elif isinstance(packet, pack.ServerLogPacket):
-                self.latest_log = packet.payloads[0].value
+            elif isinstance(p, packet.ChatPacket):
+                self.latest_log = p.payloads[0].value
+
+            elif isinstance(p, packet.ServerLogPacket):
+                self.latest_log = p.payloads[0].value
+
+            if isinstance(p, packet.ServerRoomPlayerPacket):
+                player: models.Player = p.payloads[0].value
+                pid: int = player.get_id()
+                if pid == self.player.get_id():
+                    self.player = player
+                else:
+                    for i in range(len(self.others)):
+                        if pid == self.others[i].get_id():
+                            self.others[i] = player
 
     def get_input(self) -> None:
         try:
@@ -142,20 +125,15 @@ class Game(Controller):
                 self.view.chatbox.modal()
                 self.chat(self.view.chatbox.value)
 
-            elif key == ord('q'):
-                self.disconnect()
-                self.view.stop()
-
         except KeyboardInterrupt:
-           self.disconnect()
            exit()
 
     def move(self, direction: chr) -> None:
-        pack.sendpacket(self.s, pack.MovePacket(direction))
+        packet.send(packet.MovePacket(self.player, direction), self.s)
 
     def chat(self, message: str) -> None:
         try:
-            pack.sendpacket(self.s, pack.ChatPacket(message))
+            packet.send(packet.ChatPacket(message), self.s)
         except sock.error:
             print("Error: Socket error. Traceback: ", file=sys.stderr)
             print(traceback.format_exc())

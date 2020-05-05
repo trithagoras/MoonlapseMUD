@@ -47,7 +47,8 @@ class TextBox:
                           modal is triggered by hitting an input character which you would like to be 
                           considered input to the TextBox (e.g. typing the first letter of a username).
         """
-        self.win.move(0, len(self.value))
+        self.win.clear()
+        self.win.move(0, 0)
         curs_x = self.win.getyx()[1]
 
         if first_key is not None:

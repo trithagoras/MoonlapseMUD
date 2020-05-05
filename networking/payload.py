@@ -6,10 +6,6 @@ class Payload:
     def __init__(self, value: Any):
         self.value: Any = value
 
-        # Sanitise semicolons if it's a string
-        if type(value) == str:
-            self.value: str = value.replace(';', '\\;')
-
     def serialize(self):
         return pickle.dumps(self.value).hex()
 
