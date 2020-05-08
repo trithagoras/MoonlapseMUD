@@ -143,16 +143,19 @@ class Moonlapse(NetstringReceiver):
         
         self.database.user_exists(username
         ).addCallbacks(
-                callback = self.register_user, 
-                callbackArgs = (username, password),
-                errback = lambda e: self.sendPacket(packet.denyPacket(e.getErrorMessage())) # Catch user_exists
-        ).addErrback(lambda e: self.sendPacket(packet.DenyPacket(e.getErrorMessage())))     # Catch register_user
+            callback = self.register_user, 
+            callbackArgs = (username, password),
+            errback = lambda e: self.sendPacket(packet.denyPacket(e.getErrorMessage()))  # Catch user_exists
+        ).addCallbacks(
+            callback = lambda _: self.sendPacket(packet.OkPacket()),
+            errback = lambda e: self.sendPacket(packet.DenyPacket(e.getErrorMessage()))  # Catch register_user
+        )
 
     def register_user(self, user_exists: List[Tuple[bool]], username: str, password: str):
         if user_exists[0][0]:
             raise EntryError(f"Somebody else already goes by that name")
         
-        return self.database.register_player(username)
+        return self.database.register_user(username, password)
 
     def dboperation_done(self, result):
         # print("Done")

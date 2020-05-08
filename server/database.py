@@ -29,7 +29,7 @@ class Database:
 
         # print(f"Done.")
 
-    def register_player(self, username: str, password: str) -> Deferred:
+    def register_user(self, username: str, password: str) -> Deferred:
         # print(f"Attempting to register player to database: {username}:{password}...")
         now: str = str(datetime.datetime.utcnow())
         return self.dbpool.runOperation(f"""
