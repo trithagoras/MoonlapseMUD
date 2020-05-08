@@ -47,3 +47,6 @@ class Player:
 
     def set_position(self, destination: List[int]) -> None:
         self._position = destination
+
+    def get_char(self) -> chr:
+        return self._char

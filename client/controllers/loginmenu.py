@@ -41,7 +41,12 @@ class LoginMenu(Menu):
 
         self.view.title = f"Attempted login in as {self.username} with password {self.password}"
         packet.send(packet.LoginPacket(self.username, self.password), self.s)
-
-        game = Game(self.s)
-        game.start()
-        self.start()
+        
+        response: Union[packet.OkPacket, packet.DenyPacket] = packet.receive(self.s)
+        if isinstance(response, packet.OkPacket):
+            game = Game(self.s)
+            game.start()
+            self.start()
+        
+        else:
+            self.view.title = response.payloads[0].value

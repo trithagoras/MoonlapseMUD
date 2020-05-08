@@ -47,13 +47,9 @@ class Moonlapse(NetstringReceiver):
                     protocol.sendPacket(packet.ChatPacket(f"{self.username} has departed..."))
 
     def stringReceived(self, string):
-        # print(f"Received string: {string}")
         p: packet.Packet = packet.frombytes(string)
+        print("Received packet", p)
         self.state(p)
-
-    def dataReceived(self, data):
-        print(f"Received data: {data}")
-        return super().dataReceived(data)
 
     def _PLAY(self, p: Union[packet.MovePacket, packet.ChatPacket]):
         print("Received a", p.__class__.__name__)
@@ -67,48 +63,57 @@ class Moonlapse(NetstringReceiver):
             new_protocol.sendPacket(packet.ServerRoomPlayerPacket(self.player))
 
     def _GETENTRY(self, p: Union[packet.LoginPacket, packet.RegisterPacket]):
-        self.username: str = p.payloads[0].value
-        self.password: str = p.payloads[1].value
+        username: str = p.payloads[0].value
+        password: str = p.payloads[1].value
 
         if isinstance(p, packet.LoginPacket):
-            self.database.user_exists(self.username).addCallback(self.login_check_user_exists)
-        
+            self.handle_login(username, password)
         elif isinstance(p, packet.RegisterPacket):
-            self.database.user_exists(self.username).addCallback(self.register_check_user_exists)
+            self.handle_register(username, password)
 
-    def login_check_user_exists(self, result):
-        if self.username in self.users.keys() or False in result:
-            self.sendPacket(packet.DenyPacket("user already connected"))
+    def handle_login(self, username: str, password: str):
+        if self.username in self.users.keys():
+            self.sendPacket(packet.DenyPacket("You are already inhabiting this realm"))
             return
+
+        self.database.user_exists(username
+        ).addCallbacks(
+            callback = self.check_password_correct, 
+            callbackArgs = (username, password),
+            errback = lambda e: self.sendPacket(packet.denyPacket(e.getErrorMessage())) # Catch user_exists
+        ).addCallbacks(
+            callback = self.initialise_new_player, 
+            callbackArgs=(username,), 
+            errback = lambda e: self.sendPacket(packet.DenyPacket(e.getErrorMessage())) # Catch check_password_correct
+        ).addCallbacks(
+            callback = self.process_new_player_init_pos, 
+            errback = lambda e: self.sendPacket(packet.DenyPacket(e.getErrorMessage()))  # Catch initialise_new_player
+        )
+
+    def check_password_correct(self, user_exists: List[Tuple[bool]], username: str, password: str):
+        if not user_exists[0][0]:
+            raise EntryError("I don't know anybody by that name")
+
+        return self.database.password_correct(username, password)
+
+    def initialise_new_player(self, password_correct: List[Tuple[bool]], username: str):
+        if not password_correct[0][0]:
+            raise EntryError("Incorrect password")
         
-        self.database.password_correct(self.username, self.password).addCallback(self.check_password_correct)
-
-    def register_check_user_exists(self, result):
-        if self.username in self.users.keys() or True in result:
-            self.sendPacket(packet.DenyPacket("user already registered"))
-            return
-        
-        self.database.register_player(self.username, self.password).addCallback(self.dboperation_done)
-
-    def check_password_correct(self, result):
-        if False in result:
-            self.sendPacket(packet.DenyPacket("incorrect password for user"))
-            return
-
         self.sendPacket(packet.OkPacket())
+        
+        self.username = username
+        
         self.users[self.username] = self
-
-        for name, protocol in self.users.items():
-            protocol.sendPacket(packet.ChatPacket(f"{self.username} has arrived!"))
 
         self.player = models.Player(len(self.users))
         self.player.assign_username(self.username)
         
-        self.database.get_player_pos(self.player).addCallback(self.get_player_init_pos)
+        return self.database.get_player_pos(self.player)
 
-    def get_player_init_pos(self, result):
-        # print("get_player_init_pos ->", result)
-        init_pos = result[0]
+    def process_new_player_init_pos(self, init_pos: List[Tuple[int]]):
+        print("Got", init_pos)
+        init_pos = init_pos[0]
         self.player.assign_location(list(init_pos), self.room_data['walls'], *self.room_data['size'])
 
         if init_pos == (None, None):
@@ -126,7 +131,28 @@ class Moonlapse(NetstringReceiver):
                 protocol.welcome(self)
                 protocol.sendPacket(packet.ServerRoomPlayerPacket(self.player))
 
+        for name, protocol in self.users.items():
+            protocol.sendPacket(packet.ChatPacket(f"{self.username} has arrived!"))
+
         self.state = self._PLAY
+
+    def handle_register(self, username: str, password: str):
+        if self.username in self.users.keys():
+            self.sendPacket(packet.DenyPacket("Somebody else already goes by that name"))
+            return
+        
+        self.database.user_exists(username
+        ).addCallbacks(
+                callback = self.register_user, 
+                callbackArgs = (username, password),
+                errback = lambda e: self.sendPacket(packet.denyPacket(e.getErrorMessage())) # Catch user_exists
+        ).addErrback(lambda e: self.sendPacket(packet.DenyPacket(e.getErrorMessage())))     # Catch register_user
+
+    def register_user(self, user_exists: List[Tuple[bool]], username: str, password: str):
+        if user_exists[0][0]:
+            raise EntryError(f"Somebody else already goes by that name")
+        
+        return self.database.register_player(username)
 
     def dboperation_done(self, result):
         # print("Done")
@@ -172,9 +198,13 @@ class Moonlapse(NetstringReceiver):
         return 0 <= coords[0] < max_height and 0 <= coords[1] < max_width
 
     def sendPacket(self, p: packet.Packet):
+        print("Sending", p)
         self.transport.write(p.tobytes())
-        # print(f"Sent data", p.tobytes())
 
     def welcome(self, protocol: 'Moonlapse'):
         print("Welcoming new player")
         protocol.sendPacket(packet.ServerRoomPlayerPacket(self.player))
+
+
+class EntryError(Exception):
+    pass
