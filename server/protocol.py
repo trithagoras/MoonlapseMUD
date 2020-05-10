@@ -137,10 +137,6 @@ class Moonlapse(NetstringReceiver):
         self.state = self._PLAY
 
     def handle_register(self, username: str, password: str):
-        if self.username in self.users.keys():
-            self.sendPacket(packet.DenyPacket("Somebody else already goes by that name"))
-            return
-        
         self.database.user_exists(username
         ).addCallbacks(
             callback = self.register_user, 
