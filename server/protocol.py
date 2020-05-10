@@ -77,6 +77,8 @@ class Moonlapse(NetstringReceiver):
             self.chat(p)
         elif isinstance(p, packet.HelloPacket):
             self.welcome(p)
+        elif isinstance(p, packet.DisconnectPacket):
+            self.disconnect(p)
 
 
     def _GETENTRY(self, p: Union[packet.LoginPacket, packet.RegisterPacket]):
@@ -208,7 +210,7 @@ class Moonlapse(NetstringReceiver):
         max_height, max_width = self.room_data['size']
         return 0 <= coords[0] < max_height and 0 <= coords[1] < max_width
 
-    def welcome(self, p):
+    def welcome(self, p: packet.HelloPacket):
         new_player: models.Player = p.payloads[0].value
         new_protocol: 'Moonlapse' = None
 
@@ -230,7 +232,9 @@ class Moonlapse(NetstringReceiver):
         new_protocol.sendPacket(packet.ServerRoomPlayerPacket(self.player))
         print(f"[{self.player.get_username()}] Welcomed new player {new_player.get_username()}")
 
-
+    def disconnect(self, p: packet.DisconnectPacket):
+        departing_player: models.Player = p.payloads[0].value
+        self.sendPacket(p)
 
 class EntryError(Exception):
     pass

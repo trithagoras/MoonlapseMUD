@@ -59,18 +59,25 @@ class Game(Controller):
             # Get volatile data such as player positions, etc.
             p: packet.Packet = packet.receive(self.s)
             if isinstance(p, packet.ServerRoomPlayerPacket):
-                p: Player = p.payloads[0].value
-                pid: int = p.get_id()
+                player: Player = p.payloads[0].value
+                pid: int = player.get_id()
 
+                # If the received player is ourselves, update our player
                 if pid == self.player.get_id():
-                    self.player = p
+                    self.player = player
+                
+                # If the received player is somebody else, either update the other player or add a new one in
                 elif pid in [other.get_id() for other in self.others]:
                     for oid, o in [(other.get_id(), other) for other in self.others]:
                         if pid == oid:
                             self.others.remove(o)
-                            self.others.add(p)
+                            self.others.add(player)
+                            self.chat(f"I updated {player} in my others list")
+
                 else:
-                    self.others.add(p)
+                    self.others.add(player)
+                    self.latest_log = f"I added {player} to my others list"
+
 
             elif isinstance(p, packet.ChatPacket):
                 self.latest_log = p.payloads[0].value
@@ -78,15 +85,11 @@ class Game(Controller):
             elif isinstance(p, packet.ServerLogPacket):
                 self.latest_log = p.payloads[0].value
 
-            if isinstance(p, packet.ServerRoomPlayerPacket):
-                player: models.Player = p.payloads[0].value
-                pid: int = player.get_id()
-                if pid == self.player.get_id():
-                    self.player = player
-                else:
-                    for i in range(len(self.others)):
-                        if pid == self.others[i].get_id():
-                            self.others[i] = player
+            elif isinstance(p, packet.DisconnectPacket):
+                departed: Player = p.payloads[0].value
+                for oid, o in [(other.get_id(), other) for other in self.others]:
+                    if oid == departed.get_id():
+                        self.others.remove(o)
 
     def get_input(self) -> None:
         try:
