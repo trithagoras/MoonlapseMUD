@@ -50,3 +50,6 @@ class Player:
 
     def get_char(self) -> chr:
         return self._char
+
+    def __repr__(self):
+        return f"Player: [{self.get_username()}]"

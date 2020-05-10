@@ -89,8 +89,10 @@ class MovePacket(Packet):
 
 
 class DisconnectPacket(Packet):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, player: Player, message: str = "Someone has departed..."):
+        pplayer: Payload = Payload(player)
+        pmessage: Payload = Payload(f"{player.get_username()} has departed...")
+        super().__init__(pplayer, pmessage)
 
 
 class ServerLogPacket(Packet):

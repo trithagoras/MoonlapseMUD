@@ -33,34 +33,51 @@ class Moonlapse(NetstringReceiver):
 
     def connectionMade(self):
         super().__init__()
-        # print("New connection")
+        # print(f"[{self.username}]: New connection")
         servertime: str = time.strftime('%d %B, %Y %R %p', time.gmtime())
         self.sendPacket(packet.WelcomePacket(f"Welcome to MoonlapseMUD - Server time: {servertime}"))
 
     def connectionLost(self, reason="unspecified"):
         super().__init__()
-        # print("Lost connection")
+        # print(f"[{self.username}]: Lost connection")
         if self.username in self.users:
             del self.users[self.username]
-            for name, protocol in self.users.items():
-                if protocol != self:
-                    protocol.sendPacket(packet.ChatPacket(f"{self.username} has departed..."))
+            print(f"[{self.username}]: Deleted self from users list")
+            for protocol in self.users.values():
+                print(f"[{self.username}]: Sending disconnect to {protocol.username}")
+                protocol.processPacket(packet.DisconnectPacket(self.player))
 
     def stringReceived(self, string):
+        """
+        Processes data sent from this protocol's client.
+        """
         p: packet.Packet = packet.frombytes(string)
-        print("Received packet", p)
+        print(f"[{self.username}]: Received packet from my client {p}")
         self.state(p)
 
-    def _PLAY(self, p: Union[packet.MovePacket, packet.ChatPacket]):
-        print("Received a", p.__class__.__name__)
+    def sendPacket(self, p: packet.Packet):
+        """
+        Sends a packet to this protocol's client.
+        """
+        print(f"[{self.username}]: Sending to this my client", p)
+        self.transport.write(p.tobytes())
+
+    def processPacket(self, p: packet.Packet):
+        """
+        Processes packets sent to this protocol from another protocol.
+        """
+        print(f"[{self.username}]: Received packet from another protocol {p}")
+        self.state(p)
+
+
+    def _PLAY(self, p: packet.Packet):
         if isinstance(p, packet.MovePacket):
             self.move(p)
         elif isinstance(p, packet.ChatPacket):
             self.chat(p)
         elif isinstance(p, packet.HelloPacket):
-            print("New player. Users is now", self.users.keys())
-            new_protocol: 'Moonlapse' = p.payloads[1].value
-            new_protocol.sendPacket(packet.ServerRoomPlayerPacket(self.player))
+            self.welcome(p)
+
 
     def _GETENTRY(self, p: Union[packet.LoginPacket, packet.RegisterPacket]):
         username: str = p.payloads[0].value
@@ -112,7 +129,7 @@ class Moonlapse(NetstringReceiver):
         return self.database.get_player_pos(self.player)
 
     def process_new_player_init_pos(self, init_pos: List[Tuple[int]]):
-        print("Got", init_pos)
+        print(f"[{self.username}]: Got", init_pos)
         init_pos = init_pos[0]
         self.player.assign_location(list(init_pos), self.room_data['walls'], *self.room_data['size'])
 
@@ -125,14 +142,9 @@ class Moonlapse(NetstringReceiver):
         self.sendPacket(packet.ServerRoomTickRatePacket(100))
         self.sendPacket(packet.ServerRoomPlayerPacket(self.player))
 
-        for name, protocol in self.users.items():
+        for protocol in self.users.values():
             if protocol != self:
-                print("Saying hello to", name)
-                protocol.welcome(self)
-                protocol.sendPacket(packet.ServerRoomPlayerPacket(self.player))
-
-        for name, protocol in self.users.items():
-            protocol.sendPacket(packet.ChatPacket(f"{self.username} has arrived!"))
+                protocol.processPacket(packet.HelloPacket(self.player))
 
         self.state = self._PLAY
 
@@ -154,7 +166,7 @@ class Moonlapse(NetstringReceiver):
         return self.database.register_user(username, password)
 
     def dboperation_done(self, result):
-        # print("Done")
+        # print(f"[{self.username}]: Done")
         return
 
     def proceed_to_game(self, username: str):
@@ -196,13 +208,28 @@ class Moonlapse(NetstringReceiver):
         max_height, max_width = self.room_data['size']
         return 0 <= coords[0] < max_height and 0 <= coords[1] < max_width
 
-    def sendPacket(self, p: packet.Packet):
-        print("Sending", p)
-        self.transport.write(p.tobytes())
+    def welcome(self, p):
+        new_player: models.Player = p.payloads[0].value
+        new_protocol: 'Moonlapse' = None
 
-    def welcome(self, protocol: 'Moonlapse'):
-        print("Welcoming new player")
-        protocol.sendPacket(packet.ServerRoomPlayerPacket(self.player))
+        # Get the protocol which sent the packet
+        for protocol in self.users.values():
+            if protocol.player == new_player:
+                new_protocol = protocol
+                break
+        
+        # Return if no match found
+        if not new_protocol:
+            print(f"[{self.player.get_username()}] Could not find protocol attached to new player to welcome ({new_player.get_username()})")
+            return
+
+        # Send the client player information for the newly connecting protocol
+        self.sendPacket(packet.ServerRoomPlayerPacket(new_player))
+        
+        # Send the newly connecting protocol information for this protocol's player
+        new_protocol.sendPacket(packet.ServerRoomPlayerPacket(self.player))
+        print(f"[{self.player.get_username()}] Welcomed new player {new_player.get_username()}")
+
 
 
 class EntryError(Exception):
