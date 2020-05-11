@@ -3,6 +3,7 @@ import curses.ascii
 import json
 import socket as sock
 import sys
+import os
 import time
 import traceback
 from threading import Thread
@@ -16,6 +17,10 @@ class Controller:
         self.view: View = View(self)
 
     def start(self):
+        # Eliminates an annoying delay in the program after the ESC key is pressed
+        os.environ.setdefault('ESCDELAY', '25')
+
+        # Start the view
         curses.wrapper(self.view.display)
 
     def get_input(self) -> None:

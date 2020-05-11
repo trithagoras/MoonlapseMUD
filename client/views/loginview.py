@@ -1,4 +1,5 @@
 import curses
+import curses.textpad
 
 from ..curses_helper import TextBox
 from .menuview import MenuView
@@ -14,6 +15,8 @@ class LoginView(MenuView):
         self.passwordbox = None
 
         super().__init__(controller)
+
+        self.title = "Please enter your username and password"
 
     def display(self, stdscr):
         self.stdscr = stdscr

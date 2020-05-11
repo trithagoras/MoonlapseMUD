@@ -26,16 +26,10 @@ class MainMenu(Menu):
 
     def login(self):
         loginmenu = LoginMenu(self.s)
-        err: str = loginmenu.start()
-        if err:
-            self.view.title = err
-            return
+        loginmenu.start()
         self.start()
 
     def register(self):
         registermenu = RegisterMenu(self.s)
-        err: str = registermenu.start()
-        if err:
-            self.view.title = err
-            return
+        registermenu.start()
         self.start()

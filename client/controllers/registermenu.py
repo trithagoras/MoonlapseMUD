@@ -54,6 +54,6 @@ class RegisterMenu(Menu):
         response: Union[packet.OkPacket, packet.DenyPacket] = packet.receive(self.s)
 
         if isinstance(response, packet.OkPacket):
-            self.view.title = "Registration successful! Press Q to go back and log in."
+            self.view.title = "Registration successful! Press CTRL+C or ESC to go back and log in."
         else:
             self.view.title = response.payloads[0].value

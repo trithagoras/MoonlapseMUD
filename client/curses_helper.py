@@ -1,12 +1,14 @@
 import curses.textpad
 import curses.ascii
 from typing import *
+import asyncio
 
 
 class TextBox:
     """
     A wrapper for the curses.Textpad.Textbox class (https://docs.python.org/2.0/lib/curses-textpad-objects.html)
-    The main difference here is the inclusion of a custom validator for the editing process.
+    The main difference here is the inclusion of a custom validator for the editing process. It should also be 
+    pretty cross platform in terms of input.
     """
 
     def __init__(self, parent_window, y: int, x: int, width: int):
@@ -48,6 +50,7 @@ class TextBox:
                           considered input to the TextBox (e.g. typing the first letter of a username).
         """
         self.win.clear()
+        curses.curs_set(True)
         self.win.move(0, 0)
         curs_x = self.win.getyx()[1]
 
@@ -68,6 +71,8 @@ class TextBox:
         # I'm not sure why, but sometimes the value has a trailing space
         if len(self.value) > 0 and self.value[-1] == ' ':
             self.value = self.value[: -1]
+
+        curses.curs_set(False)
 
     def validator(self, key: int):
         if curses.ascii.isprint(key):

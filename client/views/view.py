@@ -24,6 +24,8 @@ class View:
         curses.init_pair(5, curses.COLOR_GREEN, curses.COLOR_BLACK)
         curses.init_pair(6, curses.COLOR_MAGENTA, curses.COLOR_BLACK)
 
+        curses.curs_set(False)
+
         while self.running:
             self.stdscr.erase()
             self.draw()
@@ -32,12 +34,13 @@ class View:
             try:
                 self.controller.get_input()
             except KeyboardInterrupt:
-                exit()
+                self.stop()
 
     def draw(self) -> None:
         # Max terminal size
         if self.stdscr.getmaxyx() < (self.height, self.width):
-            self.stdscr.addstr(0, 0, f"Must be {self.height} rows x {self.width} cols")
+            error: str = f"Window must be {self.height} rows x {self.width} cols"
+            self.stdscr.addstr(0, (self.width - len(error)) // 2, error, curses.color_pair(4))
 
     def stop(self) -> None:
         self.running = False

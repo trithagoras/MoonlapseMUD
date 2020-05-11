@@ -25,7 +25,7 @@ class Menu(Controller):
             fn = self.menu[list(self.menu.keys())[self.cursor]]
             if fn is not None:
                 fn()
-        elif key == ord('q'):
+        elif key == curses.ascii.ESC:
             self.view.stop()
 
         return key
