@@ -72,11 +72,9 @@ class Game(Controller):
                         if pid == oid:
                             self.others.remove(o)
                             self.others.add(player)
-                            self.chat(f"I updated {player} in my others list")
 
                 else:
                     self.others.add(player)
-                    self.latest_log = f"I added {player} to my others list"
 
 
             elif isinstance(p, packet.ChatPacket):
@@ -97,13 +95,13 @@ class Game(Controller):
 
             # Movement
             if key == curses.KEY_UP:
-                self.move('u')
+                packet.send(packet.MoveUpPacket(), self.s)
             elif key == curses.KEY_RIGHT:
-                self.move('r')
+                packet.send(packet.MoveRightPacket(), self.s)
             elif key == curses.KEY_DOWN:
-                self.move('d')
+                packet.send(packet.MoveDownPacket(), self.s)
             elif key == curses.KEY_LEFT:
-                self.move('l')
+                packet.send(packet.MoveLeftPacket(), self.s)
 
             # Changing window focus
             elif key in (ord('1'), ord('2'), ord('3')):
@@ -131,8 +129,8 @@ class Game(Controller):
         except KeyboardInterrupt:
            exit()
 
-    def move(self, direction: chr) -> None:
-        packet.send(packet.MovePacket(self.player, direction), self.s)
+    # def move(self, direction: chr) -> None:
+    #     packet.send(packet.MovePacket(self.player, direction), self.s)
 
     def chat(self, message: str) -> None:
         try:

@@ -14,10 +14,3 @@ class Payload:
 
     def __eq__(self, obj):
         return isinstance(obj, Payload) and obj.value == self.value
-
-
-class StdPayload(Payload):
-    MOVE_UP = Payload("u")
-    MOVE_DOWN = Payload("d")
-    MOVE_LEFT = Payload("l")
-    MOVE_RIGHT = Payload("r")
