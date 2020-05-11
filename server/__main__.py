@@ -18,7 +18,7 @@ class MoonlapseServer(Factory):
     def __init__(self):
         self.database: Database = database.Database("./server/connectionstrings.json")
         self.database.connect()
-        self.users: Dict[str, 'Moonlapse'] = {}
+        self.users: Dict[str, protocol.Moonlapse] = {}
 
     def buildProtocol(self, addr):
         print("Adding a new client. Sending users:", self.users.items())

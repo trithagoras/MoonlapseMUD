@@ -26,21 +26,32 @@ class Moonlapse(NetstringReceiver):
     The self.stringReceived method handles received netstrings. This method is called with the netstring 
     payload as a single argument whenever a complete netstring is received. This method should never be 
     called external to the underlying twisted.protocols.basic.NetstringReceiver implementation. It is fired 
-    every data is received to this protocol.
+    every time data this protocol receives a full netstring's worth of bytes data.
 
-    The self.sendPacket method 
+    The self.sendPacket method is used to send a packet back to this protocol's client.
 
-    The self.processPacket method
+    The self.processPacket method is used to tell another protocol on the server to process a packet which 
+    doesn't necessarily have to be sent to any clients.
     """
     def __init__(self, database: database.Database, users: Dict[str, 'Moonlapse']):
         super().__init__()
         self.database: Database = database
+
+        # A volatile dictionary of usernames to protocols passed in by the server.
         self.users: Dict[str, 'Moonlapse'] = users
+
+        # Information specific to the player using this protocol
         self.username: str = None
         self.password: str = None
         self.player: models.Player = None
+
+        # The state of the protocol which gets called as a function to process only the packets 
+        # intended to be processed in the protocol's current state. Should only be called in the 
+        # self.stringReceived method every time a complete netstring is received and converted to 
+        # a packet.
         self.state: function = self._GETENTRY
 
+        # Load in the map file and convert it to palatable data type to be sent out to the client.
         pwd: str = os.path.dirname(__file__)
         room_data_filename: str = os.path.join(pwd, '..', 'maps', 'map.bmp.json')
         self.room_data: Dict[str, object] = None
@@ -49,13 +60,11 @@ class Moonlapse(NetstringReceiver):
 
     def connectionMade(self) -> None:
         super().__init__()
-        # print(f"[{self.username}]: New connection")
         servertime: str = time.strftime('%d %B, %Y %R %p', time.gmtime())
         self.sendPacket(packet.WelcomePacket(f"Welcome to MoonlapseMUD - Server time: {servertime}"))
 
     def connectionLost(self, reason="unspecified") -> None:
         super().__init__()
-        # print(f"[{self.username}]: Lost connection")
         if self.username in self.users:
             del self.users[self.username]
             print(f"[{self.username}]: Deleted self from users list")
@@ -220,12 +229,24 @@ class Moonlapse(NetstringReceiver):
         return self.database.register_user(username, password)
 
     def chat(self, p: packet.ChatPacket):
+        """
+        Sends a chat packet too all clients connected to the server.
+        Includes this protocol's connected player username.
+        """
         message: str = f"{self.username} says: {p.payloads[0].value}"
         if message.strip() != '':
             for name, protocol in self.users.items():
                 protocol.sendPacket(packet.ChatPacket(message))
 
     def move(self, p: packet.MovePacket):
+        """
+        Updates this protocol's player's position and sends the player back to all 
+        clients connected to the server.
+
+        NOTE: This should be avoided in a future release to prevent sending more 
+              information than is required. A client will know all the information 
+              about every player connected to the server even if they are not in view.
+        """
         pos: Tuple[int] = self.player.get_position()
 
         # Calculate the desired desination
@@ -253,6 +274,10 @@ class Moonlapse(NetstringReceiver):
         return 0 <= coords[0] < max_height and 0 <= coords[1] < max_width
 
     def welcome(self, p: packet.HelloPacket):
+        """
+        Called whenever a new protocol joins the server. They will tell this protocol about their 
+        player and this protocol tells them about its player in return.
+        """
         new_player: models.Player = p.payloads[0].value
         new_protocol: 'Moonlapse' = None
 
@@ -275,8 +300,15 @@ class Moonlapse(NetstringReceiver):
         print(f"[{self.player.get_username()}] Welcomed new player {new_player.get_username()}")
 
     def disconnect(self, p: packet.DisconnectPacket):
+        """
+        Called when a protocol is disconnecting. Passes the message along to this protocol's client.
+        """
         departing_player: models.Player = p.payloads[0].value
         self.sendPacket(p)
 
+
 class EntryError(Exception):
+    """
+    Raised if there was an error during the login or registration process.
+    """
     pass
