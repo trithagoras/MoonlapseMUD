@@ -90,47 +90,41 @@ class Game(Controller):
                         self.others.remove(o)
 
     def get_input(self) -> None:
-        try:
-            key = self.view.stdscr.getch()
+        super().get_input()
+        key = self.view.stdscr.getch()
 
-            # Movement
-            if key == curses.KEY_UP:
-                packet.send(packet.MoveUpPacket(), self.s)
-            elif key == curses.KEY_RIGHT:
-                packet.send(packet.MoveRightPacket(), self.s)
-            elif key == curses.KEY_DOWN:
-                packet.send(packet.MoveDownPacket(), self.s)
-            elif key == curses.KEY_LEFT:
-                packet.send(packet.MoveLeftPacket(), self.s)
+        # Movement
+        if key == curses.KEY_UP:
+            packet.send(packet.MoveUpPacket(), self.s)
+        elif key == curses.KEY_RIGHT:
+            packet.send(packet.MoveRightPacket(), self.s)
+        elif key == curses.KEY_DOWN:
+            packet.send(packet.MoveDownPacket(), self.s)
+        elif key == curses.KEY_LEFT:
+            packet.send(packet.MoveLeftPacket(), self.s)
 
-            # Changing window focus
-            elif key in (ord('1'), ord('2'), ord('3')):
-                self.view.focus = int(chr(key))
+        # Changing window focus
+        elif key in (ord('1'), ord('2'), ord('3')):
+            self.view.focus = int(chr(key))
 
-            # Changing window 2 focus
-            elif key == ord('?'):
-                self.view.win2_focus = GameView.Window2Focus.HELP
-            elif key == ord('k'):
-                self.view.win2_focus = GameView.Window2Focus.SKILLS
-            elif key == ord('i'):
-                self.view.win2_focus = GameView.Window2Focus.INVENTORY
-            elif key == ord('p'):
-                self.view.win2_focus = GameView.Window2Focus.SPELLBOOK
-            elif key == ord('g'):
-                self.view.win2_focus = GameView.Window2Focus.GUILD
-            elif key == ord('j'):
-                self.view.win2_focus = GameView.Window2Focus.JOURNAL
+        # Changing window 2 focus
+        elif key == ord('?'):
+            self.view.win2_focus = GameView.Window2Focus.HELP
+        elif key == ord('k'):
+            self.view.win2_focus = GameView.Window2Focus.SKILLS
+        elif key == ord('i'):
+            self.view.win2_focus = GameView.Window2Focus.INVENTORY
+        elif key == ord('p'):
+            self.view.win2_focus = GameView.Window2Focus.SPELLBOOK
+        elif key == ord('g'):
+            self.view.win2_focus = GameView.Window2Focus.GUILD
+        elif key == ord('j'):
+            self.view.win2_focus = GameView.Window2Focus.JOURNAL
 
-            # Chat
-            elif key in (curses.KEY_ENTER, curses.ascii.LF, curses.ascii.CR) and self.view.chatbox is not None:
-                self.view.chatbox.modal()
-                self.chat(self.view.chatbox.value)
-
-        except KeyboardInterrupt:
-           exit()
-
-    # def move(self, direction: chr) -> None:
-    #     packet.send(packet.MovePacket(self.player, direction), self.s)
+        # Chat
+        elif key in (curses.KEY_ENTER, curses.ascii.LF, curses.ascii.CR) and self.view.chatbox is not None:
+            self.view.chatbox.modal()
+            self.chat(self.view.chatbox.value)
 
     def chat(self, message: str) -> None:
         try:
