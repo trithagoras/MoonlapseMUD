@@ -3,6 +3,7 @@ import json
 import socket
 import traceback
 import pickle
+import threading
 
 from .payload import *
 from .models import *
@@ -52,13 +53,21 @@ class Packet:
         self.payloads: Tuple[Payload] = payloads
 
     def tobytes(self) -> str:
+        # serialize_dict: Dict[str, str] = {}
+        # serialize_dict['a'] = self.action
+        # for i in range(len(self.payloads)):
+        #     serialize_dict[f'p{i}'] = self.payloads[i].serialize()
+        # datastr: str = json.dumps(serialize_dict, separators=(',', ':'))
+        # lengthstr: str = str(len(datastr))
+        # return str.encode(lengthstr + ':' + datastr + ',', 'utf-8')
         serialize_dict: Dict[str, str] = {}
         serialize_dict['a'] = self.action
         for i in range(len(self.payloads)):
             serialize_dict[f'p{i}'] = self.payloads[i].serialize()
-        datastr: str = json.dumps(serialize_dict, separators=(',', ':'))
-        lengthstr: str = str(len(datastr))
-        return str.encode(lengthstr + ':' + datastr + ',', 'utf-8')
+        data = json.dumps(serialize_dict, separators=(',', ':')).encode('utf-8')
+
+        length = len(data)
+        return str(length).encode('ascii') + b':' + data + b','
 
     
     def __repr__(self) -> str:
@@ -99,6 +108,9 @@ class LoginPacket(Packet):
         pusername = Payload(username)
         ppassword = Payload(password)
         super().__init__(pusername, ppassword)
+
+class LogoutPacket(Packet):
+    pass
 
 class RegisterPacket(Packet):
     """
@@ -246,7 +258,14 @@ def frombytes(data: bytes) -> Packet:
     The payload is automatically pickled and converted to a hex string in order to be sent over 
     the network. This allows you to send and receive all picklable Python objects.
     """
-    obj_dict: Dict[str, str] = json.loads(data)
+    # print(f"Trying to load {data}")
+    try:
+        obj_dict: Dict[str, str] = json.loads(data)
+    except json.decoder.JSONDecodeError as e:
+        return
+        print(f"Error decoding JSON: attempted to load {data}")
+        print(traceback.format_exc())
+        return
 
     action: Optional[str] = None
     payloads: List[Optional[Payload]] = []
@@ -279,7 +298,7 @@ def send(p: Packet, s: socket.socket) -> str:
     return p.tobytes()
     
 
-def receive(s: socket.socket) -> Packet:
+def receive(s: socket.socket, debug=False) -> Packet:
     """
     Receives a netstring bytes over a socket. Ensure all data is received and no more. Then 
     converts the data into the original Packet (preserving the exact type from the ones defined 
@@ -296,30 +315,66 @@ def receive(s: socket.socket) -> Packet:
         Packet -- The original Packet that was sent with the exact subtype preserved. All original 
                   payloads associated are depickled as python objects.
     """
+    if debug:
+        f = open('packetdebug.txt', 'a')
+    if debug: f.write(f"\nThread {threading.get_ident()}\nPacket.receive({s}, debug={debug})" + '\n')
     length: bytes = b''
-    json: bytes = b''
-    for i in range(len(str(Packet.MAX_LENGTH))):
+    if debug: f.write(f"Initialised length to {length}" + '\n')
+    if debug: f.write(f"Entering loop to read packet length" + '\n')
+    while len(length) <= len(str(Packet.MAX_LENGTH)):
         c: bytes = s.recv(1)
+        if debug: f.write(f"\tReceived byte: {c} (current length: {length})" + '\n')
         if c != b':':
+            if debug: f.write(f"\t\tNot b':'" + '\n')
             try:
                 int(c)
+                if debug: f.write(f"\t\t\tIt's a digit ({int(c)})" + '\n')
             except ValueError:
-                raise PacketParseError(f"Error reading packet length. So far got {length} but next digit came in as {c}")
-            length += c
+                if debug: f.write(f"\t\t\tIt's NOT a digit, throwing exception ({c})" + '\n')
+                # possible_rest = s.recv(int(2*length))
+                if debug: 
+                    f.write(f"\t\t\tThere might be more..." + '\n')
+                    for i in range(100):
+                        f.write(s.recv(1).decode('utf-8'))
+                if debug: f.close()
+                #raise PacketParseError(f"Error reading packet length. So far got {length} but next digit came in as {c}. The rest is posisbly {possible_rest}.")
+            else:
+                length += c
+                if debug: f.write(f"\t\t\tAppended to length (current length {length}" + '\n')
         else:
+            if debug: f.write(f"\t\tIS b':'. Final length to read is {int(length)}" + '\n')
+            if len(length) < 1:
+                if debug: f.write(f"\t\t\tBut the length is empty! Returning" + '\n')
+                return
             data: bytes = s.recv(int(length))
+            if debug: f.write(f"\t\tAdded the rest of the {int(length)} bytes to data ({data})" + '\n')
+
 
             # Perhaps all the data is not received yet
+            if debug: f.write(f"\t\tChecking if all the data's been received" + '\n')
             while len(data) < int(length):
+                if debug: f.write(f"\t\t\tMore data to come ({len(data)} < {int(length)})" + '\n')
                 nextLength = int(length) - len(data)
                 data += s.recv(nextLength)
+                if debug: f.write(f"\t\t\tAdded another batch of {nextLength} bytes to data ({data})" + '\n')
+
+            if debug: f.write(f"\t\tAll data's been read ({len(data)} >= {int(length)})" + '\n')
 
             # Read off the trailing comma
+            if debug: f.write(f"\t\tReceiving an extra byte to read off the trailing comma" + '\n')
             s.recv(1)
-
+            if debug: f.write(f"\t\tDone" + '\n')
+            if debug: f.write(f"\t\tReturning {frombytes(data)}" + '\n')
+            if debug and frombytes(data) is None:
+                f.write(f"\t\tThere might be more..." + '\n')
+                for i in range(100):
+                    f.write(s.recv(1, ).decode('utf-8'))
+            if debug: f.close()
             return frombytes(data)
 
-    raise PacketParseError("Error reading packet length. Too long.")
+    if debug: f.write(f"\tBroke out of the loop, packet must be too long ({length})" + '\n')
+    if debug: f.close()
+    #raise PacketParseError("Error reading packet length. Too long.")
 
 
 class PacketParseError(Exception):

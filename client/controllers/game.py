@@ -17,6 +17,7 @@ class Game(Controller):
     def __init__(self, s: sock.socket):
         super().__init__()
         self.s: sock.socket = s
+        self._logged_in = True
 
         # Game data
         self.player: Optional[models.Player] = None
@@ -42,10 +43,10 @@ class Game(Controller):
         super().start()
 
     def receive_data(self) -> None:
-        while True:
+        while self._logged_in:
             # Get initial room data if not already done
-            while not self.ready():
-                p: packet.Packet = packet.receive(self.s)
+            while not self.ready() and self._logged_in:
+                p: packet.Packet = packet.receive(self.s, debug=True)
 
                 if isinstance(p, packet.ServerRoomSizePacket):
                     self.size = [p.payloads[0].value, p.payloads[1].value]
@@ -57,7 +58,7 @@ class Game(Controller):
                     self.tick_rate = p.payloads[0].value
             
             # Get volatile data such as player positions, etc.
-            p: packet.Packet = packet.receive(self.s)
+            p: packet.Packet = packet.receive(self.s, debug=True)
             if isinstance(p, packet.ServerRoomPlayerPacket):
                 player: Player = p.payloads[0].value
                 pid: int = player.get_id()
@@ -122,7 +123,7 @@ class Game(Controller):
             self.view.win2_focus = GameView.Window2Focus.JOURNAL
 
         # Chat
-        elif key in (curses.KEY_ENTER, curses.ascii.LF, curses.ascii.CR) and self.view.chatbox is not None:
+        elif key in (curses.KEY_ENTER, curses.ascii.LF, curses.ascii.CR):
             self.view.chatbox.modal()
             self.chat(self.view.chatbox.value)
 
@@ -137,3 +138,11 @@ class Game(Controller):
         if self.player is None:
             return False
         return None not in (self.size, self.walls, self.tick_rate)
+
+    def stop(self) -> None:
+        super().stop()
+
+        # This should stop the receiving thread...
+        self._logged_in = False
+        packet.send(packet.LogoutPacket(), self.s)
+        time.sleep(0.2)

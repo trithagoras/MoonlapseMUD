@@ -22,7 +22,7 @@ class MoonlapseServer(Factory):
 
     def buildProtocol(self, addr):
         print("Adding a new client. Sending users:", self.users.items())
-        return protocol.Moonlapse(self.database, self.users)
+        return protocol.Moonlapse(self, self.database, self.users)
 
 
 if __name__ == '__main__':

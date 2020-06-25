@@ -39,14 +39,19 @@ class LoginMenu(Menu):
             self.view.title = "Username or password must not be blank"
             return
 
-        self.view.title = f"Attempted login in as {self.username} with password {self.password}"
+        self.view.title = "Please wait..."
         packet.send(packet.LoginPacket(self.username, self.password), self.s)
-        
-        response: Union[packet.OkPacket, packet.DenyPacket] = packet.receive(self.s)
-        if isinstance(response, packet.OkPacket):
-            game = Game(self.s)
-            game.start()
-            self.start()
-        
+        self.view.title = "Sent login request..."
+        try:
+            response: Union[packet.OkPacket, packet.DenyPacket] = packet.receive(self.s, debug=True)
+        except Exception as e:
+            self.view.title = str(e)
         else:
-            self.view.title = response.payloads[0].value
+            self.view.title = "Got response..."
+            if isinstance(response, packet.OkPacket):
+                self.view.title = "Entering game..."
+                game = Game(self.s)
+                game.start()     
+                self.start()       
+            else:
+                self.view.title = str(response)

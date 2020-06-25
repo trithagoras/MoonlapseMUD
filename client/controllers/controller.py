@@ -23,5 +23,8 @@ class Controller:
         # Start the view
         curses.wrapper(self.view.display)
 
+    def stop(self) -> None:
+        pass
+
     def get_input(self) -> None:
         pass

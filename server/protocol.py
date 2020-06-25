@@ -5,6 +5,7 @@ from twisted.internet.protocol import Protocol
 from twisted.internet.defer import Deferred
 
 from server import database
+from server.__main__ import MoonlapseServer
 from networking import packet
 from networking import models
 
@@ -33,8 +34,9 @@ class Moonlapse(NetstringReceiver):
     The self.processPacket method is used to tell another protocol on the server to process a packet which 
     doesn't necessarily have to be sent to any clients.
     """
-    def __init__(self, database: database.Database, users: Dict[str, 'Moonlapse']):
+    def __init__(self, server: MoonlapseServer, database: database.Database, users: Dict[str, 'Moonlapse']):
         super().__init__()
+        self._server: MoonlapseServer = server
         self.database: Database = database
 
         # A volatile dictionary of usernames to protocols passed in by the server.
@@ -59,18 +61,14 @@ class Moonlapse(NetstringReceiver):
             self.room_data = json.load(room_data_file)
 
     def connectionMade(self) -> None:
-        super().__init__()
+        super().connectionMade()
         servertime: str = time.strftime('%d %B, %Y %R %p', time.gmtime())
         self.sendPacket(packet.WelcomePacket(f"Welcome to MoonlapseMUD - Server time: {servertime}"))
 
     def connectionLost(self, reason="unspecified") -> None:
-        super().__init__()
-        if self.username in self.users:
-            del self.users[self.username]
-            print(f"[{self.username}]: Deleted self from users list")
-            for protocol in self.users.values():
-                print(f"[{self.username}]: Sending disconnect to {protocol.username}")
-                protocol.processPacket(packet.DisconnectPacket(self.player))
+        super().connectionLost()
+        self.state = self._DISCONNECT
+        self.processPacket(packet.DisconnectPacket(self.player))
 
     def stringReceived(self, string) -> None:
         """
@@ -79,7 +77,7 @@ class Moonlapse(NetstringReceiver):
         on dataReceived.
         """
         p: packet.Packet = packet.frombytes(string)
-        print(f"[{self.username}]: Received packet from my client {p}")
+        print(f"[{self.username}][{self.state.__name__}][{self.users.keys()}]: Received packet from my client {p}")
         self.state(p)
 
     def sendPacket(self, p: packet.Packet) -> None:
@@ -87,15 +85,15 @@ class Moonlapse(NetstringReceiver):
         Sends a packet to this protocol's client. 
         Call this to communicate information back to the game client application.
         """
-        print(f"[{self.username}]: Sending to this my client", p)
         self.transport.write(p.tobytes())
+        print(f"[{self.username}][{self.state.__name__}][{self.users.keys()}]: Sent data to my client: {p.tobytes()}")
 
     def processPacket(self, p: packet.Packet) -> None:
         """
         Processes packets sent to this protocol from another protocol.
         Call this to communicate with other protocols connected to the main server.
         """
-        print(f"[{self.username}]: Received packet from another protocol {p}")
+        print(f"[{self.username}][{self.state.__name__}][{self.users.keys()}]: Received packet from a protocol {p}")
         self.state(p)
 
 
@@ -111,8 +109,10 @@ class Moonlapse(NetstringReceiver):
             self.chat(p)
         elif isinstance(p, packet.HelloPacket):
             self.welcome(p)
+        elif isinstance(p, packet.LogoutPacket):
+            self.logout(p)
         elif isinstance(p, packet.DisconnectPacket):
-            self.disconnect(p)
+            self.disconnect_other(p)
 
 
     def _GETENTRY(self, p: Union[packet.LoginPacket, packet.RegisterPacket]) -> None:
@@ -151,7 +151,7 @@ class Moonlapse(NetstringReceiver):
         ).addCallbacks(
             callback = self._check_password_correct, 
             callbackArgs = (username, password),
-            errback = lambda e: self.sendPacket(packet.denyPacket(e.getErrorMessage())) # Catch user_exists
+            errback = lambda e: self.sendPacket(packet.DenyPacket(e.getErrorMessage())) # Catch user_exists
         ).addCallbacks(
             callback = self._initialise_player, 
             callbackArgs=(username,), 
@@ -183,7 +183,7 @@ class Moonlapse(NetstringReceiver):
         return self.database.get_player_pos(self.player)
 
     def _establish_player_in_world(self, init_pos: List[Tuple[int]]) -> None:
-        print(f"[{self.username}]: Got", init_pos)
+        print(f"[{self.username}][{self.state.__name__}][{self.users.keys()}]: Got", init_pos)
         init_pos = init_pos[0]
         self.player.assign_location(list(init_pos), self.room_data['walls'], *self.room_data['size'])
 
@@ -201,6 +201,16 @@ class Moonlapse(NetstringReceiver):
                 protocol.processPacket(packet.HelloPacket(self.player))
 
         self.state = self._PLAY
+
+    def logout(self, p):
+        del self.users[self.username]
+        self.username = None
+        self.password = None
+        self.player = None
+        self.state = self._GETENTRY
+
+    def disconnect_other(self, p: packet.DisconnectPacket):
+        self.sendPacket(p)
 
     def _handle_registration(self, username: str, password: str) -> None:
         """
@@ -227,6 +237,25 @@ class Moonlapse(NetstringReceiver):
             raise EntryError(f"Somebody else already goes by that name")
         
         return self.database.register_user(username, password)
+
+    def _DISCONNECT(self, p: packet.DisconnectPacket):
+        """
+        Handles packets received when this protocol is in the DISCONNECT state.
+        Releases this protocol from the server and informs all other protocols 
+        of this disconnection. No more code should be executed from this protocol.
+
+        This should never be called directly. Instead it should be handleded by 
+        self.connectionLost.
+        """
+        # Release this protocol from the server
+        if self.username in self.users.keys():
+            del self.users[self.username]
+            print(f"[{self.username}][{self.state.__name__}][{self.users.keys()}]: Deleted self from users list")
+
+        # Tell all still connected protocols about this disconnection
+        for protocol in self.users.values():
+            if protocol != self:
+                protocol.processPacket(p)
 
     def chat(self, p: packet.ChatPacket):
         """
@@ -298,13 +327,6 @@ class Moonlapse(NetstringReceiver):
         # Send the newly connecting protocol information for this protocol's player
         new_protocol.sendPacket(packet.ServerRoomPlayerPacket(self.player))
         print(f"[{self.player.get_username()}] Welcomed new player {new_player.get_username()}")
-
-    def disconnect(self, p: packet.DisconnectPacket):
-        """
-        Called when a protocol is disconnecting. Passes the message along to this protocol's client.
-        """
-        departing_player: models.Player = p.payloads[0].value
-        self.sendPacket(p)
 
 
 class EntryError(Exception):

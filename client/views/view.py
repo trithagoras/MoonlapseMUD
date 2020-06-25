@@ -34,6 +34,7 @@ class View:
             try:
                 self.controller.get_input()
             except KeyboardInterrupt:
+                self.controller.stop()
                 self.stop()
 
     def draw(self) -> None:
