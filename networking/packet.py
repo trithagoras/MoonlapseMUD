@@ -100,6 +100,13 @@ class WelcomePacket(Packet):
         super().__init__(Payload(motd))
 
 
+class GoodbyePacket(Packet):
+    """
+    A packet sent from a protocol to a client after a logout request is received.
+    """
+    pass
+
+
 class LoginPacket(Packet):
     """
     A packet sent from a client to a protocol to request a login.

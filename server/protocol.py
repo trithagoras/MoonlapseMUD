@@ -203,6 +203,7 @@ class Moonlapse(NetstringReceiver):
         self.state = self._PLAY
 
     def logout(self, p):
+        self.sendPacket(packet.GoodbyePacket())
         del self.users[self.username]
         self.username = None
         self.password = None

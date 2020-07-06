@@ -30,9 +30,9 @@ class Game(Controller):
         self.chatbox = None
         self.view = GameView(self)
 
-    def start(self) -> None:
         self._logged_in = True
 
+    def start(self) -> None:
         # Listen for game data in its own thread
         threading.Thread(target=self.receive_data).start()
 
@@ -60,6 +60,7 @@ class Game(Controller):
                     self.walls = p.payloads[0].value
                 elif isinstance(p, packet.ServerRoomTickRatePacket):
                     self.tick_rate = p.payloads[0].value
+
             f.write(f"\tGot initial game data (game._logged_in = {self._logged_in})\n")
 
             f.write(f"\tGetting volatile game data (game._logged_in = {self._logged_in})\n")
@@ -100,6 +101,10 @@ class Game(Controller):
                 for oid, o in [(other.get_id(), other) for other in self.others]:
                     if oid == departed.get_id():
                         self.others.remove(o)
+
+            elif isinstance(p, packet.GoodbyePacket):
+                self.stop()
+                break
 
             f.write(f"\tHandled volatile game data\n")
 
@@ -143,8 +148,7 @@ class Game(Controller):
             self.chat(self.view.chatbox.value)
 
         elif key == ord('q'):
-            self.view.stop()
-            self.stop()
+            packet.send(packet.LogoutPacket(), self.s)
 
     def chat(self, message: str) -> None:
         try:
@@ -159,11 +163,5 @@ class Game(Controller):
         return None not in (self.size, self.walls, self.tick_rate)
 
     def stop(self) -> None:
-        super().stop()
-
-        packet.send(packet.LogoutPacket(), self.s)
-
-        # This will stop the receiving thread
         self._logged_in = False
-
-        time.sleep(1.5)
+        self.view.stop()

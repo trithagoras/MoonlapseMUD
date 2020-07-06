@@ -53,7 +53,6 @@ def main() -> None:
     """
     address = handle_arguments()
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.settimeout(1.5)
         s.connect(address)
         mainmenu = MainMenu(s)
         mainmenu.start()
