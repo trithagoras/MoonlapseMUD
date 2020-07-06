@@ -23,6 +23,9 @@ class LoginMenu(Menu):
 
         self.view = LoginView(self)
 
+    def start(self) -> None:
+        super().start()
+
     def get_input(self) -> int:
         key = super().get_input()
         if curses.ascii.isprint(key) or key in (curses.KEY_LEFT, curses.KEY_RIGHT, curses.KEY_DC):

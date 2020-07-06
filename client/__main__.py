@@ -41,7 +41,7 @@ def handle_arguments() -> Tuple[str, int]:
     elif n_args >= 2:
         hostname = sys.argv[1]
     elif n_args == 3:
-        port = sys.argv[2]
+        port = int(sys.argv[2])
 
     return hostname, port
 
@@ -53,6 +53,7 @@ def main() -> None:
     """
     address = handle_arguments()
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(1.5)
         s.connect(address)
         mainmenu = MainMenu(s)
         mainmenu.start()

@@ -4,7 +4,7 @@ import socket as sock
 import sys
 import time
 import traceback
-from threading import Thread
+import threading
 from typing import *
 
 from networking import packet
@@ -17,7 +17,6 @@ class Game(Controller):
     def __init__(self, s: sock.socket):
         super().__init__()
         self.s: sock.socket = s
-        self._logged_in = True
 
         # Game data
         self.player: Optional[models.Player] = None
@@ -32,8 +31,10 @@ class Game(Controller):
         self.view = GameView(self)
 
     def start(self) -> None:
+        self._logged_in = True
+
         # Listen for game data in its own thread
-        Thread(target=self.receive_data, daemon=True).start()
+        threading.Thread(target=self.receive_data).start()
 
         # Don't draw with game data until it's been received
         while not self.ready():
@@ -43,7 +44,10 @@ class Game(Controller):
         super().start()
 
     def receive_data(self) -> None:
+        f = open('packetdebug.txt', 'a')
+        f.write(f"\nThread {threading.get_ident()}\ngame.receive_data() (game._logged_in = {self._logged_in})\n")
         while self._logged_in:
+            f.write(f"\tGetting initial game data (game._logged_in = {self._logged_in})\n")
             # Get initial room data if not already done
             while not self.ready() and self._logged_in:
                 p: packet.Packet = packet.receive(self.s, debug=True)
@@ -56,9 +60,17 @@ class Game(Controller):
                     self.walls = p.payloads[0].value
                 elif isinstance(p, packet.ServerRoomTickRatePacket):
                     self.tick_rate = p.payloads[0].value
-            
+            f.write(f"\tGot initial game data (game._logged_in = {self._logged_in})\n")
+
+            f.write(f"\tGetting volatile game data (game._logged_in = {self._logged_in})\n")
+
+
             # Get volatile data such as player positions, etc.
             p: packet.Packet = packet.receive(self.s, debug=True)
+
+
+            f.write(f"\tGot volatile game data (game._logged_in = {self._logged_in})\n")
+            f.write(f"\tHandling volatile game data (game._logged_in = {self._logged_in})\n")
             if isinstance(p, packet.ServerRoomPlayerPacket):
                 player: Player = p.payloads[0].value
                 pid: int = player.get_id()
@@ -77,7 +89,6 @@ class Game(Controller):
                 else:
                     self.others.add(player)
 
-
             elif isinstance(p, packet.ChatPacket):
                 self.latest_log = p.payloads[0].value
 
@@ -89,6 +100,10 @@ class Game(Controller):
                 for oid, o in [(other.get_id(), other) for other in self.others]:
                     if oid == departed.get_id():
                         self.others.remove(o)
+
+            f.write(f"\tHandled volatile game data\n")
+
+        f.write(f"\tFinished receiving data (game._logged_in = {self._logged_in})\n")
 
     def get_input(self) -> None:
         super().get_input()
@@ -127,6 +142,10 @@ class Game(Controller):
             self.view.chatbox.modal()
             self.chat(self.view.chatbox.value)
 
+        elif key == ord('q'):
+            self.view.stop()
+            self.stop()
+
     def chat(self, message: str) -> None:
         try:
             packet.send(packet.ChatPacket(message), self.s)
@@ -142,7 +161,9 @@ class Game(Controller):
     def stop(self) -> None:
         super().stop()
 
-        # This should stop the receiving thread...
-        self._logged_in = False
         packet.send(packet.LogoutPacket(), self.s)
-        time.sleep(0.2)
+
+        # This will stop the receiving thread
+        self._logged_in = False
+
+        time.sleep(1.5)
