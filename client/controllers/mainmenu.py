@@ -23,7 +23,6 @@ class MainMenu(Menu):
             motd: str = p.payloads[0].value
         self.view.title = motd
 
-
     def login(self):
         loginmenu = LoginMenu(self.s)
         loginmenu.start()

@@ -24,6 +24,7 @@ class LoginMenu(Menu):
         self.view = LoginView(self)
 
     def start(self) -> None:
+        self.view.title = "Please enter your username and password"
         super().start()
 
     def get_input(self) -> int:

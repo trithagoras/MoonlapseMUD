@@ -16,8 +16,6 @@ class LoginView(MenuView):
 
         super().__init__(controller)
 
-        self.title = "Please enter your username and password"
-
     def display(self, stdscr):
         self.stdscr = stdscr
         self.usernamebox = TextBox(stdscr, 6, 20, 20)

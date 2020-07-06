@@ -180,9 +180,9 @@ class DisconnectPacket(Packet):
     A packet sent to signify the client's connection has been lost. An optional message 
     can be supplied which could be displayed to other clients.
     """
-    def __init__(self, player: Player, message: str = "Someone has departed..."):
+    def __init__(self, player: Player):
         pplayer: Payload = Payload(player)
-        pmessage: Payload = Payload(f"{player.get_username()} has departed...")
+        pmessage: Payload = Payload(f"{'Someone' if player is None else player.get_username()} has departed...")
         super().__init__(pplayer, pmessage)
 
 

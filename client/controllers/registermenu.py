@@ -24,6 +24,10 @@ class RegisterMenu(Menu):
 
         self.view = RegisterView(self)
 
+    def start(self) -> None:
+        self.view.title = "Please enter your desired username and password"
+        super().start()
+
     def get_input(self) -> int:
         key = super().get_input()
         if curses.ascii.isprint(key) or key in (curses.KEY_LEFT, curses.KEY_RIGHT, curses.KEY_DC):
