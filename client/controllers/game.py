@@ -1,10 +1,8 @@
 import curses
 import curses.ascii
 import socket
-import sys
 import threading
 import time
-import traceback
 from typing import *
 from networking import packet
 from networking import models

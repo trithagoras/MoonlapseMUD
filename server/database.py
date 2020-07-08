@@ -1,13 +1,8 @@
-import json
-from twisted.enterprise import adbapi
-from twisted.internet.defer import inlineCallbacks
-from twisted.internet.defer import Deferred
 import datetime
-from typing import *
-import traceback
-import sys
-
+import json
 from networking import models
+from twisted.enterprise import adbapi
+from twisted.internet.defer import Deferred
 
 
 class Database:
@@ -18,19 +13,21 @@ class Database:
             self.cs = json.load(f)
 
     def connect(self):
-        # print("Connecting to database... ", end='')
+        print("Connecting to database...")
 
-        self.dbpool = adbapi.ConnectionPool('psycopg2', 
+        self.dbpool = adbapi.ConnectionPool(
+            dbapiName='psycopg2',
             user=self.cs['user'],
             password=self.cs['password'],
             host=self.cs['host'],
             port=self.cs['port'],
-            database=self.cs['database'])
+            database=self.cs['database']
+        )
 
-        # print(f"Done.")
+        print("Done.")
 
     def register_user(self, username: str, password: str) -> Deferred:
-        # print(f"Attempting to register player to database: {username}:{password}...")
+        print(f"Attempting to register player to database: {username}:{password}...")
         now: str = str(datetime.datetime.utcnow())
         return self.dbpool.runOperation(f"""
             INSERT INTO users (username, password)
@@ -48,7 +45,7 @@ class Database:
         """)
 
     def user_exists(self, username: str) -> Deferred:
-        # print(f"Checking if user {username} exists...")
+        print(f"Checking if user {username} exists...")
         return self.dbpool.runQuery(f"""
             SELECT CASE 
                 WHEN EXISTS (
@@ -61,7 +58,7 @@ class Database:
         """)
 
     def password_correct(self, username: str, password: str) -> Deferred:
-        # print(f"Checking if credentials {username}:{password} are correct...")
+        print(f"Checking if credentials {username}:{password} are correct...")
         return self.dbpool.runQuery(f"""
             SELECT CASE 
                 WHEN EXISTS (
@@ -75,7 +72,7 @@ class Database:
         """)
 
     def update_player_pos(self, player: models.Player, y: int, x: int) -> Deferred:
-        # print(f"Updating player position ({player.get_username()})...")
+        print(f"Updating player position ({player.get_username()})...")
         return self.dbpool.runOperation(f"""
             UPDATE entities
             SET position = '{y}, {x}'
@@ -88,7 +85,7 @@ class Database:
         """)
 
     def get_player_pos(self, player: models.Player) -> Deferred:
-        # print(f"Getting player position ({player.get_username()})...", end='')
+        print(f"Getting player position ({player.get_username()})...", end='')
         return self.dbpool.runQuery(f"""
             SELECT position[0], position[1]
             FROM entities

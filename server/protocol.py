@@ -1,11 +1,8 @@
 from twisted.protocols.basic import NetstringReceiver
-from twisted.protocols.basic import IncompleteNetstring
-from twisted.protocols.basic import NetstringParseError
-from twisted.internet.protocol import Protocol
 from twisted.internet.defer import Deferred
 
-from server import database
 from server.__main__ import MoonlapseServer
+from database import Database
 from networking import packet
 from networking import models
 
@@ -34,7 +31,7 @@ class Moonlapse(NetstringReceiver):
     The self.processPacket method is used to tell another protocol on the server to process a packet which 
     doesn't necessarily have to be sent to any clients.
     """
-    def __init__(self, server: MoonlapseServer, database: database.Database, users: Dict[str, 'Moonlapse']):
+    def __init__(self, server: MoonlapseServer, database: Database, users: Dict[str, 'Moonlapse']):
         super().__init__()
         self._server: MoonlapseServer = server
         self.database: Database = database
@@ -43,20 +40,20 @@ class Moonlapse(NetstringReceiver):
         self.users: Dict[str, 'Moonlapse'] = users
 
         # Information specific to the player using this protocol
-        self.username: str = None
-        self.password: str = None
-        self.player: models.Player = None
+        self.username: Optional[str] = None
+        self.password: Optional[str] = None
+        self.player: Optional[models.Player] = None
 
         # The state of the protocol which gets called as a function to process only the packets 
         # intended to be processed in the protocol's current state. Should only be called in the 
         # self.stringReceived method every time a complete netstring is received and converted to 
         # a packet.
-        self.state: function = self._GETENTRY
+        self.state: Callable = self._GETENTRY
 
         # Load in the map file and convert it to palatable data type to be sent out to the client.
         pwd: str = os.path.dirname(__file__)
         room_data_filename: str = os.path.join(pwd, '..', 'maps', 'map.bmp.json')
-        self.room_data: Dict[str, object] = None
+        self.room_data: Dict[str, object] = {}
         with open(room_data_filename, 'r') as room_data_file:
             self.room_data = json.load(room_data_file)
 
@@ -96,7 +93,6 @@ class Moonlapse(NetstringReceiver):
         print(f"[{self.username}][{self.state.__name__}][{self.users.keys()}]: Received packet from a protocol {p}")
         self.state(p)
 
-
     def _PLAY(self, p: packet.Packet) -> None:
         """
         Handles packets received when this protocol is in the PLAY state.
@@ -113,7 +109,6 @@ class Moonlapse(NetstringReceiver):
             self.logout(p)
         elif isinstance(p, packet.DisconnectPacket):
             self.disconnect_other(p)
-
 
     def _GETENTRY(self, p: Union[packet.LoginPacket, packet.RegisterPacket]) -> None:
         """
@@ -225,12 +220,12 @@ class Moonlapse(NetstringReceiver):
         """
         self.database.user_exists(username
         ).addCallbacks(
-            callback = self._register_user, 
-            callbackArgs = (username, password),
-            errback = lambda e: self.sendPacket(packet.denyPacket(e.getErrorMessage()))  # Catch user_exists
+            callback=self._register_user,
+            callbackArgs=(username, password),
+            errback=lambda e: self.sendPacket(packet.DenyPacket(e.getErrorMessage()))  # Catch user_exists
         ).addCallbacks(
-            callback = lambda _: self.sendPacket(packet.OkPacket()),
-            errback = lambda e: self.sendPacket(packet.DenyPacket(e.getErrorMessage()))  # Catch register_user
+            callback=lambda _: self.sendPacket(packet.OkPacket()),
+            errback=lambda e: self.sendPacket(packet.DenyPacket(e.getErrorMessage()))  # Catch register_user
         )
 
     def _register_user(self, user_exists: List[Tuple[bool]], username: str, password: str) -> Deferred:
@@ -279,7 +274,7 @@ class Moonlapse(NetstringReceiver):
         """
         pos: Tuple[int] = self.player.get_position()
 
-        # Calculate the desired desination
+        # Calculate the desired destination
         dest: List[int] = list(pos)
         if isinstance(p, packet.MoveUpPacket):
             dest[0] -= 1
@@ -309,7 +304,7 @@ class Moonlapse(NetstringReceiver):
         player and this protocol tells them about its player in return.
         """
         new_player: models.Player = p.payloads[0].value
-        new_protocol: 'Moonlapse' = None
+        new_protocol: Optional['Moonlapse'] = None
 
         # Get the protocol which sent the packet
         for protocol in self.users.values():

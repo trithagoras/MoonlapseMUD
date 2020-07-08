@@ -1,15 +1,12 @@
+import socket
 import sys
 from typing import *
-import traceback
-import socket
 
 # Required to import top level modules
-import os
 from pathlib import Path
 file = Path(__file__).resolve()
 parent, root = file.parent, file.parents[1]
 sys.path.append(str(root))
-
 
 from client.controllers.mainmenu import MainMenu
 

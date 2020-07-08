@@ -5,7 +5,7 @@ from typing import *
 
 class Log:
     def __init__(self):
-        self.latest: Dict[float, str] = None
+        self.latest: Dict[float, str] = {}
 
     def log(self, message: str):
         # Log times as seconds since 1-Jan-1970 (Unix time)

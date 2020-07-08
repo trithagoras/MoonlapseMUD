@@ -1,7 +1,26 @@
 import curses.textpad
 import curses.ascii
 from typing import *
-import asyncio
+
+
+def validator(key: int):
+    if curses.ascii.isprint(key):
+        return key
+
+    # Delete left
+    if key in (curses.ascii.BS, curses.KEY_BACKSPACE, curses.ascii.DEL):
+        return curses.ascii.BS
+
+    # Delete right
+    if key in (curses.ascii.EOT, curses.KEY_DC):
+        return curses.ascii.EOT
+
+    # Stop editing
+    if key in (curses.ascii.LF, curses.ascii.CR, curses.ascii.BEL, curses.KEY_ENTER, curses.ascii.ESC,
+               curses.ascii.TAB, curses.KEY_DOWN, curses.KEY_UP):
+        return curses.ascii.BEL
+
+    return key
 
 
 class TextBox:
@@ -67,28 +86,9 @@ class TextBox:
                 # Move cursor left
                 self.win.move(0, curs_x - 1)
 
-        self.value = self.box.edit(self.validator)
+        self.value = self.box.edit(validator)
         # I'm not sure why, but sometimes the value has a trailing space
         if len(self.value) > 0 and self.value[-1] == ' ':
             self.value = self.value[: -1]
 
         curses.curs_set(False)
-
-    def validator(self, key: int):
-        if curses.ascii.isprint(key):
-            return key
-
-        # Delete left
-        if key in (curses.ascii.BS, curses.KEY_BACKSPACE, curses.ascii.DEL):
-            return curses.ascii.BS
-
-        # Delete right
-        if key in (curses.ascii.EOT, curses.KEY_DC):
-            return curses.ascii.EOT
-
-        # Stop editing
-        if key in (curses.ascii.LF, curses.ascii.CR, curses.ascii.BEL, curses.KEY_ENTER, curses.ascii.ESC,
-                   curses.ascii.TAB, curses.KEY_DOWN, curses.KEY_UP):
-            return curses.ascii.BEL
-
-        return key

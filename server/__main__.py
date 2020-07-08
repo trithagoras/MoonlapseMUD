@@ -3,7 +3,6 @@ from twisted.internet import reactor
 from typing import *
 
 # Required to import from shared modules
-import os
 import sys
 from pathlib import Path
 file = Path(__file__).resolve()
@@ -16,7 +15,7 @@ from server import protocol
 
 class MoonlapseServer(Factory):
     def __init__(self):
-        self.database: Database = database.Database("./server/connectionstrings.json")
+        self.database: database.Database = database.Database("./server/connectionstrings.json")
         self.database.connect()
         self.users: Dict[str, protocol.Moonlapse] = {}
 
