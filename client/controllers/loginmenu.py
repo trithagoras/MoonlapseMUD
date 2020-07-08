@@ -1,13 +1,11 @@
 import curses
-import json
+import curses.ascii
 import socket
-import sys
-import traceback
-
 from networking import packet
-from ..views.loginview import LoginView
+from typing import *
 from .game import Game
 from .menu import Menu
+from ..views.loginview import LoginView
 
 
 class LoginMenu(Menu):
@@ -21,14 +19,10 @@ class LoginMenu(Menu):
             "Password": self.login
         })
 
-        self.view = LoginView(self)
+        self.view = LoginView(self, title="Please enter your username and password")
 
-    def start(self) -> None:
-        self.view.title = "Please enter your username and password"
-        super().start()
-
-    def get_input(self) -> int:
-        key = super().get_input()
+    def handle_input(self) -> int:
+        key = super().handle_input()
         if curses.ascii.isprint(key) or key in (curses.KEY_LEFT, curses.KEY_RIGHT, curses.KEY_DC):
             if self.cursor == 0:
                 self.view.usernamebox.modal(first_key=key)
@@ -38,7 +32,7 @@ class LoginMenu(Menu):
                 self.password = self.view.passwordbox.value
         return key
 
-    def login(self):
+    def login(self) -> None:
         if '' in (self.username, self.password):
             self.view.title = "Username or password must not be blank"
             return
@@ -54,8 +48,9 @@ class LoginMenu(Menu):
             self.view.title = "Got response..."
             if isinstance(response, packet.OkPacket):
                 self.view.title = "Entering game..."
-                game = Game(self.s)
-                game.start()     
+                Game(self.s).start()
                 self.start()       
+            elif isinstance(response, packet.DenyPacket):
+                self.view.title = response.payloads[0].value
             else:
-                self.view.title = str(response)
+                self.view.title = "Unexpected error. Please try again."

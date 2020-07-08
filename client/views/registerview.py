@@ -4,8 +4,8 @@ from ..curses_helper import TextBox
 
 
 class RegisterView(MenuView):
-    def __init__(self, controller):
-        super().__init__(controller)
+    def __init__(self, controller, title: Optional[str] = None):
+        super().__init__(controller, title=title)
 
         self.username: str = ''
         self.password: str = ''

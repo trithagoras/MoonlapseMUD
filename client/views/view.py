@@ -33,7 +33,7 @@ class View:
             self.stdscr.refresh()
 
             try:
-                self.controller.get_input()
+                self.controller.handle_input()
             except KeyboardInterrupt:
                 self.controller.stop()
                 self.stop()

@@ -1,7 +1,7 @@
 import curses
-
-from ..views.menuview import MenuView
+import curses.ascii
 from .controller import Controller
+from ..views.menuview import MenuView
 
 
 class Menu(Controller):
@@ -11,7 +11,7 @@ class Menu(Controller):
         self.cursor: int = 0
         self.view = MenuView(self)
 
-    def get_input(self) -> int:
+    def handle_input(self) -> int:
         key = self.view.stdscr.getch()
 
         # Movement

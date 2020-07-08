@@ -1,12 +1,10 @@
 import curses
-import json
+import curses.ascii
 import socket
-import sys
-import traceback
-
 from networking import packet
-from ..views.registerview import RegisterView
+from typing import *
 from .menu import Menu
+from ..views.registerview import RegisterView
 
 
 class RegisterMenu(Menu):
@@ -22,14 +20,10 @@ class RegisterMenu(Menu):
             "Confirm password": self.register
         })
 
-        self.view = RegisterView(self)
+        self.view = RegisterView(self, title="Please enter your desired username and password")
 
-    def start(self) -> None:
-        self.view.title = "Please enter your desired username and password"
-        super().start()
-
-    def get_input(self) -> int:
-        key = super().get_input()
+    def handle_input(self) -> int:
+        key = super().handle_input()
         if curses.ascii.isprint(key) or key in (curses.KEY_LEFT, curses.KEY_RIGHT, curses.KEY_DC):
             if self.cursor == 0:
                 self.view.usernamebox.modal(first_key=key)
@@ -59,5 +53,7 @@ class RegisterMenu(Menu):
 
         if isinstance(response, packet.OkPacket):
             self.view.title = "Registration successful! Press CTRL+C or ESC to go back and log in."
-        else:
+        elif isinstance(response, packet.DenyPacket):
             self.view.title = response.payloads[0].value
+        else:
+            self.view.title = "Unexpected error. Please try again."

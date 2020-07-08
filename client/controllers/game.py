@@ -1,22 +1,21 @@
 import curses
-import json
-import socket as sock
+import curses.ascii
+import socket
 import sys
+import threading
 import time
 import traceback
-import threading
 from typing import *
-
 from networking import packet
 from networking import models
-from ..views.gameview import GameView
 from .controller import Controller
+from ..views.gameview import GameView
 
 
 class Game(Controller):
-    def __init__(self, s: sock.socket):
+    def __init__(self, s: socket.socket):
         super().__init__()
-        self.s: sock.socket = s
+        self.s: socket.socket = s
 
         # Game data
         self.player: Optional[models.Player] = None
@@ -44,10 +43,7 @@ class Game(Controller):
         super().start()
 
     def receive_data(self) -> None:
-        f = open('packetdebug.txt', 'a')
-        f.write(f"\nThread {threading.get_ident()}\ngame.receive_data() (game._logged_in = {self._logged_in})\n")
         while self._logged_in:
-            f.write(f"\tGetting initial game data (game._logged_in = {self._logged_in})\n")
             # Get initial room data if not already done
             while not self.ready() and self._logged_in:
                 p: packet.Packet = packet.receive(self.s, debug=True)
@@ -61,19 +57,11 @@ class Game(Controller):
                 elif isinstance(p, packet.ServerRoomTickRatePacket):
                     self.tick_rate = p.payloads[0].value
 
-            f.write(f"\tGot initial game data (game._logged_in = {self._logged_in})\n")
-
-            f.write(f"\tGetting volatile game data (game._logged_in = {self._logged_in})\n")
-
-
             # Get volatile data such as player positions, etc.
             p: packet.Packet = packet.receive(self.s, debug=True)
 
-
-            f.write(f"\tGot volatile game data (game._logged_in = {self._logged_in})\n")
-            f.write(f"\tHandling volatile game data (game._logged_in = {self._logged_in})\n")
             if isinstance(p, packet.ServerRoomPlayerPacket):
-                player: Player = p.payloads[0].value
+                player: models.Player = p.payloads[0].value
                 pid: int = player.get_id()
 
                 # If the received player is ourselves, update our player
@@ -97,7 +85,7 @@ class Game(Controller):
                 self.latest_log = p.payloads[0].value
 
             elif isinstance(p, packet.DisconnectPacket):
-                departed: Player = p.payloads[0].value
+                departed: models.Player = p.payloads[0].value
                 for oid, o in [(other.get_id(), other) for other in self.others]:
                     if oid == departed.get_id():
                         self.others.remove(o)
@@ -106,23 +94,22 @@ class Game(Controller):
                 self.stop()
                 break
 
-            f.write(f"\tHandled volatile game data\n")
-
-        f.write(f"\tFinished receiving data (game._logged_in = {self._logged_in})\n")
-
-    def get_input(self) -> None:
-        super().get_input()
-        key = self.view.stdscr.getch()
+    def handle_input(self) -> int:
+        key = super().handle_input()
 
         # Movement
+        directionpacket: Optional[packet.MovePacket] = None
         if key == curses.KEY_UP:
-            packet.send(packet.MoveUpPacket(), self.s)
+            directionpacket = packet.MoveUpPacket()
         elif key == curses.KEY_RIGHT:
-            packet.send(packet.MoveRightPacket(), self.s)
+            directionpacket = packet.MoveRightPacket()
         elif key == curses.KEY_DOWN:
-            packet.send(packet.MoveDownPacket(), self.s)
+            directionpacket = packet.MoveDownPacket()
         elif key == curses.KEY_LEFT:
-            packet.send(packet.MoveLeftPacket(), self.s)
+            directionpacket = packet.MoveLeftPacket()
+
+        if directionpacket:
+            packet.send(directionpacket, self.s)
 
         # Changing window focus
         elif key in (ord('1'), ord('2'), ord('3')):
@@ -147,21 +134,18 @@ class Game(Controller):
             self.view.chatbox.modal()
             self.chat(self.view.chatbox.value)
 
+        # Quit on Windows. TODO: Figure out how to make CTRL+C or ESC work.
         elif key == ord('q'):
             packet.send(packet.LogoutPacket(), self.s)
 
+        return key
+
     def chat(self, message: str) -> None:
-        try:
-            packet.send(packet.ChatPacket(message), self.s)
-        except sock.error:
-            print("Error: Socket error. Traceback: ", file=sys.stderr)
-            print(traceback.format_exc())
+        packet.send(packet.ChatPacket(message), self.s)
 
     def ready(self) -> bool:
-        if self.player is None:
-            return False
-        return None not in (self.size, self.walls, self.tick_rate)
+        return None not in (self.player, self.size, self.walls, self.tick_rate)
 
     def stop(self) -> None:
         self._logged_in = False
-        self.view.stop()
+        super().stop()
