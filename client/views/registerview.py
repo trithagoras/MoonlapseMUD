@@ -1,21 +1,19 @@
-import curses
-
-from ..curses_helper import TextBox
+from typing import *
 from .menuview import MenuView
+from ..curses_helper import TextBox
 
 
 class RegisterView(MenuView):
     def __init__(self, controller):
+        super().__init__(controller)
+
         self.username: str = ''
         self.password: str = ''
         self.confirmpassword: str = ''
 
-        # Textboxes are initialised once the controller passes stdscr to the display method.
-        self.usernamebox = None
-        self.passwordbox = None
-        self.confirmpasswordbox = None
-
-        super().__init__(controller)
+        self.usernamebox: Optional[TextBox] = None
+        self.passwordbox: Optional[TextBox] = None
+        self.confirmpasswordbox: Optional[TextBox] = None
 
     def display(self, stdscr):
         self.stdscr = stdscr
@@ -26,8 +24,10 @@ class RegisterView(MenuView):
         super().display(stdscr)
 
     def draw(self):
+        super().draw()
+
         self.stdscr.addstr(6, 30, self.controller.username)
         self.stdscr.addstr(9, 30, self.controller.password)
         self.stdscr.addstr(12, 30, self.controller.confirmpassword)
-        super().draw()
+
         self.stdscr.move(6 + self.controller.cursor * 3, 30)

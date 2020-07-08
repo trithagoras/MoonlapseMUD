@@ -1,8 +1,9 @@
 import curses
 import time
-
-from ..curses_helper import TextBox
+import os
+from typing import *
 from .view import View
+from ..curses_helper import TextBox
 
 
 class GameView(View):
@@ -13,24 +14,25 @@ class GameView(View):
         self.log: Dict[float, str] = {}
         self.latest_log: Dict[float, str] = {}
 
+        self.win1 = None
         self.win1_height, self.win1_width = (23, 53)
         self.win1_y, self.win1_x = (3, 0)
+
+        self.win2 = None
         self.win2_height, self.win2_width = (23, 53)
         self.win2_y, self.win2_x = (3, 53)
+
+        self.win3 = None
         self.win3_height, self.win3_width = (17, 106)
         self.win3_y, self.win3_x = (26, 0)
+
+        self.chatbox: Optional[TextBox] = None
         self.chatwin_height, self.chatwin_width = (1, self.win3_width - 8)
         self.chatwin_y, self.chatwin_x = (self.win3_y + self.win3_height - self.chatwin_height - 1, self.win3_x + 7)
 
-        # Textboxes are initialised once the controller passes stdscr to the display method.
-        self.win1 = None
-        self.win2 = None
-        self.win3 = None
-        self.chatbox = None
-
         # Window 2 and focus
-        self.focus = 1
-        self.win2_focus = Window2Focus.SKILLS
+        self.focus: int = 1
+        self.win2_focus = GameView.Window2Focus.SKILLS
 
     def display(self, stdscr):
         self.stdscr = stdscr
@@ -41,7 +43,9 @@ class GameView(View):
         self.win2 = stdscr.subwin(self.win2_height, self.win2_width, self.win2_y, self.win2_x)
         self.win3 = stdscr.subwin(self.win3_height, self.win3_width, self.win3_y, self.win3_x)
 
+        # Init chatbox
         self.chatbox = TextBox(stdscr, self.chatwin_y, self.chatwin_x, self.chatwin_width)
+
         super().display(stdscr)
 
     def draw(self) -> None:
@@ -50,7 +54,8 @@ class GameView(View):
         # Focus control labels
         self.stdscr.hline(0, 0, curses.ACS_HLINE, self.width)
 
-        control_title, control_string = "", ""
+        control_title: str = ''
+        control_string: str = ''
         if self.focus == 1:
             control_title = "Map Controls "
             control_string = "[V] Look  [D] Pick up item  [E] Use/Equip  [←/→/↑/↓] Move  [</>] Use Stairs/Ladders"
@@ -64,8 +69,8 @@ class GameView(View):
         self.stdscr.addstr(0, 2, control_title)
         self.stdscr.addstr(1, 2, control_string)
 
-        # help key
-        help_string = "[?] Help"
+        # Help key
+        help_string: str = "[?] Help"
         self.stdscr.addstr(1, self.width - 1 - len(help_string), help_string)
 
         # Adding border to windows
@@ -74,73 +79,48 @@ class GameView(View):
         self.win3.border()
 
         # Rendering window titles
-        if self.focus == 1:
-            self.title(self.win1, "[1] Forgotten Moor", True)
-        else:
-            self.win1.addstr(0, 2, "[1] Forgotten Moor ")
-
-        if self.focus == 2:
-            self.title(self.win2, f"[2] {self.win2_focus[0]}", True)
-        else:
-            self.title(self.win2, f"[2] {self.win2_focus[0]}")
-
-        if self.focus == 3:
-            self.title(self.win3, "[3] Log", True)
-        else:
-            self.title(self.win3, "[3] Log")
+        self.title(self.win1, "[1] Forgotten Moor", self.focus == 1)
+        self.title(self.win2, f"[2] {self.win2_focus[0]}", self.focus == 2)
+        self.title(self.win3, "[3] Log", self.focus == 3)
 
         # Window 1 content
         self.draw_map()
 
         # Window 2 content
-        if self.win2_focus == Window2Focus.SKILLS:
+        if self.win2_focus == GameView.Window2Focus.SKILLS:
             self.draw_status_win()
-        elif self.win2_focus == Window2Focus.HELP:
+        elif self.win2_focus == GameView.Window2Focus.HELP:
             self.draw_help_win()
 
         # Window 3 content
         self.draw_log()
 
     def draw_map(self):
-        sight_radius = 10
+        sight_radius: int = 10
 
         for row in range(-sight_radius, sight_radius + 1):
             for col in range(-sight_radius, sight_radius + 1):
-                player_pos: Tuple[int] = self.game.player.get_position()
+                player_pos = self.game.player.get_position()
                 pos = (player_pos[0] + row, player_pos[1] + col)
 
-                if self.coordinate_exists(pos[0], pos[1]):
-                    # drawing walls
-                    if [pos[0], pos[1]] in self.game.walls:
-                        self.win1.addch(11 + row, 26 + col * 2, '█')
-                    else:
-                        self.win1.addch(11 + row, 26 + col * 2, '·')
+                if self.coordinate_exists(*pos):
+                    is_wall: bool = list(pos) in self.game.walls
+                    is_player: bool = pos in [o.get_position() for o in self.game.others]
 
-                    # drawing other players
-                    for other in self.game.others:
-                        other_pos: Tuple[int] = other.get_position()
-                        if (other_pos[0], other_pos[1]) == pos:
-                            self.win1.addch(11 + row, 26 + col * 2, '☺')
+                    self.win1.addch(11 + row, 26 + col * 2,
+                                    '█' if is_wall
+                               else '☺' if is_player
+                               else '·'
+                    )
 
-        # drawing player to centre of screen
+        # Draw player to centre of screen
         self.win1.addch(11, 26, '☻')
 
     def draw_help_win(self):
-        self.win2.addstr(2, 2, "Navigating the 3 game panels can be done with the")
-        self.win2.addstr(3, 2, "[1], [2], [3] keys.")
-        self.win2.addstr(4, 2, "Controls for each focused panel is shown above.")
-
-        self.win2.addstr(6, 2, "The second panel [2] can be changed to show")
-        self.win2.addstr(7, 2, "other screens which can be focused and")
-        self.win2.addstr(8, 2, "interacted with. The keys to do so are")
-        self.win2.addstr(9, 2, "found in the help section below:")
-
-        self.win2.addstr(11, 2, "[?] Help")
-        self.win2.addstr(12, 2, "[K] Skills")
-        self.win2.addstr(13, 2, "[I] Inventory")
-        self.win2.addstr(14, 2, "[P] Spellbook")
-        self.win2.addstr(15, 2, "[G] Guild / Social")
-        self.win2.addstr(16, 2, "[J] Journal")
+        with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'assets', 'help.txt'), 'r') as helpfile:
+            lines: List[str] = helpfile.readlines()
+            for y, line in enumerate(lines, 2):
+                self.win2.addstr(y, 2, line)
 
     def draw_status_win(self):
         self.win2.addstr(1, 2, "coreyb65, Guardian of Forgotten Moor")
@@ -238,12 +218,11 @@ class GameView(View):
                 for row in range(len(array) - 1):
                     win.addstr(y + row + 1, padding, array[row + 1])
 
-
-class Window2Focus:
-    HELP = ("Help", "")
-    SKILLS = ("Skills", "CONTROLS")
-    INVENTORY = ("Inventory", "(D) Drop  (E) Equip  ...")
-    SPELLBOOK = ("Spellbook", "")
-    GUILD = ("Guild", "")
-    JOURNAL = ("Journal", "")
-    # ...
+    class Window2Focus:
+        HELP = ("Help", "")
+        SKILLS = ("Skills", "CONTROLS")
+        INVENTORY = ("Inventory", "(D) Drop  (E) Equip  ...")
+        SPELLBOOK = ("Spellbook", "")
+        GUILD = ("Guild", "")
+        JOURNAL = ("Journal", "")
+        # ...

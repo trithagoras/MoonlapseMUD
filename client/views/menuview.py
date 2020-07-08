@@ -10,12 +10,9 @@ class MenuView(View):
 
     def draw(self) -> None:
         super().draw()
-        for i in range(len(self.controller.menu)):
-            string = list(self.controller.menu.keys())[i]
-            if i == self.controller.cursor:
-                self.stdscr.addstr(6 + i * 3, 5, string, curses.A_UNDERLINE)
-            else:
-                self.stdscr.addstr(6 + i * 3, 5, string)
+        for i, menuitem in enumerate(self.controller.menu.keys()):
+            selected: bool = i == self.controller.cursor
+            self.stdscr.addstr(6 + i * 3, 5, menuitem, curses.A_BOLD if selected else curses.A_DIM)
 
-        if self.title is not None:
+        if self.title:
             self.stdscr.addstr(2, (self.width - len(self.title)) // 2, self.title, curses.color_pair(2))
