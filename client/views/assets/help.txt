@@ -1,0 +1,15 @@
+Navigating the 3 game panels can be done with the
+[1], [2], [3] keys.
+Controls for each focused panel is shown above.
+
+The second panel [2] can be changed to show
+other screens which can be focused and
+interacted with. The keys to do so are
+found in the help section below:
+
+[?] Help
+[K] Skills
+[I] Inventory
+[P] Spellbook
+[G] Guild / Social
+[J] Journal
