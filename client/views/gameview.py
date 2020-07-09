@@ -11,8 +11,8 @@ class GameView(View):
         super().__init__(game)
 
         self.game = game
-        self.log: Dict[float, str] = {}
-        self.latest_log: Dict[float, str] = {}
+        self.visible_log: Dict[float, str] = {}
+        self.times_logged: int = 0
 
         self.win1 = None
         self.win1_height, self.win1_width = (23, 53)
@@ -146,20 +146,22 @@ class GameView(View):
     def draw_log(self):
         self.win3.hline(self.win3_height - 3, 1, curses.ACS_HLINE, self.win3_width - 2)
 
-        # Fill the log
-        if self.game.latest_log is not None and self.game.latest_log != self.latest_log:
-            self.log[time.time()] = self.game.latest_log
-            self.latest_log = self.game.latest_log
+        # Update the log if necessary
+        logsize_diff: int = self.game.logger.size - self.times_logged
+        if logsize_diff > 0:
+            self.visible_log.update(self.game.logger.latest)
+            self.times_logged += logsize_diff
 
-        if self.log != {}:
-            log_keys = list(self.log.keys())
-            # Strip the old logs that can't fit in the window.
-            log_keys = log_keys[max(0, len(log_keys) - self.win3_height + self.chatwin_height + 4):]
+            # Truncate the log to display only the newest entries that will fit in the view
+            log_keys = list(self.visible_log.keys())
+            log_keys_to_remove = log_keys[:max(0, len(log_keys) - self.win3_height + self.chatwin_height + 4)]
+            for key in log_keys_to_remove:
+                del self.visible_log[key]
 
+        if self.visible_log != {}:
             log_line: int = 2
-            for k in log_keys:
-                timestamp: str = time.strftime('%R', time.localtime(float(k)))
-                message: str = self.log[k]
+            for utctime, message in self.visible_log.items():
+                timestamp: str = time.strftime('%R', time.localtime(utctime))
                 self.win3.addstr(log_line, 1, f" [{timestamp}] {message}")
                 log_line += 1
 

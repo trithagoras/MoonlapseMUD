@@ -1,7 +1,5 @@
 import random
-import sys
 from typing import *
-import traceback
 
 class Player:
     def __init__(self, player_id):

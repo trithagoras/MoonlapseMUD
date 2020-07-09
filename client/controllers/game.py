@@ -6,6 +6,7 @@ import time
 from typing import *
 from networking import packet
 from networking import models
+from networking.logger import Log
 from .controller import Controller
 from ..views.gameview import GameView
 
@@ -21,7 +22,8 @@ class Game(Controller):
         self.walls: Optional[List[List[int, int]]] = None
         self.size: Optional[Tuple[int, int]] = None
         self.tick_rate: Optional[int] = None
-        self.latest_log: Optional[str] = None
+
+        self.logger: Log = Log()
 
         # UI
         self.chatbox = None
@@ -76,11 +78,8 @@ class Game(Controller):
                 else:
                     self.others.add(player)
 
-            elif isinstance(p, packet.ChatPacket):
-                self.latest_log = p.payloads[0].value
-
             elif isinstance(p, packet.ServerLogPacket):
-                self.latest_log = p.payloads[0].value
+                self.logger.log(p.payloads[0].value)
 
             elif isinstance(p, packet.DisconnectPacket):
                 departed: models.Player = p.payloads[0].value

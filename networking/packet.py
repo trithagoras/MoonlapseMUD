@@ -1,8 +1,6 @@
-from typing import *
 import json
 import socket
 import traceback
-import pickle
 import threading
 
 from .payload import *

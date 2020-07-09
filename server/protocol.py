@@ -5,6 +5,7 @@ from server.__main__ import MoonlapseServer
 from database import Database
 from networking import packet
 from networking import models
+from networking.logger import Log
 
 from typing import *
 import time
@@ -35,6 +36,7 @@ class Moonlapse(NetstringReceiver):
         super().__init__()
         self._server: MoonlapseServer = server
         self.database: Database = database
+        self.logger: Log = Log()
 
         # A volatile dictionary of usernames to protocols passed in by the server.
         self.users: Dict[str, 'Moonlapse'] = users
@@ -253,22 +255,31 @@ class Moonlapse(NetstringReceiver):
             if protocol != self:
                 protocol.processPacket(p)
 
-    def chat(self, p: packet.ChatPacket):
+    def broadcast(self, message: str) -> None:
         """
-        Sends a chat packet too all clients connected to the server.
-        Includes this protocol's connected player username.
+        Sends a message to all clients connected to the server.
         """
-        message: str = f"{self.username} says: {p.payloads[0].value}"
-        if message.strip() != '':
-            for name, protocol in self.users.items():
-                protocol.sendPacket(packet.ChatPacket(message))
+        for name, protocol in self.users.items():
+            protocol.sendPacket(packet.ServerLogPacket(message))
 
-    def move(self, p: packet.MovePacket):
+        self.logger.log(message)
+
+    def chat(self, p: packet.ChatPacket) -> None:
+        """
+        Broadcasts a chat message which includes this protocol's connected player username.
+        Truncates to 80 characters. Cannot be empty.
+        """
+        message: str = p.payloads[0].value
+        if message.strip() != '':
+            message: str = f"{self.username} says: {message[:80]}"
+            self.broadcast(message)
+
+    def move(self, p: packet.MovePacket) -> None:
         """
         Updates this protocol's player's position and sends the player back to all 
         clients connected to the server.
 
-        NOTE: This should be avoided in a future release to prevent sending more 
+        NOTE: This method should be avoided in a future release to prevent sending more
               information than is required. A client will know all the information 
               about every player connected to the server even if they are not in view.
         """
