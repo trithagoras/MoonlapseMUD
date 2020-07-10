@@ -197,11 +197,13 @@ class Moonlapse(NetstringReceiver):
             if protocol != self:
                 protocol.processPacket(packet.HelloPacket(self.player))
 
+        self.broadcast(f"{self.username} has arrived.")
         self.state = self._PLAY
 
     def logout(self, p):
         self.sendPacket(packet.GoodbyePacket())
         del self.users[self.username]
+        self.broadcast(f"{self.username} has departed.")
         self.username = None
         self.password = None
         self.player = None
