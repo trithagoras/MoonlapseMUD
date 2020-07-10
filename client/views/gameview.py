@@ -152,7 +152,7 @@ class GameView(View):
             self.visible_log.update(self.game.logger.latest)
             self.times_logged += logsize_diff
 
-            # Truncate the log to display only the newest entries that will fit in the view
+            # Truncate the log to only the newest entries that will fit in the view
             log_keys = list(self.visible_log.keys())
             log_keys_to_remove = log_keys[:max(0, len(log_keys) - self.win3_height + self.chatwin_height + 4)]
             for key in log_keys_to_remove:
