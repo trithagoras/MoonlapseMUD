@@ -6,7 +6,7 @@ class View:
         self.controller = controller
 
         # Init window sizes
-        self.height, self.width = (43, 106)
+        self.height, self.width = (41, 106)
         self.stdscr = None
 
         self.running = True
@@ -27,6 +27,9 @@ class View:
 
         curses.curs_set(False)
 
+        self._update_loop()
+
+    def _update_loop(self):
         while self.running:
             self.stdscr.erase()
             self.draw()

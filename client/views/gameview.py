@@ -23,12 +23,13 @@ class GameView(View):
         self.win2_y, self.win2_x = (3, 53)
 
         self.win3 = None
-        self.win3_height, self.win3_width = (17, 106)
+        self.win3_height, self.win3_width = (13, 106)
         self.win3_y, self.win3_x = (26, 0)
 
         self.chatbox: Optional[TextBox] = None
+        self.chatwin = None
         self.chatwin_height, self.chatwin_width = (1, self.win3_width - 8)
-        self.chatwin_y, self.chatwin_x = (self.win3_y + self.win3_height - self.chatwin_height - 1, self.win3_x + 7)
+        self.chatwin_y, self.chatwin_x = (self.win3_y + self.win3_height, self.win3_x + 7)
 
         # Window 2 and focus
         self.focus: int = 1
@@ -42,9 +43,11 @@ class GameView(View):
         self.win1 = stdscr.subwin(self.win1_height, self.win1_width, self.win1_y, self.win1_x)
         self.win2 = stdscr.subwin(self.win2_height, self.win2_width, self.win2_y, self.win2_x)
         self.win3 = stdscr.subwin(self.win3_height, self.win3_width, self.win3_y, self.win3_x)
+        self.chatwin = stdscr.subwin(self.chatwin_height, self.chatwin_width, self.chatwin_y, self.chatwin_x)
 
         # Init chatbox
-        self.chatbox = TextBox(stdscr, self.chatwin_y, self.chatwin_x, self.chatwin_width)
+        self.chatbox = TextBox(self.chatwin, 0, 0, self.chatwin_width,
+                               parentview=self, wins_to_update=(self.win1, self.win2, self.win3))
 
         super().display(stdscr)
 
@@ -52,7 +55,7 @@ class GameView(View):
         super().draw()
 
         # Focus control labels
-        self.stdscr.hline(0, 0, curses.ACS_HLINE, self.width)
+        self.stdscr.hline(0, 0, curses.A_HORIZONTAL, self.width)
 
         control_title: str = ''
         control_string: str = ''
@@ -77,6 +80,7 @@ class GameView(View):
         self.win1.border()
         self.win2.border()
         self.win3.border()
+        self.draw_chatwin_border()
 
         # Rendering window titles
         self.title(self.win1, "[1] Forgotten Moor", self.focus == 1)
@@ -97,6 +101,7 @@ class GameView(View):
 
     def draw_map(self):
         sight_radius: int = 10
+        win1_hwidth, win1_hheight = self.win1_width // 2, self.win1_height // 2
 
         for row in range(-sight_radius, sight_radius + 1):
             for col in range(-sight_radius, sight_radius + 1):
@@ -107,14 +112,14 @@ class GameView(View):
                     is_wall: bool = list(pos) in self.game.walls
                     is_player: bool = pos in [o.get_position() for o in self.game.others]
 
-                    self.win1.addch(11 + row, 26 + col * 2,
+                    self.win1.addch(win1_hheight + row, win1_hwidth + col * 2,
                                     '█' if is_wall
                                else '☺' if is_player
                                else '·'
                     )
 
         # Draw player to centre of screen
-        self.win1.addch(11, 26, '☻')
+        self.win1.addch(win1_hheight, win1_hwidth, '☻')
 
     def draw_help_win(self):
         with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'assets', 'help.txt'), 'r') as helpfile:
@@ -144,8 +149,6 @@ class GameView(View):
         self.win2.addstr(20, 2, f"??????????    31/31 {self.progress_bar(3, 10)} (3,000/10,000)")
 
     def draw_log(self):
-        self.win3.hline(self.win3_height - 3, 1, curses.ACS_HLINE, self.win3_width - 2)
-
         # Update the log if necessary
         logsize_diff: int = self.game.logger.size - self.times_logged
         if logsize_diff > 0:
@@ -154,7 +157,7 @@ class GameView(View):
 
             # Truncate the log to only the newest entries that will fit in the view
             log_keys = list(self.visible_log.keys())
-            log_keys_to_remove = log_keys[:max(0, len(log_keys) - self.win3_height + self.chatwin_height + 4)]
+            log_keys_to_remove = log_keys[:max(0, len(log_keys) - self.win3_height + self.chatwin_height + 2)]
             for key in log_keys_to_remove:
                 del self.visible_log[key]
 
@@ -166,7 +169,18 @@ class GameView(View):
                 log_line += 1
 
         # Add chat prompt
-        self.win3.addstr(15, 2, "Say: ")
+        self.stdscr.addstr(self.chatwin_y, self.chatwin_x - 5, "Say: ")
+
+    def draw_chatwin_border(self):
+        # The chatwin is only 1 high, so the native curses border function doesn't like it.
+        # Draw the border manually with stdscr.
+        self.stdscr.hline(self.height - 1, 1, curses.A_HORIZONTAL, self.width - 2)
+        self.stdscr.vline(self.chatwin_y, 0, curses.A_VERTICAL, self.chatwin_height)
+        self.stdscr.vline(self.chatwin_y, self.width - 1, curses.A_VERTICAL, self.chatwin_height)
+        self.stdscr.addch(self.height - 1, 0, '└')
+        self.stdscr.addch(self.height - 1, self.width - 1, '┘')
+        self.stdscr.vline(self.chatwin_y - 1, 0, curses.A_VERTICAL, 1)
+        self.stdscr.vline(self.chatwin_y - 1, self.width - 1, curses.A_VERTICAL, 1)
 
     def coordinate_exists(self, y: int, x: int) -> bool:
         return 0 <= y < self.game.size[0] and 0 <= x < self.game.size[1]

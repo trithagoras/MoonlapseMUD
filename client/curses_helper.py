@@ -30,7 +30,7 @@ class TextBox:
     pretty cross platform in terms of input.
     """
 
-    def __init__(self, parent_window, y: int, x: int, width: int):
+    def __init__(self, parent_window, y: int, x: int, width: int, parentview=None, wins_to_update: Iterable = None):
         """
         Initialises the TextBox.
 
@@ -52,9 +52,14 @@ class TextBox:
         self.win.keypad(1)
 
         # Define the underlying Textbox and enable spaces to be stripped from the result
-        self.box: curses.textpad.Textbox = curses.textpad.Textbox(self.win)
+        self.box: ExtendedTextBox = ExtendedTextBox(self.win)
 
         self.value: str = ''
+
+        # Editing the textbox is blocking, so we might need to supply some windows needing updating
+        # each cycle through the edit loop.
+        self.parentview = parentview
+        self.wins_to_update = wins_to_update
 
     def __del__(self):
         self.box = None
@@ -86,9 +91,29 @@ class TextBox:
                 # Move cursor left
                 self.win.move(0, curs_x - 1)
 
-        self.value = self.box.edit(validator)
+        self.value = self.box.edit(validator, parentview=self.parentview, wins_to_update=self.wins_to_update)
         # I'm not sure why, but sometimes the value has a trailing space
         if len(self.value) > 0 and self.value[-1] == ' ':
             self.value = self.value[: -1]
 
         curses.curs_set(False)
+
+
+class ExtendedTextBox(curses.textpad.Textbox):
+    def edit(self, validate=None, parentview=None, wins_to_update: Iterable = None):
+        "Edit in the widget window and collect the results. Also updates any windows passed in to it each cycle."
+        while 1:
+            ch = self.win.getch()
+            if validate:
+                ch = validate(ch)
+            if not ch:
+                continue
+            if not self.do_command(ch):
+                break
+            if wins_to_update:
+                for win in wins_to_update:
+                    win.erase()
+                    parentview.draw()
+                    win.refresh()
+            self.win.refresh()
+        return self.gather()
