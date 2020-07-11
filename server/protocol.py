@@ -140,7 +140,7 @@ class Moonlapse(NetstringReceiver):
         If an error occurs at any point in the process, it is sent as a Deny Packet back 
         to the client with an appropriate error message.
         """
-        if self.username in self.users.keys():
+        if username in self.users.keys():
             self.sendPacket(packet.DenyPacket("You are already inhabiting this realm"))
             return
 
