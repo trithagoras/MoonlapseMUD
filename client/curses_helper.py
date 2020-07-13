@@ -61,10 +61,6 @@ class TextBox:
         self.parentview = parentview
         self.wins_to_update = wins_to_update
 
-    def __del__(self):
-        self.box = None
-        self.win = None
-
     def modal(self, first_key: Optional[int] = None) -> None:
         """
         Enters the editing loop for this TextBox. This sets the result of this TextBox which can be 
@@ -102,6 +98,7 @@ class TextBox:
 class ExtendedTextBox(curses.textpad.Textbox):
     def edit(self, validate=None, parentview=None, wins_to_update: Iterable = None):
         "Edit in the widget window and collect the results. Also updates any windows passed in to it each cycle."
+        self.win.nodelay(True)
         while 1:
             ch = self.win.getch()
             if validate:
@@ -116,4 +113,5 @@ class ExtendedTextBox(curses.textpad.Textbox):
                     parentview.draw()
                     win.refresh()
             self.win.refresh()
+        self.win.nodelay(False)
         return self.gather()
