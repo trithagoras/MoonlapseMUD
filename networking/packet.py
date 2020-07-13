@@ -280,6 +280,7 @@ def frombytes(data: bytes) -> Packet:
     except TypeError:
         print(f"TypeError: {specificPacketClassName} can't handle arguments {tuple(payloads)}.")
 
+
 def send(p: Packet, s: socket.socket) -> bytes:
     """
     Converts a Packet to bytes and sends it over a socket. Ensures all the data is sent and no more.

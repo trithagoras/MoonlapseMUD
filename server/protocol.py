@@ -168,16 +168,23 @@ class Moonlapse(NetstringReceiver):
         return self.database.password_correct(username, password)
 
     def _initialise_player(self, password_correct: List[Tuple[bool]], username: str) -> Deferred:
+        print(f"_initialise_player(password_correct={password_correct}, username={username})")
         if not password_correct[0][0]:
             raise EntryError("Incorrect password")
         
         self.sendPacket(packet.OkPacket())
-        
+
         self.username = username
-        
+
         self.users[self.username] = self
 
-        self.player = models.Player(len(self.users))
+        # Assign the lowest available ID to this new player
+        ids: List[int] = [-1 if protocol.player is None else protocol.player.get_id() for protocol in self.users.values()]
+        id = 0
+        while id in ids:
+            id += 1
+        self.player = models.Player(id)
+
         self.player.assign_username(self.username)
         
         return self.database.get_player_pos(self.player)

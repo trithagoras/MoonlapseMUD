@@ -50,4 +50,4 @@ class Player:
         return self._char
 
     def __repr__(self):
-        return f"Player: [{self.get_username()}]"
+        return f"Player: [username={self.get_username()}, id={self.get_id()}]"
