@@ -50,7 +50,14 @@ def main() -> None:
     """
     address = handle_arguments()
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.connect(address)
+        try:
+            s.connect(address)
+        except ConnectionRefusedError:
+            print(f"Connection to {address[0]}:{address[1]} refused. Is the server up?")
+            sys.exit(-1)
+        except Exception as e:
+            print(f"Could not establish a connection to {address[0]}:{address[1]}. {e}.")
+            sys.exit(-1)
         mainmenu = MainMenu(s)
         mainmenu.start()
 
