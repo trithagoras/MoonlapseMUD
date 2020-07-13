@@ -44,7 +44,7 @@ class View:
     def draw(self) -> None:
         # Max terminal size
         if self.stdscr.getmaxyx() < (self.height, self.width):
-            error: str = f"Window must be {self.height} rows x {self.width} cols"
+            error: str = f"Window must be {self.height} rows x {self.width + 1} cols"
             self.stdscr.addstr(0, (self.width - len(error)) // 2, error, curses.color_pair(4))
 
     def stop(self) -> None:
