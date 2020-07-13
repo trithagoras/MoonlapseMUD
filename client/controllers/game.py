@@ -46,7 +46,7 @@ class Game(Controller):
         while self._logged_in:
             # Get initial room data if not already done
             while not self.ready() and self._logged_in:
-                p: packet.Packet = packet.receive(self.s, debug=True)
+                p: packet.Packet = packet.receive(self.s)
 
                 if isinstance(p, packet.ServerRoomSizePacket):
                     self.size = [p.payloads[0].value, p.payloads[1].value]
@@ -58,7 +58,7 @@ class Game(Controller):
                     self.tick_rate = p.payloads[0].value
 
             # Get volatile data such as player positions, etc.
-            p: packet.Packet = packet.receive(self.s, debug=True)
+            p: packet.Packet = packet.receive(self.s)
 
             if isinstance(p, packet.ServerRoomPlayerPacket):
                 player: models.Player = p.payloads[0].value
@@ -81,12 +81,14 @@ class Game(Controller):
             elif isinstance(p, packet.ServerLogPacket):
                 self.logger.log(p.payloads[0].value)
 
-            elif isinstance(p, packet.LogoutPacket):
+            # Another player has logged out or disconnected so we remove them from the game.
+            elif isinstance(p, packet.LogoutPacket) or isinstance(p, packet.DisconnectPacket):
                 departed: models.Player = p.payloads[0].value
                 for oid, o in [(other.get_id(), other) for other in self.others]:
                     if oid == departed.get_id():
                         self.others.remove(o)
 
+            # Server sent back a goodbye packet indicating it's OK for us to exit the game.
             elif isinstance(p, packet.GoodbyePacket):
                 self.stop()
                 break
@@ -133,7 +135,7 @@ class Game(Controller):
 
         # Quit on Windows. TODO: Figure out how to make CTRL+C or ESC work.
         elif key == ord('q'):
-            packet.send(packet.LogoutPacket(), self.s)
+            packet.send(packet.LogoutPacket(self.player), self.s)
 
         return key
 

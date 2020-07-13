@@ -1,5 +1,6 @@
 from twisted.protocols.basic import NetstringReceiver
 from twisted.internet.defer import Deferred
+from twisted.python.failure import Failure
 
 from server.__main__ import MoonlapseServer
 from database import Database
@@ -45,6 +46,7 @@ class Moonlapse(NetstringReceiver):
         self.username: Optional[str] = None
         self.password: Optional[str] = None
         self.player: Optional[models.Player] = None
+        self.logged_in: bool = False
 
         # The state of the protocol which gets called as a function to process only the packets 
         # intended to be processed in the protocol's current state. Should only be called in the 
@@ -64,10 +66,11 @@ class Moonlapse(NetstringReceiver):
         servertime: str = time.strftime('%d %B, %Y %R %p', time.gmtime())
         self.sendPacket(packet.WelcomePacket(f"Welcome to MoonlapseMUD - Server time: {servertime}"))
 
-    def connectionLost(self, reason="unspecified") -> None:
+    def connectionLost(self, reason: Failure = None) -> None:
         super().connectionLost()
         self.state = self._DISCONNECT
-        self.processPacket(packet.DisconnectPacket(self.player))
+        if self.logged_in:
+            self.processPacket(packet.DisconnectPacket(self.player, reason=reason.getErrorMessage()))
 
     def stringReceived(self, string) -> None:
         """
@@ -198,18 +201,40 @@ class Moonlapse(NetstringReceiver):
                 protocol.processPacket(packet.HelloPacket(self.player))
 
         self.broadcast(f"{self.username} has arrived.")
+        self.logged_in = True
         self.state = self._PLAY
 
-    def logout(self, p):
-        self.sendPacket(packet.GoodbyePacket())
-        del self.users[self.username]
-        self.broadcast(f"{self.username} has departed.")
-        self.username = None
-        self.password = None
-        self.player = None
-        self.state = self._GETENTRY
+    def logout(self, p: packet.LogoutPacket):
+        player: models.Player = p.payloads[0].value
+        if player.get_username() == self.username:
+            # If the player to logout it ourselves, tell all other protocols
+            for protocol in self.users.values():
+                if protocol != self:
+                    protocol.processPacket(p)
+
+            self.sendPacket(packet.GoodbyePacket())
+            del self.users[self.username]
+            self.username = None
+            self.password = None
+            self.player = None
+            self.logged_in = False
+            self.state = self._GETENTRY
+
+        else:
+            # If the player to logout is not ourselves, handle things differently
+            self.logout_other(p)
 
     def disconnect_other(self, p: packet.DisconnectPacket):
+        other_player: Optional[models.Player] = p.payloads[0].value
+        other_name: str = other_player.get_username() if other_player else 'Someone'
+        reason: Optional[str] = p.payloads[1].value
+        self.sendPacket(packet.ServerLogPacket(f"{other_name} has disconnected{': ' + reason if reason else ''}."))
+        self.sendPacket(p)
+
+    def logout_other(self, p: packet.LogoutPacket):
+        other_player: Optional[models.Player] = p.payloads[0].value
+        other_name: str = other_player.get_username() if other_player else 'Someone'
+        self.sendPacket(packet.ServerLogPacket(f"{other_name} has departed..."))
         self.sendPacket(p)
 
     def _handle_registration(self, username: str, password: str) -> None:

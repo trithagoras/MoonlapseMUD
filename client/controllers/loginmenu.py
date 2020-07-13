@@ -41,7 +41,7 @@ class LoginMenu(Menu):
         packet.send(packet.LoginPacket(self.username, self.password), self.s)
         self.view.title = "Sent login request..."
         try:
-            response: Union[packet.OkPacket, packet.DenyPacket] = packet.receive(self.s, debug=True)
+            response: Union[packet.OkPacket, packet.DenyPacket] = packet.receive(self.s)
         except Exception as e:
             self.view.title = str(e)
         else:
