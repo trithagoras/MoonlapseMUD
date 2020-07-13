@@ -81,7 +81,7 @@ class Game(Controller):
             elif isinstance(p, packet.ServerLogPacket):
                 self.logger.log(p.payloads[0].value)
 
-            elif isinstance(p, packet.DisconnectPacket):
+            elif isinstance(p, packet.LogoutPacket):
                 departed: models.Player = p.payloads[0].value
                 for oid, o in [(other.get_id(), other) for other in self.others]:
                     if oid == departed.get_id():
