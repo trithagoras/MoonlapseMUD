@@ -108,10 +108,12 @@ class ExtendedTextBox(curses.textpad.Textbox):
             if not self.do_command(ch):
                 break
             if wins_to_update:
+                curses.curs_set(0)
                 for win in wins_to_update:
                     win.erase()
                     parentview.draw()
                     win.refresh()
+                curses.curs_set(1)
             self.win.refresh()
         self.win.nodelay(False)
         return self.gather()

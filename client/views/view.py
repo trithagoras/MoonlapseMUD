@@ -27,19 +27,19 @@ class View:
 
         curses.curs_set(False)
 
-        self._update_loop()
-
-    def _update_loop(self):
         while self.running:
-            self.stdscr.erase()
-            self.draw()
-            self.stdscr.refresh()
+            self._update_display()
 
             try:
                 self.controller.handle_input()
             except KeyboardInterrupt:
                 self.controller.stop()
                 self.stop()
+
+    def _update_display(self):
+        self.stdscr.erase()
+        self.draw()
+        self.stdscr.refresh()
 
     def draw(self) -> None:
         # Max terminal size
