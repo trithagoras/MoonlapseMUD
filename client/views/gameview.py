@@ -55,7 +55,7 @@ class GameView(View):
         super().draw()
 
         # Focus control labels
-        self.stdscr.hline(0, 0, curses.A_HORIZONTAL, self.width)
+        self.stdscr.hline(0, 0, curses.ACS_HLINE, self.width)
 
         control_title: str = ''
         control_string: str = ''
@@ -174,13 +174,13 @@ class GameView(View):
     def draw_chatwin_border(self):
         # The chatwin is only 1 high, so the native curses border function doesn't like it.
         # Draw the border manually with stdscr.
-        self.stdscr.hline(self.height - 1, 1, curses.A_HORIZONTAL, self.width - 2)
-        self.stdscr.vline(self.chatwin_y, 0, curses.A_VERTICAL, self.chatwin_height)
-        self.stdscr.vline(self.chatwin_y, self.width - 1, curses.A_VERTICAL, self.chatwin_height)
+        self.stdscr.hline(self.height - 1, 1, curses.ACS_HLINE, self.width - 2)
+        self.stdscr.vline(self.chatwin_y, 0, curses.ACS_VLINE, self.chatwin_height)
+        self.stdscr.vline(self.chatwin_y, self.width - 1, curses.ACS_VLINE, self.chatwin_height)
         self.stdscr.addch(self.height - 1, 0, '└')
         self.stdscr.addch(self.height - 1, self.width - 1, '┘')
-        self.stdscr.vline(self.chatwin_y - 1, 0, curses.A_VERTICAL, 1)
-        self.stdscr.vline(self.chatwin_y - 1, self.width - 1, curses.A_VERTICAL, 1)
+        self.stdscr.vline(self.chatwin_y - 1, 0, curses.ACS_VLINE, 1)
+        self.stdscr.vline(self.chatwin_y - 1, self.width - 1, curses.ACS_VLINE, 1)
 
     def coordinate_exists(self, y: int, x: int) -> bool:
         return 0 <= y < self.game.size[0] and 0 <= x < self.game.size[1]
