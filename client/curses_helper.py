@@ -70,29 +70,32 @@ class TextBox:
                           considered input to the TextBox (e.g. typing the first letter of a username).
         """
         self.win.clear()
-        curses.curs_set(True)
         self.win.move(0, 0)
         curs_x = self.win.getyx()[1]
+
+        curses.curs_set(1)
 
         if first_key is not None:
             if curses.ascii.isprint(first_key):
                 # Add first letter and move cursor right
                 self.win.addch(0, curs_x, chr(first_key))
-                self.win.move(0, curs_x + 1)
+                curs_x += 1
             elif first_key == curses.KEY_DC and len(self.value) > 0:
                 # Delete first letter and move cursor at beginning
                 self.win.addstr(0, 0, self.value[1:])
-                self.win.move(0, 0)
+                curs_x = self.win.getyx()[1]
             elif first_key == curses.KEY_LEFT:
                 # Move cursor left
-                self.win.move(0, curs_x - 1)
+                curs_x = max(0, curs_x - 1)
+
+            self.win.move(self.win.getyx()[0], curs_x)
 
         self.value = self.box.edit(validator, parentview=self.parentview, wins_to_update=self.wins_to_update)
         # I'm not sure why, but sometimes the value has a trailing space
         if len(self.value) > 0 and self.value[-1] == ' ':
             self.value = self.value[: -1]
 
-        curses.curs_set(False)
+        curses.curs_set(0)
 
 
 class ExtendedTextBox(curses.textpad.Textbox):
@@ -100,6 +103,7 @@ class ExtendedTextBox(curses.textpad.Textbox):
         "Edit in the widget window and collect the results. Also updates any windows passed in to it each cycle."
         self.win.nodelay(True)
         while 1:
+            curses.curs_set(1)
             ch = self.win.getch()
             if validate:
                 ch = validate(ch)
@@ -108,12 +112,11 @@ class ExtendedTextBox(curses.textpad.Textbox):
             if not self.do_command(ch):
                 break
             if wins_to_update:
-                curses.curs_set(0)
                 for win in wins_to_update:
                     win.erase()
                     parentview.draw()
+                    curses.curs_set(0)
                     win.refresh()
-                curses.curs_set(1)
             self.win.refresh()
         self.win.nodelay(False)
         return self.gather()
