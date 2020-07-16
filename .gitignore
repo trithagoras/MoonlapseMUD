@@ -1,4 +1,8 @@
-*.pyproj
-.vs/*
-*.log
 server/connectionstrings.json
+/packetdebug.txt
+*.pyc
+*.xml
+*.iml
+*.log
+.vs/*
+*.pyproj

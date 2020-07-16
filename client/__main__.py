@@ -1,6 +1,14 @@
+import socket
 import sys
 from typing import *
-from controller import MainMenu
+
+# Required to import top level modules
+from pathlib import Path
+file = Path(__file__).resolve()
+parent, root = file.parent, file.parents[1]
+sys.path.append(str(root))
+
+from client.controllers.mainmenu import MainMenu
 
 
 def handle_arguments() -> Tuple[str, int]:
@@ -19,18 +27,18 @@ def handle_arguments() -> Tuple[str, int]:
     :return: The hostname and/or port specified in the command line arguments, otherwise ('moonlapse.net', 8081).
     """
     hostname: str = 'moonlapse.net'
-    port: int = 8081
+    port: int = 42523
 
-    # sys.argv will return something like ['client', 'localhost', 8081]
+    # sys.argv will return something like ['client', 'localhost', 8123]
     n_args: int = len(sys.argv)
 
     if n_args not in (1, 2, 3):
-        print("Usage: client [hostname=moonlapse.net] [port=8081]", file=sys.stderr)
+        print("Usage: client [hostname=moonlapse.net] [port=8123]", file=sys.stderr)
         sys.exit(2)
     elif n_args >= 2:
         hostname = sys.argv[1]
     elif n_args == 3:
-        port = sys.argv[2]
+        port = int(sys.argv[2])
 
     return hostname, port
 
@@ -40,15 +48,18 @@ def main() -> None:
     The main entry point of the game. Starts a MainMenu object to connect to the specified remote server (specified in
     the command line arguments) to begin the game. Prints error details to stderr and exits if there was an exception.
     """
-    hostname, port = handle_arguments()
-
-    try:
-        mainmenu = MainMenu(hostname, port)
+    address = handle_arguments()
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        try:
+            s.connect(address)
+        except ConnectionRefusedError:
+            print(f"Connection to {address[0]}:{address[1]} refused. Is the server up?")
+            sys.exit(-1)
+        except Exception as e:
+            print(f"Could not establish a connection to {address[0]}:{address[1]}. {e}.")
+            sys.exit(-1)
+        mainmenu = MainMenu(s)
         mainmenu.start()
-
-    except Exception as e:
-        print(f"Error: Connection refused. {e}", file=sys.stderr)
-        sys.exit(1)
 
 
 if __name__ == '__main__':
