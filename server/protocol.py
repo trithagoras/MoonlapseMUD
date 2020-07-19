@@ -70,24 +70,26 @@ class Moonlapse(NetstringReceiver):
         asciilist = maps.ml2asciilist(self.ground_map_file)
         self.map_height = len(asciilist)
         self.map_width = len(asciilist[0])
-        self.ground_map_data: Dict[chr, List[List[int]]] = {}
+        self.ground_map_data: Dict[chr, Set[Tuple[int, int]]] = {}
         for y, row in enumerate(asciilist):
             for x, c in enumerate(row):
-                if c in self.ground_map_data.keys():
-                    self.ground_map_data[c].append([y, x])
-                else:
-                    self.ground_map_data[c] = [[y, x]]
+                if c != maps.NOTHING:
+                    if c in self.ground_map_data.keys():
+                        self.ground_map_data[c].add((y, x))
+                    else:
+                        self.ground_map_data[c] = {(y, x)}
 
 
         # Repeat for solid and roof map data
         asciilist = maps.ml2asciilist(self.solid_map_file)
-        self.solid_map_data: Dict[chr, List[List[int]]] = {}
+        self.solid_map_data: Dict[chr, Set[Tuple[int, int]]] = {}
         for y, row in enumerate(asciilist):
             for x, c in enumerate(row):
-                if c in self.solid_map_data.keys():
-                    self.solid_map_data[c].append([y, x])
-                else:
-                    self.solid_map_data[c] = [[y, x]]
+                if c != maps.NOTHING:
+                    if c in self.solid_map_data.keys():
+                        self.solid_map_data[c].add((y, x))
+                    else:
+                        self.solid_map_data[c] = {(y, x)}
 
     def connectionMade(self) -> None:
         super().connectionMade()
@@ -356,7 +358,10 @@ class Moonlapse(NetstringReceiver):
         elif isinstance(p, packet.MoveLeftPacket):
             dest[1] -= 1
 
-        if self._within_bounds(dest) and tuple(dest) not in self.solid_map_data.keys():
+        all_solid_coords = set()
+        for coords in self.solid_map_data.values():
+            all_solid_coords.update(coords)
+        if self._within_bounds(dest) and tuple(dest) not in all_solid_coords:
             self.player.set_position(dest)
             d: Deferred = self.database.update_player_pos(self.player, dest[0], dest[1])
 
