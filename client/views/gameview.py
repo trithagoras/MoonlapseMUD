@@ -1,6 +1,8 @@
 import curses
 import time
 import os
+import maps
+import random
 from typing import *
 from .view import View
 from ..curses_helper import TextBox
@@ -107,19 +109,42 @@ class GameView(View):
             for col in range(-sight_radius, sight_radius + 1):
                 player_pos = self.game.player.get_position()
                 pos = (player_pos[0] + row, player_pos[1] + col)
+                random.seed(hash(pos))
 
                 if self.coordinate_exists(*pos):
-                    is_wall: bool = list(pos) in self.game.walls
-                    is_player: bool = pos in [o.get_position() for o in self.game.others]
+                    is_player: bool = tuple(pos) in [o.get_position() for o in self.game.others]
 
-                    self.win1.addch(win1_hheight + row, win1_hwidth + col * 2,
-                                    '█' if is_wall
-                               else '☺' if is_player
-                               else '·'
-                    )
+                    # Materials
+                    for mattype in "ground", "solid":
+                        if self.is_material(pos, maps.STONE, mattype=mattype):
+                            self.win1.addch(win1_hheight + row, win1_hwidth + col * 2, random.choice(['·']), curses.color_pair(1))
+                        elif self.is_material(pos, maps.GRASS, mattype=mattype):
+                            self.win1.addch(win1_hheight + row, win1_hwidth + col * 2, random.choice([',', '`']), curses.color_pair(5))
+                        elif self.is_material(pos, maps.SAND, mattype=mattype):
+                            self.win1.addch(win1_hheight + row, win1_hwidth + col * 2, '~', curses.color_pair(7))
+                        elif self.is_material(pos, maps.WATER, mattype=mattype):
+                            self.win1.addch(win1_hheight + row, win1_hwidth + col * 2, '░', curses.color_pair(3))
+                        elif self.is_material(pos, maps.LEAF, mattype=mattype):
+                            self.win1.addch(win1_hheight + row, win1_hwidth + col * 2, random.choice(['╭', '╮', '╯', '╰']), curses.color_pair(5))
+                        elif self.is_material(pos, maps.COBBLESTONE, mattype=mattype):
+                            self.win1.addch(win1_hheight + row, win1_hwidth + col * 2, random.choice(['░']), curses.color_pair(1))
+                        elif self.is_material(pos, maps.WOOD, mattype=mattype):
+                            self.win1.addch(win1_hheight + row, win1_hwidth + col * 2, random.choice(['◍']), curses.color_pair(7))
+
+                    # Objects
+                    if is_player:
+                        self.win1.addch(win1_hheight + row, win1_hwidth + col * 2, '☺', curses.color_pair(6))
+
+
 
         # Draw player to centre of screen
         self.win1.addch(win1_hheight, win1_hwidth, '☻')
+
+    def is_material(self, pos: Tuple[int, int], material: chr, mattype: str) -> bool:
+        materials: Dict[chr, Set[Tuple[int, int]]] = self.game.ground_map_data if mattype == 'ground' else self.game.solid_map_data if mattype == 'solid' else None
+        if material in materials:
+            return pos in materials[material]
+        return False
 
     def draw_help_win(self):
         with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'assets', 'help.txt'), 'r') as helpfile:
@@ -128,7 +153,7 @@ class GameView(View):
                 self.win2.addstr(y, 2, line)
 
     def draw_status_win(self):
-        self.win2.addstr(1, 2, "coreyb65, Guardian of Forgotten Moor")
+        self.win2.addstr(1, 2, f"coreyb65, Guardian of Forgotten Moor")
         self.win2.addstr(3, 2, f"Level 15 {self.progress_bar(7, 10)} (7/10 skill levels to 16)")
 
         self.win2.addstr(5, 2, f"Vitality      31/31 {self.progress_bar(3, 10)} (3,000/10,000)")
