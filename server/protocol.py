@@ -10,8 +10,8 @@ from networking.logger import Log
 
 from typing import *
 import time
-import json
 import os
+import maps
 
 
 class Moonlapse(NetstringReceiver):
@@ -54,12 +54,40 @@ class Moonlapse(NetstringReceiver):
         # a packet.
         self.state: Callable = self._GETENTRY
 
-        # Load in the map file and convert it to palatable data type to be sent out to the client.
+        # Load in the map files and convert them to palatable data types to be sent out to the client.
         pwd: str = os.path.dirname(__file__)
-        room_data_filename: str = os.path.join(pwd, '..', 'maps', 'map.bmp.json')
-        self.room_data: Dict[str, object] = {}
-        with open(room_data_filename, 'r') as room_data_file:
-            self.room_data = json.load(room_data_file)
+        ground_map_fn: str = os.path.join(pwd, '..', 'maps', 'forest_ground.ml')
+        with open(ground_map_fn, 'r') as f:
+            self.ground_map_file = [line.strip('\n') for line in f.readlines()]
+
+        solid_map_fn: str = os.path.join(pwd, '..', 'maps', 'forest_solid.ml')
+        with open(solid_map_fn, 'r') as f:
+            self.solid_map_file = [line.strip('\n') for line in f.readlines()]
+
+        # Load the coordinates of each type of ground material into a dictionary
+        # Should be accessed like self.ground_map_data[maps.STONE] which will return all coordinates where
+        # stone is found.
+        asciilist = maps.ml2asciilist(self.ground_map_file)
+        self.map_height = len(asciilist)
+        self.map_width = len(asciilist[0])
+        self.ground_map_data: Dict[chr, List[List[int]]] = {}
+        for y, row in enumerate(asciilist):
+            for x, c in enumerate(row):
+                if c in self.ground_map_data.keys():
+                    self.ground_map_data[c].append([y, x])
+                else:
+                    self.ground_map_data[c] = [[y, x]]
+
+
+        # Repeat for solid and roof map data
+        asciilist = maps.ml2asciilist(self.solid_map_file)
+        self.solid_map_data: Dict[chr, List[List[int]]] = {}
+        for y, row in enumerate(asciilist):
+            for x, c in enumerate(row):
+                if c in self.solid_map_data.keys():
+                    self.solid_map_data[c].append([y, x])
+                else:
+                    self.solid_map_data[c] = [[y, x]]
 
     def connectionMade(self) -> None:
         super().connectionMade()
@@ -192,16 +220,16 @@ class Moonlapse(NetstringReceiver):
     def _establish_player_in_world(self, init_pos: List[Tuple[int]]) -> None:
         print(f"[{self.username}][{self.state.__name__}][{self.users.keys()}]: Got", init_pos)
         init_pos = init_pos[0]
-        self.player.assign_location(list(init_pos), self.room_data['walls'], *self.room_data['size'])
+        self.player.assign_location(list(init_pos), list(self.solid_map_data.keys()), self.map_height, self.map_width)
 
         if init_pos == (None, None):
             pos = self.player.get_position()
             self.database.update_player_pos(self.player, pos[0], pos[1])
 
-        self.sendPacket(packet.ServerRoomSizePacket(*self.room_data['size']))
-        self.sendPacket(packet.ServerRoomGeometryPacket(self.room_data['walls']))
-        self.sendPacket(packet.ServerRoomTickRatePacket(100))
-        self.sendPacket(packet.ServerRoomPlayerPacket(self.player))
+        self.sendPacket(packet.ServerGroundMapFilePacket(self.ground_map_file))
+        self.sendPacket(packet.ServerSolidMapFilePacket(self.solid_map_file))
+        self.sendPacket(packet.ServerTickRatePacket(100))
+        self.sendPacket(packet.ServerPlayerPacket(self.player))
 
         for protocol in self.users.values():
             if protocol != self:
@@ -330,18 +358,17 @@ class Moonlapse(NetstringReceiver):
         elif isinstance(p, packet.MoveLeftPacket):
             dest[1] -= 1
 
-        if self._within_bounds(dest) and dest not in self.room_data['walls']:
+        if self._within_bounds(dest) and tuple(dest) not in self.solid_map_data.keys():
             self.player.set_position(dest)
             d: Deferred = self.database.update_player_pos(self.player, dest[0], dest[1])
 
             for name, protocol in self.users.items():
-                protocol.sendPacket(packet.ServerRoomPlayerPacket(self.player))
+                protocol.sendPacket(packet.ServerPlayerPacket(self.player))
         else:
             self.sendPacket(packet.DenyPacket("can't move there"))
 
     def _within_bounds(self, coords: List[int]) -> bool:
-        max_height, max_width = self.room_data['size']
-        return 0 <= coords[0] < max_height and 0 <= coords[1] < max_width
+        return 0 <= coords[0] < self.map_height and 0 <= coords[1] < self.map_width
 
     def welcome(self, p: packet.HelloPacket):
         """
@@ -363,10 +390,10 @@ class Moonlapse(NetstringReceiver):
             return
 
         # Send the client player information for the newly connecting protocol
-        self.sendPacket(packet.ServerRoomPlayerPacket(new_player))
+        self.sendPacket(packet.ServerPlayerPacket(new_player))
         
         # Send the newly connecting protocol information for this protocol's player
-        new_protocol.sendPacket(packet.ServerRoomPlayerPacket(self.player))
+        new_protocol.sendPacket(packet.ServerPlayerPacket(self.player))
         print(f"[{self.player.get_username()}] Welcomed new player {new_player.get_username()}")
 
 

@@ -1,10 +1,10 @@
 import json
 import socket
 import traceback
-import threading
 
 from .payload import *
 from .models import *
+from typing.io import *
 
 
 class Packet:
@@ -193,7 +193,7 @@ class ServerRoomFullPacket(Packet):
         super().__init__()
 
 
-class ServerRoomPlayerPacket(Packet):
+class ServerPlayerPacket(Packet):
     """
     A packet sent from a protocol to a client containing an entire models.Player object.
     """
@@ -211,20 +211,23 @@ class HelloPacket(Packet):
         super().__init__(Payload(player))
 
 
-class ServerRoomGeometryPacket(Packet):
+class ServerGroundMapFilePacket(Packet):
     """
-    A packet sent from a protocol to its client describing the geometry of the room it's connected to.
-    This should be interpreted by the game client for drawing to the screen, etc.
-    Something like {
-        "walls": [[1, 2], [3, 4]],
-        "grass": [[2, 2], [4, 4], [4, 6]]
-    }
+    A packet sent from a protocol to its client describing the
     """
-    def __init__(self, geometry: Dict[str, List[List[int]]]):
-        super().__init__(Payload(geometry))
+    def __init__(self, mapfile: List[str]):
+        super().__init__(Payload(mapfile))
 
 
-class ServerRoomSizePacket(Packet):
+class ServerSolidMapFilePacket(Packet):
+    """
+    A packet sent from a protocol to its client describing the
+    """
+    def __init__(self, mapfile: List[str]):
+        super().__init__(Payload(mapfile))
+
+
+class ServerMapSizePacket(Packet):
     """
     A packet sent from a protocol to its client describing the height and width of the room it's connected 
     to. Ths should be interpreted by the game client for drawing to the screen, etc.
@@ -235,7 +238,7 @@ class ServerRoomSizePacket(Packet):
         super().__init__(pheight, pwidth)
 
 
-class ServerRoomTickRatePacket(Packet):
+class ServerTickRatePacket(Packet):
     """
     A packet sent from a protocol to its client describing the tick rate of the room it's connected to. This 
     should be interpreted by the game client for handling input and refreshing the screen, etc.

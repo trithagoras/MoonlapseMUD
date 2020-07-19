@@ -3,6 +3,7 @@ import curses.ascii
 import socket
 import threading
 import time
+import maps
 from typing import *
 from networking import packet
 from networking import models
@@ -19,7 +20,10 @@ class Game(Controller):
         # Game data
         self.player: Optional[models.Player] = None
         self.others: Set[models.Player] = set()
-        self.walls: Optional[List[List[int, int]]] = None
+        self.ground_map: Optional[bytes] = None
+        self.ground_map_data: Dict[chr, Set[Tuple[int, int]]] = {}
+        self.solid_map_data: Dict[chr, Set[Tuple[int, int]]] = {}
+        self.roof_map_data: Dict[chr, Set[Tuple[int, int]]] = {}
         self.size: Optional[Tuple[int, int]] = None
         self.tick_rate: Optional[int] = None
 
@@ -47,20 +51,19 @@ class Game(Controller):
             # Get initial room data if not already done
             while not self.ready() and self._logged_in:
                 p: packet.Packet = packet.receive(self.s)
-
-                if isinstance(p, packet.ServerRoomSizePacket):
-                    self.size = [p.payloads[0].value, p.payloads[1].value]
-                elif isinstance(p, packet.ServerRoomPlayerPacket):
+                if isinstance(p, packet.ServerPlayerPacket):
                     self.player = p.payloads[0].value
-                elif isinstance(p, packet.ServerRoomGeometryPacket):
-                    self.walls = p.payloads[0].value
-                elif isinstance(p, packet.ServerRoomTickRatePacket):
+                elif isinstance(p, packet.ServerGroundMapFilePacket):
+                    self.construct_map_data(p.payloads[0].value, mattype='ground')
+                elif isinstance(p, packet.ServerSolidMapFilePacket):
+                    self.construct_map_data(p.payloads[0].value, mattype='solid')
+                elif isinstance(p, packet.ServerTickRatePacket):
                     self.tick_rate = p.payloads[0].value
 
             # Get volatile data such as player positions, etc.
             p: packet.Packet = packet.receive(self.s)
 
-            if isinstance(p, packet.ServerRoomPlayerPacket):
+            if isinstance(p, packet.ServerPlayerPacket):
                 player: models.Player = p.payloads[0].value
                 pid: int = player.get_id()
 
@@ -92,6 +95,27 @@ class Game(Controller):
             elif isinstance(p, packet.GoodbyePacket):
                 self.stop()
                 break
+
+    def construct_map_data(self, map_file: List[str], mattype: str):
+        """Load the coordinates of each type of ground material into a dictionary
+           Should be accessed like self.ground_map_data[maps.STONE] which will return all coordinates where
+           stone is found."""
+        asciilist = maps.ml2asciilist(map_file)
+        self.size = len(asciilist), len(asciilist[0])
+        for y, row in enumerate(asciilist):
+            for x, c in enumerate(row):
+                if mattype == 'ground':
+                    if c in self.ground_map_data.keys():
+                        self.ground_map_data[c].add((y, x))
+                    else:
+                        self.ground_map_data[c] = {(y, x)}
+                elif mattype == 'solid':
+                    if c in self.solid_map_data.keys():
+                        self.solid_map_data[c].add((y, x))
+                    else:
+                        self.solid_map_data[c] = {(y, x)}
+                else:
+                    raise NotImplementedError("I need to rethink the construction of different types of map data")
 
     def handle_input(self) -> int:
         key = super().handle_input()
@@ -143,7 +167,7 @@ class Game(Controller):
         packet.send(packet.ChatPacket(message), self.s)
 
     def ready(self) -> bool:
-        return None not in (self.player, self.size, self.walls, self.tick_rate)
+        return False not in [bool(data) for data in (self.player, self.size, self.ground_map_data, self.tick_rate)]
 
     def stop(self) -> None:
         self._logged_in = False
