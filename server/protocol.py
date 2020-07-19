@@ -240,8 +240,8 @@ class Moonlapse(NetstringReceiver):
         self.state = self._PLAY
 
     def logout(self, p: packet.LogoutPacket):
-        player: models.Player = p.payloads[0].value
-        if player.get_username() == self.username:
+        username: str = p.payloads[0].value
+        if username == self.username:
             # If the player to logout it ourselves, tell all other protocols
             for protocol in self.users.values():
                 if protocol != self:
@@ -267,8 +267,7 @@ class Moonlapse(NetstringReceiver):
         self.sendPacket(p)
 
     def logout_other(self, p: packet.LogoutPacket):
-        other_player: Optional[models.Player] = p.payloads[0].value
-        other_name: str = other_player.get_username() if other_player else 'Someone'
+        other_name: str = p.payloads[0].value if p.payloads[0].value else 'Someone'
         self.sendPacket(packet.ServerLogPacket(f"{other_name} has departed..."))
         self.sendPacket(p)
 

@@ -86,9 +86,9 @@ class Game(Controller):
 
             # Another player has logged out or disconnected so we remove them from the game.
             elif isinstance(p, packet.LogoutPacket) or isinstance(p, packet.DisconnectPacket):
-                departed: models.Player = p.payloads[0].value
-                for oid, o in [(other.get_id(), other) for other in self.others]:
-                    if oid == departed.get_id():
+                username: str = p.payloads[0].value
+                for ouname, o in [(other.get_username(), other) for other in self.others]:
+                    if ouname == username:
                         self.others.remove(o)
 
             # Server sent back a goodbye packet indicating it's OK for us to exit the game.
@@ -159,7 +159,7 @@ class Game(Controller):
 
         # Quit on Windows. TODO: Figure out how to make CTRL+C or ESC work.
         elif key == ord('q'):
-            packet.send(packet.LogoutPacket(self.player), self.s)
+            packet.send(packet.LogoutPacket(self.player.get_username()), self.s)
 
         return key
 

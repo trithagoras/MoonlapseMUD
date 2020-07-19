@@ -106,8 +106,8 @@ class LoginPacket(Packet):
         super().__init__(pusername, ppassword)
 
 class LogoutPacket(Packet):
-    def __init__(self, player: Player):
-        super().__init__(Payload(player))
+    def __init__(self, username: str):
+        super().__init__(Payload(username))
 
 class RegisterPacket(Packet):
     """
