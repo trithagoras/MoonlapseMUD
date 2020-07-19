@@ -131,6 +131,10 @@ class GameView(View):
                         elif self.is_material(pos, maps.WOOD, mattype=mattype):
                             self.win1.addch(win1_hheight + row, win1_hwidth + col * 2, random.choice(['◍']), curses.color_pair(7))
 
+                    # Overrides: Enter in here if solid must look different from ground, for example
+                    if self.is_material(pos, maps.STONE, mattype='solid'):
+                        self.win1.addch(win1_hheight + row, win1_hwidth + col * 2, random.choice(['█']),curses.color_pair(1))
+
                     # Objects
                     if is_player:
                         self.win1.addch(win1_hheight + row, win1_hwidth + col * 2, '☺', curses.color_pair(6))
