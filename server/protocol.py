@@ -98,7 +98,7 @@ class Moonlapse(NetstringReceiver):
         super().connectionLost()
         self.state = self._DISCONNECT
         if self.logged_in:
-            self.processPacket(packet.DisconnectPacket(self.player, reason=reason.getErrorMessage()))
+            self.processPacket(packet.DisconnectPacket(self.username, reason=reason.getErrorMessage()))
 
     def stringReceived(self, string) -> None:
         """
@@ -260,8 +260,7 @@ class Moonlapse(NetstringReceiver):
             self.logout_other(p)
 
     def disconnect_other(self, p: packet.DisconnectPacket):
-        other_player: Optional[models.Player] = p.payloads[0].value
-        other_name: str = other_player.get_username() if other_player else 'Someone'
+        other_name: str = p.payloads[0].value if p.payloads[0].value else 'Someone'
         reason: Optional[str] = p.payloads[1].value
         self.sendPacket(packet.ServerLogPacket(f"{other_name} has disconnected{': ' + reason if reason else ''}."))
         self.sendPacket(p)

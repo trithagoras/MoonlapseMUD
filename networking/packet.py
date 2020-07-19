@@ -170,10 +170,10 @@ class DisconnectPacket(Packet):
     A packet sent to signify the client's connection has been lost. An optional reason
     can be supplied which could be displayed to other clients.
     """
-    def __init__(self, player: Player, reason: Optional[str] = None):
-        pplayer: Payload = Payload(player)
+    def __init__(self, username: str, reason: Optional[str] = None):
+        pusername: Payload = Payload(username)
         preason: Payload = Payload(reason)
-        super().__init__(pplayer, preason)
+        super().__init__(pusername, preason)
 
 
 class ServerLogPacket(Packet):
