@@ -1,6 +1,6 @@
 import curses
-
-from .view import View
+from curses_helper import color_addstr
+from .view import View, Color
 
 
 class MenuView(View):
@@ -12,7 +12,7 @@ class MenuView(View):
         super().draw()
         for i, menuitem in enumerate(self.controller.menu.keys()):
             selected: bool = i == self.controller.cursor
-            self.stdscr.addstr(6 + i * 3, 5, menuitem, curses.A_BOLD if selected else curses.A_DIM)
+            color_addstr(self.stdscr, 6 + i * 3, 5, menuitem, Color.WHITE, curses.A_BOLD if selected else curses.A_DIM)
 
         if self.title:
-            self.stdscr.addstr(2, (self.width - len(self.title)) // 2, self.title, curses.color_pair(2))
+            color_addstr(self.stdscr, 2, (self.width - len(self.title)) // 2, self.title, Color.CYAN, curses.A_UNDERLINE)

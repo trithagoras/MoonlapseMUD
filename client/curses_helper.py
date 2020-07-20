@@ -1,6 +1,28 @@
+import curses
 import curses.textpad
 import curses.ascii
 from typing import *
+from client.views import Color
+
+
+def color_addch(window: curses.window, y: int, x: int, ch: chr, colour: int, *attr):
+    window.attron(curses.color_pair(colour))
+    if attr:
+        window.attron(*attr)
+    window.addch(y, x, ch)
+    if attr:
+        window.attroff(*attr)
+    window.attron(curses.color_pair(Color.WHITE))
+
+
+def color_addstr(window: curses.window, y: int, x: int, string: str, colour: int, *attr):
+    window.attron(curses.color_pair(colour))
+    if attr:
+        window.attron(*attr)
+    window.addstr(y, x, string)
+    if attr:
+        window.attroff(*attr)
+    window.attron(curses.color_pair(Color.WHITE))
 
 
 def validator(key: int):

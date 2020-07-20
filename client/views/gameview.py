@@ -4,8 +4,9 @@ import os
 import maps
 import random
 from typing import *
-from .view import View
+from .view import View, Color
 from ..curses_helper import TextBox
+from ..curses_helper import color_addch
 
 
 class GameView(View):
@@ -114,35 +115,35 @@ class GameView(View):
                 if self.coordinate_exists(*pos):
                     is_player: bool = tuple(pos) in [o.get_position() for o in self.game.others]
 
+                    cy, cx = win1_hheight + row, win1_hwidth + col * 2
                     # Materials
                     for mattype in "ground", "solid":
                         if self.is_material(pos, maps.STONE, mattype=mattype):
-                            self.win1.addch(win1_hheight + row, win1_hwidth + col * 2, random.choice(['·']), curses.color_pair(1))
+                            color_addch(self.win1, cy, cx, random.choice(['·']), Color.WHITE)
+
                         elif self.is_material(pos, maps.GRASS, mattype=mattype):
-                            self.win1.addch(win1_hheight + row, win1_hwidth + col * 2, random.choice([',', '`']), curses.color_pair(5))
+                            color_addch(self.win1, cy, cx, random.choice([',', '`']), Color.GREEN)
                         elif self.is_material(pos, maps.SAND, mattype=mattype):
-                            self.win1.addch(win1_hheight + row, win1_hwidth + col * 2, '~', curses.color_pair(7))
+                            color_addch(self.win1, cy, cx, '~', Color.YELLOW)
                         elif self.is_material(pos, maps.WATER, mattype=mattype):
-                            self.win1.addch(win1_hheight + row, win1_hwidth + col * 2, '░', curses.color_pair(3))
+                            color_addch(self.win1, cy, cx, '░', Color.BLUE)
                         elif self.is_material(pos, maps.LEAF, mattype=mattype):
-                            self.win1.addch(win1_hheight + row, win1_hwidth + col * 2, random.choice(['╭', '╮', '╯', '╰']), curses.color_pair(5))
+                            color_addch(self.win1, cy, cx, random.choice(['╭', '╮', '╯', '╰']), Color.GREEN)
                         elif self.is_material(pos, maps.COBBLESTONE, mattype=mattype):
-                            self.win1.addch(win1_hheight + row, win1_hwidth + col * 2, random.choice(['░']), curses.color_pair(1))
+                            color_addch(self.win1, cy, cx, random.choice(['░']), Color.WHITE)
                         elif self.is_material(pos, maps.WOOD, mattype=mattype):
-                            self.win1.addch(win1_hheight + row, win1_hwidth + col * 2, random.choice(['◍']), curses.color_pair(7))
+                            color_addch(self.win1, cy, cx, random.choice(['◍']), Color.YELLOW)
 
                     # Overrides: Enter in here if solid must look different from ground, for example
                     if self.is_material(pos, maps.STONE, mattype='solid'):
-                        self.win1.addch(win1_hheight + row, win1_hwidth + col * 2, random.choice(['█']),curses.color_pair(1))
+                        color_addch(self.win1, cy, cx, random.choice(['█']), Color.WHITE)
 
                     # Objects
                     if is_player:
-                        self.win1.addch(win1_hheight + row, win1_hwidth + col * 2, '☺', curses.color_pair(6))
-
-
+                        color_addch(self.win1, cy, cx, '☺', Color.WHITE)
 
         # Draw player to centre of screen
-        self.win1.addch(win1_hheight, win1_hwidth, '☻')
+        color_addch(self.win1, win1_hheight, win1_hwidth, '☺', Color.WHITE)
 
     def is_material(self, pos: Tuple[int, int], material: chr, mattype: str) -> bool:
         materials: Dict[chr, Set[Tuple[int, int]]] = self.game.ground_map_data if mattype == 'ground' else self.game.solid_map_data if mattype == 'solid' else None

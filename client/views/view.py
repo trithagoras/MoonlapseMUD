@@ -1,4 +1,6 @@
 import curses
+from . import Color
+from curses_helper import color_addstr
 
 
 class View:
@@ -18,13 +20,13 @@ class View:
         curses.start_color()
 
         # Init color pairs
-        curses.init_pair(1, curses.COLOR_WHITE, curses.COLOR_BLACK)
-        curses.init_pair(2, curses.COLOR_BLACK, curses.COLOR_WHITE)
-        curses.init_pair(3, curses.COLOR_CYAN, curses.COLOR_BLACK)
-        curses.init_pair(4, curses.COLOR_RED, curses.COLOR_BLACK)
-        curses.init_pair(5, curses.COLOR_GREEN, curses.COLOR_BLACK)
-        curses.init_pair(6, curses.COLOR_MAGENTA, curses.COLOR_BLACK)
-        curses.init_pair(7, curses.COLOR_YELLOW, curses.COLOR_BLACK)
+        curses.init_pair(Color.WHITE, curses.COLOR_WHITE, curses.COLOR_BLACK)
+        curses.init_pair(Color.CYAN, curses.COLOR_CYAN, curses.COLOR_BLACK)
+        curses.init_pair(Color.RED, curses.COLOR_RED, curses.COLOR_BLACK)
+        curses.init_pair(Color.GREEN, curses.COLOR_GREEN, curses.COLOR_BLACK)
+        curses.init_pair(Color.MAGENTA, curses.COLOR_MAGENTA, curses.COLOR_BLACK)
+        curses.init_pair(Color.YELLOW, curses.COLOR_YELLOW, curses.COLOR_BLACK)
+        curses.init_pair(Color.BLUE, curses.COLOR_BLUE, curses.COLOR_BLACK)
 
         curses.curs_set(False)
 
@@ -46,7 +48,7 @@ class View:
         # Max terminal size
         if self.stdscr.getmaxyx() < (self.height, self.width):
             error: str = f"Window must be {self.height} rows x {self.width + 1} cols"
-            self.stdscr.addstr(0, (self.width - len(error)) // 2, error, curses.color_pair(4))
+            color_addstr(self.stdscr, 0, (self.width - len(error)) // 2, error, Color.RED)
 
     def stop(self) -> None:
         self.running = False

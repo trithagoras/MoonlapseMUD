@@ -1,7 +1,7 @@
 import curses
 import curses.ascii
 import os
-from client.views import View
+from client.views.view import View
 
 
 class Controller:

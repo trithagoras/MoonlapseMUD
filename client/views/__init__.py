@@ -1,5 +1,11 @@
-from .gameview import GameView
-from .loginview import LoginView
-from .menuview import MenuView
-from .registerview import RegisterView
-from .view import View
+import enum
+
+
+class Color(enum.IntEnum):
+    CYAN = 1
+    RED = 2
+    GREEN = 3
+    WHITE = 4
+    MAGENTA = 5
+    YELLOW = 6
+    BLUE = 7
