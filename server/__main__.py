@@ -1,6 +1,7 @@
 from twisted.internet.protocol import Factory
 from twisted.internet import reactor
 from typing import *
+import os
 
 # Required to import from shared modules
 import sys
@@ -15,7 +16,9 @@ from server import protocol
 
 class MoonlapseServer(Factory):
     def __init__(self):
-        self.database: database.Database = database.Database("./server/connectionstrings.json")
+        pwd: str = os.path.dirname(__file__)
+        connectinstringspath: str = os.path.join(pwd, 'connectionstrings.json')
+        self.database: database.Database = database.Database(connectinstringspath)
         self.database.connect()
         self.users: Dict[str, protocol.Moonlapse] = {}
 
