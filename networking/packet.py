@@ -1,10 +1,10 @@
 import json
 import socket
 import traceback
+import inspect
 
 from .payload import *
 from .models import *
-from typing.io import *
 
 
 class Packet:
@@ -261,15 +261,37 @@ def frombytes(data: bytes) -> Packet:
     obj_dict: Dict[str, str] = json.loads(data)
 
     action: Optional[str] = None
-    payloads: List[Optional[Payload]] = []
+    payloads: List[Optional[Any]] = []
     for key in obj_dict:
         value: str = obj_dict[key]
         if key == 'a':
             action = value
+
         elif key[0] == 'p':
             index: int = int(key[1:])
-            payloadbytes = bytes.fromhex(value)
-            payloads.insert(index, pickle.loads(payloadbytes))
+
+            attrs = json.loads(value)
+
+            if isinstance(attrs, dict):
+                classkey = attrs.pop('classkey')
+                constructor = globals()[classkey]
+                constructor_sig_args = list(inspect.signature(constructor).parameters.values())
+
+                constructor_args = []
+                for k, v in attrs.items():
+                    if k in [p.name for p in constructor_sig_args]:
+                        p = [p for p in constructor_sig_args if p.name == k][0]
+                        if p.default is p.empty:
+                            constructor_args.append(v)
+
+                value = constructor(*constructor_args)
+                for k, v in attrs.items():
+                    setattr(value, k, v)
+
+            else:
+                value = attrs
+
+            payloads.insert(index, value)
     
     # Use reflection to construct the specific packet type we're looking for
     specificPacketClassName: str = action
