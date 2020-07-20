@@ -261,49 +261,26 @@ def frombytes(data: bytes) -> Packet:
     obj_dict: Dict[str, str] = json.loads(data)
 
     action: Optional[str] = None
-    payloads: List[Optional[Any]] = []
-    for key in obj_dict:
-        value: str = obj_dict[key]
+    payloads_values: List[Optional[Any]] = []
+    for key, value in obj_dict.items():
         if key == 'a':
             action = value
 
         elif key[0] == 'p':
             index: int = int(key[1:])
-
-            attrs = json.loads(value)
-
-            if isinstance(attrs, dict):
-                classkey = attrs.pop('classkey')
-                constructor = globals()[classkey]
-                constructor_sig_args = list(inspect.signature(constructor).parameters.values())
-
-                constructor_args = []
-                for k, v in attrs.items():
-                    if k in [p.name for p in constructor_sig_args]:
-                        p = [p for p in constructor_sig_args if p.name == k][0]
-                        if p.default is p.empty:
-                            constructor_args.append(v)
-
-                value = constructor(*constructor_args)
-                for k, v in attrs.items():
-                    setattr(value, k, v)
-
-            else:
-                value = attrs
-
-            payloads.insert(index, value)
+            payloads_values.insert(index, Payload.deserialize(value).value)
     
     # Use reflection to construct the specific packet type we're looking for
     specificPacketClassName: str = action
     try:
         constructor: Type = globals()[specificPacketClassName]
-        rPacket = constructor(*tuple(payloads))
+        rPacket = constructor(*payloads_values)
         return rPacket
     except KeyError:
         print(f"KeyError: {specificPacketClassName} is not a valid packet name. Stacktrace: ")
         print(traceback.format_exc())
     except TypeError:
-        print(f"TypeError: {specificPacketClassName} can't handle arguments {tuple(payloads)}.")
+        print(f"TypeError: {specificPacketClassName} can't handle arguments {tuple(payloads_values)}.")
 
 
 def send(p: Packet, s: socket.socket) -> bytes:

@@ -3,8 +3,8 @@ from typing import *
 
 
 class Player:
-    def __init__(self, _id: int):
-        self._id: int = _id
+    def __init__(self, player_id: int):
+        self._id: int = player_id
 
         self._username: Optional[str] = None
         self._position: Optional[List[int]] = None
