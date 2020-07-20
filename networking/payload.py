@@ -1,5 +1,7 @@
 from typing import *
-import pickle
+import json
+import inspect
+from .models import *
 
 
 class Payload:
@@ -7,10 +9,49 @@ class Payload:
         self.value: Any = value
 
     def serialize(self):
-        return pickle.dumps(self.value).hex()
+        def default(o):
+            if hasattr(o, '__dict__'):
+                d = o.__dict__
+                o['classkey'] = o.__class__.__name__
+                return d
+            else:
+                return o
+
+        if hasattr(self.value, '__dict__'):
+            data = json.dumps(self.value.__dict__, default=default, separators=(',', ': '))
+            data = f'{data[:1]}"classkey":"{self.value.__class__.__name__}",{data[1:]}'
+            return data
+        else:
+            return json.dumps(self.value, default=default, separators=(',', ': '))
 
     def __repr__(self):
         return f"(Payload: {self.value})"
 
     def __eq__(self, obj):
         return isinstance(obj, Payload) and obj.value == self.value
+
+    @staticmethod
+    def deserialize(serialized: str) -> 'Payload':
+        attrs = json.loads(serialized)
+
+        if isinstance(attrs, dict):
+            # Use reflection to construct the specific payload type we're looking for
+            classkey: str = attrs.pop('classkey')
+            constructor: Type = globals()[classkey]
+            required_params = list(inspect.signature(constructor).parameters.values())
+
+            # TODO: Remember this might cause unexpected bugs if constructors need to do something meaningful with a
+            #       non-null parameter
+            constructor_args = []
+            for p in required_params:
+                if p.default is p.empty:
+                    constructor_args.append(None)
+
+            value = constructor(*constructor_args)
+            for k, v in attrs.items():
+                setattr(value, k, v)
+
+        else:
+            value = attrs
+
+        return Payload(value)

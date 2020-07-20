@@ -1,14 +1,14 @@
 import random
 from typing import *
 
+
 class Player:
-    def __init__(self, player_id):
+    def __init__(self, player_id: int):
+        self._id: int = player_id
+
         self._username: Optional[str] = None
         self._position: Optional[List[int]] = None
-
-        self._id: Optional[int] = None
         self._char: Optional[chr] = None
-        self._assign_id(player_id)
 
     def ready(self) -> bool:
         return None not in (self._username, self._position, self._id, self._char)
