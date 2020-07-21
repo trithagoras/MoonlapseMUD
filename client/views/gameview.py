@@ -113,43 +113,40 @@ class GameView(View):
                 random.seed(hash(pos))
 
                 if self.coordinate_exists(*pos):
-                    is_player: bool = tuple(pos) in [o.get_position() for o in self.game.others]
-
                     cy, cx = win1_hheight + row, win1_hwidth + col * 2
-                    # Materials
-                    for mattype in "ground", "solid":
-                        if self.is_material(pos, maps.STONE, mattype=mattype):
-                            color_addch(self.win1, cy, cx, random.choice(['·']), Color.WHITE)
-
-                        elif self.is_material(pos, maps.GRASS, mattype=mattype):
+                    for map_data in (self.game.ground_map_data, self.game.solid_map_data, self.game.roof_map_data):
+                        if pos not in map_data:
+                            continue
+                        c = map_data[pos]
+                        if c == maps.STONE:
+                            color_addch(self.win1, cy, cx, '·', Color.WHITE)
+                        elif c == maps.GRASS:
                             color_addch(self.win1, cy, cx, random.choice([',', '`']), Color.GREEN)
-                        elif self.is_material(pos, maps.SAND, mattype=mattype):
+                        elif c == maps.SAND:
                             color_addch(self.win1, cy, cx, '~', Color.YELLOW)
-                        elif self.is_material(pos, maps.WATER, mattype=mattype):
+                        elif c == maps.WATER:
                             color_addch(self.win1, cy, cx, '░', Color.BLUE)
-                        elif self.is_material(pos, maps.LEAF, mattype=mattype):
+                        elif c == maps.LEAF:
                             color_addch(self.win1, cy, cx, random.choice(['╭', '╮', '╯', '╰']), Color.GREEN)
-                        elif self.is_material(pos, maps.COBBLESTONE, mattype=mattype):
-                            color_addch(self.win1, cy, cx, random.choice(['░']), Color.WHITE)
-                        elif self.is_material(pos, maps.WOOD, mattype=mattype):
-                            color_addch(self.win1, cy, cx, random.choice(['◍']), Color.YELLOW)
+                        elif c == maps.COBBLESTONE:
+                            color_addch(self.win1, cy, cx, '░', Color.WHITE)
+                        elif c == maps.WOOD:
+                            color_addch(self.win1, cy, cx, '◍', Color.YELLOW)
 
                     # Overrides: Enter in here if solid must look different from ground, for example
-                    if self.is_material(pos, maps.STONE, mattype='solid'):
-                        color_addch(self.win1, cy, cx, random.choice(['█']), Color.WHITE)
+                    map_data = self.game.solid_map_data
+                    if pos in map_data:
+                        c = map_data[pos]
+                        if c == maps.STONE:
+                            color_addch(self.win1, cy, cx, '█', Color.WHITE)
 
                     # Objects
+                    is_player: bool = pos in [o.get_position() for o in self.game.others]
                     if is_player:
                         color_addch(self.win1, cy, cx, '☺', Color.WHITE)
 
         # Draw player to centre of screen
         color_addch(self.win1, win1_hheight, win1_hwidth, '☺', Color.WHITE)
-
-    def is_material(self, pos: Tuple[int, int], material: chr, mattype: str) -> bool:
-        materials: Dict[chr, Set[Tuple[int, int]]] = self.game.ground_map_data if mattype == 'ground' else self.game.solid_map_data if mattype == 'solid' else None
-        if material in materials:
-            return pos in materials[material]
-        return False
 
     def draw_help_win(self):
         with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'assets', 'help.txt'), 'r') as helpfile:
@@ -158,7 +155,7 @@ class GameView(View):
                 self.win2.addstr(y, 2, line)
 
     def draw_status_win(self):
-        self.win2.addstr(1, 2, f"coreyb65, Guardian of Forgotten Moor")
+        self.win2.addstr(1, 2, f"{self.game.player.get_username()}, Guardian of Forgotten Moor")
         self.win2.addstr(3, 2, f"Level 15 {self.progress_bar(7, 10)} (7/10 skill levels to 16)")
 
         self.win2.addstr(5, 2, f"Vitality      31/31 {self.progress_bar(3, 10)} (3,000/10,000)")

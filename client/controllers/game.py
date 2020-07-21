@@ -21,9 +21,9 @@ class Game(Controller):
         self.player: Optional[models.Player] = None
         self.others: Set[models.Player] = set()
         self.ground_map: Optional[bytes] = None
-        self.ground_map_data: Dict[chr, Set[Tuple[int, int]]] = {}
-        self.solid_map_data: Dict[chr, Set[Tuple[int, int]]] = {}
-        self.roof_map_data: Dict[chr, Set[Tuple[int, int]]] = {}
+        self.ground_map_data: Dict[Tuple[int, int], chr] = {}
+        self.solid_map_data: Dict[Tuple[int, int], chr] = {}
+        self.roof_map_data: Dict[Tuple[int, int], chr] = {}
         self.size: Optional[Tuple[int, int]] = None
         self.tick_rate: Optional[int] = None
 
@@ -105,15 +105,9 @@ class Game(Controller):
         for y, row in enumerate(asciilist):
             for x, c in enumerate(row):
                 if mattype == 'ground':
-                    if c in self.ground_map_data.keys():
-                        self.ground_map_data[c].add((y, x))
-                    else:
-                        self.ground_map_data[c] = {(y, x)}
+                    self.ground_map_data[(y, x)] = c
                 elif mattype == 'solid':
-                    if c in self.solid_map_data.keys():
-                        self.solid_map_data[c].add((y, x))
-                    else:
-                        self.solid_map_data[c] = {(y, x)}
+                    self.solid_map_data[(y, x)] = c
                 else:
                     raise NotImplementedError("I need to rethink the construction of different types of map data")
 
