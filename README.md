@@ -1,4 +1,5 @@
 # ![MoonlapseMUD Logo](https://i.imgur.com/Ie6YZ4v.png)
+![Deploy MoonlapseMUD on production server](https://github.com/trithagoras/MoonlapseMUD/workflows/Deploy%20MoonlapseMUD%20on%20production%20server/badge.svg)
 
 Welcome to Moonlapse MUD: an open-source, multi-user dungeon designed to play directly in any terminal.
 
