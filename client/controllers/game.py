@@ -20,7 +20,7 @@ class Game(Controller):
 
         # Game data
         self.player: Optional[models.Player] = None
-        self.objects_in_view: Set[Any] = set()
+        self.visible_users: Dict[str, Tuple[int, int]] = {}
         self.ground_map: Optional[bytes] = None
         self.size: Optional[Tuple[int, int]] = None
         self.tick_rate: Optional[int] = None
@@ -54,7 +54,9 @@ class Game(Controller):
             while not self.ready() and self._logged_in:
                 p: packet.Packet = packet.receive(self.s)
                 if isinstance(p, packet.ServerPlayerPacket):
-                    self.player_exchange(p.payloads[0].value)
+                    self.player = p.payloads[0].value
+                elif isinstance(p, packet.ServerUserPositionPacket):
+                    self.user_exchange(p.payloads[0].value, p.payloads[1].value)
                 elif isinstance(p, packet.ServerGroundMapFilePacket):
                     self.construct_map_data(p.payloads[0].value, mattype='ground')
                 elif isinstance(p, packet.ServerSolidMapFilePacket):
@@ -65,8 +67,8 @@ class Game(Controller):
             # Get volatile data such as player positions, etc.
             p: packet.Packet = packet.receive(self.s)
 
-            if isinstance(p, packet.ServerPlayerPacket):
-                self.player_exchange(p.payloads[0].value)
+            if isinstance(p, packet.ServerUserPositionPacket):
+                self.user_exchange(p.payloads[0].value, tuple(p.payloads[1].value))  # Can't receive tuples as JSON
 
             elif isinstance(p, packet.ServerLogPacket):
                 self.logger.log(p.payloads[0].value)
@@ -74,26 +76,21 @@ class Game(Controller):
             # Another player has logged out or disconnected so we remove them from the game.
             elif isinstance(p, packet.LogoutPacket) or isinstance(p, packet.DisconnectPacket):
                 username: str = p.payloads[0].value
-                for obj in self.objects_in_view:
-                    if isinstance(obj, models.Player) and obj.get_username() == username and obj in self.objects_in_view:
-                        self.objects_in_view.remove(obj)
-                        break
+                if username in self.visible_users:
+                    self.visible_users.pop(username)
 
             # Server sent back a goodbye packet indicating it's OK for us to exit the game.
             elif isinstance(p, packet.GoodbyePacket):
                 self.stop()
                 break
 
-    def player_exchange(self, other_player: models.Player):
-        # If the received player is ourselves, update our player
-        if other_player.get_username() == self.username:
-            self.player = other_player
+    def user_exchange(self, username: str, position: Tuple[int, int]):
+        # If the received username is ourselves, update ourself
+        if username == self.username:
+            self.player.set_position(list(position))
 
-        # If the received player is somebody else, either update the other player or add a new one in
-        else:
-            if other_player in self.objects_in_view:
-                self.objects_in_view.remove(other_player)
-            self.objects_in_view.add(other_player)
+        # If the received player is somebody else, either update the other user position or add a new one in
+        self.visible_users[username] = position
 
     def construct_map_data(self, map_file: List[str], mattype: str):
         """Load the coordinates of each type of ground material into a dictionary

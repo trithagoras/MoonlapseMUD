@@ -199,6 +199,14 @@ class ServerPlayerPacket(Packet):
         super().__init__(Payload(player))
 
 
+class ServerUserPositionPacket(Packet):
+    """
+    A packet sent from a protocol to a client containing a username and the associated player position.
+    """
+    def __init__(self, username: str, position: Tuple[int, int]):
+        super().__init__(Payload(username), Payload(position))
+
+
 class ServerGroundMapFilePacket(Packet):
     """
     A packet sent from a protocol to its client describing the

@@ -54,7 +54,7 @@ class Moonlapse(NetstringReceiver):
         self.username: Optional[str] = None
         self.password: Optional[str] = None
         self.player: Optional[models.Player] = None
-        self.players_visible_objects: List[Any] = []
+        self.players_visible_users: Dict[str, Tuple[int, int]] = {}
         self.logged_in: bool = False
 
         # The state of the protocol which gets called as a function to process only the packets 
@@ -139,8 +139,8 @@ class Moonlapse(NetstringReceiver):
         """
         if isinstance(p, packet.MovePacket):
             self.move(p)
-        elif isinstance(p, packet.ServerPlayerPacket):
-            self.player_exchange(p)
+        elif isinstance(p, packet.ServerUserPositionPacket):
+            self.user_exchange(p)
         elif isinstance(p, packet.ChatPacket):
             self.chat(p)
         elif isinstance(p, packet.LogoutPacket):
@@ -211,10 +211,10 @@ class Moonlapse(NetstringReceiver):
         
         return self.database.get_player_pos(self.player)
 
-    def _establish_player_in_world(self, init_pos: List[Tuple[int]]) -> None:
+    def _establish_player_in_world(self, init_pos: List[Tuple[float]]) -> None:
         print(f"[{self.username}][{self.state.__name__}][{self.users.keys()}]: Got", init_pos)
-        init_pos = init_pos[0]
-        self.player.assign_location(list(init_pos), list(self.solid_map_data.values()), self.map_height, self.map_width)
+        init_pos = (int(init_pos[0][0]), int(init_pos[0][1]))
+        self.player.assign_location(init_pos, list(self.solid_map_data.values()), self.map_height, self.map_width)
         self.player.set_view_radius(10)
 
         if init_pos == (None, None):
@@ -224,9 +224,10 @@ class Moonlapse(NetstringReceiver):
         self.sendPacket(packet.ServerGroundMapFilePacket(self.ground_map_file))
         self.sendPacket(packet.ServerSolidMapFilePacket(self.solid_map_file))
         self.sendPacket(packet.ServerTickRatePacket(100))
+        self.sendPacket(packet.ServerPlayerPacket(self.player))
 
         self.state = self._PLAY
-        self.broadcast(packet.ServerPlayerPacket(self.player))
+        self.broadcast(packet.ServerUserPositionPacket(self.username, self.player.get_position()), excluding=(self.username,))
         self.broadcast(packet.ServerLogPacket(f"{self.username} has arrived."))
         self.logged_in = True
 
@@ -320,10 +321,7 @@ class Moonlapse(NetstringReceiver):
         """
         print(f"[{self.username}][{self.state.__name__}][{self.users.keys()}]: Broadcasting {packets} to {including if including else 'everyone'} except {excluding}")
 
-        sendto: Dict[str, 'Moonlapse'] = self.users
-        for username in excluding:
-            sendto.pop(username)
-
+        sendto: Dict[str, 'Moonlapse'] = {u: p for u, p in self.users.items() if u not in excluding}
         if including:
             sendto = {k: v for k, v in sendto.items() if k in including}
 
@@ -368,33 +366,33 @@ class Moonlapse(NetstringReceiver):
             self.player.set_position(dest)
             self.database.update_player_pos(self.player, dest[0], dest[1])
 
-            usernames_in_view: Tuple(str) = self.get_usernames_in_view()
+            current_usernames_in_view: Tuple[str] = self.get_usernames_in_view()
 
             # For players who were previously in our view but aren't any more, tell them to remove us from their view
             # Also remove them from our view
-            for obj in reversed(self.players_visible_objects):
-                if isinstance(obj, models.Player) and obj.get_username() not in usernames_in_view:
-                    fake_player: models.Player = models.Player(self.username)
-                    fake_player.set_position([-1, -1])
-                    self.broadcast(packet.ServerPlayerPacket(fake_player), including=(obj.get_username(),))
-                    self.players_visible_objects.remove(obj)
+            for old_username_in_view in list(self.players_visible_users.keys()):    # We might change the dict's size during iteration so better convert it to a list
+                if old_username_in_view not in current_usernames_in_view:
+                    self.broadcast(packet.ServerUserPositionPacket(self.username, (-1, -1)), including=(old_username_in_view,))
+                    self.players_visible_users.pop(old_username_in_view)
 
             # Tell everyone in view our position has updated or we have entered their view
-            self.broadcast(packet.ServerPlayerPacket(self.player), including=usernames_in_view)
+            self.broadcast(packet.ServerUserPositionPacket(self.username, self.player.get_position()), including=current_usernames_in_view)
 
         else:
             self.sendPacket(packet.DenyPacket("can't move there"))
 
-    def player_exchange(self, p: packet.ServerPlayerPacket):
+    def user_exchange(self, p: packet.ServerUserPositionPacket):
+        # We can't send or receive tuples as JSON so convert it when expecting
+        p = packet.ServerUserPositionPacket(p.payloads[0].value, tuple(p.payloads[1].value))
+
         self.sendPacket(p)
 
-        other: models.Player = p.payloads[0].value
-        if other not in self.players_visible_objects:
-            self.players_visible_objects.append(other)
+        other_username: str = p.payloads[0].value
+        if other_username not in self.players_visible_users:
+            self.players_visible_users[other_username] = p.payloads[1].value
 
-            other_username: str = other.get_username()
             if other_username != self.username:
-                self.broadcast(packet.ServerPlayerPacket(self.player), including=(other_username,))
+                self.broadcast(packet.ServerUserPositionPacket(self.username, self.player.get_position()), including=(other_username,))
 
     def get_usernames_in_view(self) -> Tuple[str]:
         return tuple([username for username in self.users if within_bounds(

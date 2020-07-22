@@ -105,10 +105,10 @@ class GameView(View):
     def draw_map(self):
         view_radius = self.game.player.get_view_radius()
         win1_hwidth, win1_hheight = self.win1_width // 2, self.win1_height // 2
+        player_pos = self.game.player.get_position()
 
         for row in range(-view_radius, view_radius + 1):
             for col in range(-view_radius, view_radius + 1):
-                player_pos = self.game.player.get_position()
                 pos = (player_pos[0] + row, player_pos[1] + col)
                 random.seed(hash(pos))
 
@@ -141,11 +141,10 @@ class GameView(View):
                             color_addch(self.win1, cy, cx, '█', Color.WHITE)
 
                     # Objects
-                    for obj in self.game.objects_in_view:
-                        if pos == obj.get_position():
-                            color_addch(self.win1, cy, cx, '☺', Color.WHITE)
+                    if pos in self.game.visible_users.values():
+                        color_addch(self.win1, cy, cx, '☺', Color.WHITE)
 
-        # Draw player to centre of screen
+        # Draw player in middle of screen
         color_addch(self.win1, win1_hheight, win1_hwidth, '☺', Color.WHITE)
 
     def draw_help_win(self):

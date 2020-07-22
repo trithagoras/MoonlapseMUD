@@ -1,32 +1,31 @@
 import random
 from typing import *
-import copy
 
 
 class Player:
     def __init__(self, username: str):
         self._username: str = username
-        self._position: Optional[List[int]] = None
-        self._char: Optional[chr] = None
+        self._position: Optional[Tuple[int, int]] = None
+        self._char: chr = '@'
         self._view_radius: Optional[int] = None
 
     def ready(self) -> bool:
-        return None not in (self._username, self._position, self._id, self._char)
+        return None not in (self._username, self._position, self._char)
 
-    def assign_location(self, position: List[int], walls: List[Tuple[int, int]], max_height: int, max_width: int) -> None:
-        if position == [None, None]:
+    def assign_location(self, position: Tuple[int, int], walls: List[Tuple[int, int]], max_height: int, max_width: int) -> None:
+        if position == (None, None):
             while True:
-                self._position = [random.randint(1, max_height), random.randint(1, max_width)]
-                if tuple(self._position) not in walls:
+                self._position = random.randint(1, max_height), random.randint(1, max_width)
+                if self._position not in walls:
                     break
         else:
-            self._position = [position[0], position[1]]
+            self._position = (position[0], position[1])
 
     def get_username(self) -> str:
         return self._username
 
     def get_position(self) -> Tuple[int, int]:
-        return tuple(self._position)
+        return self._position
 
     def set_position(self, destination: List[int]) -> None:
         self._position = destination
