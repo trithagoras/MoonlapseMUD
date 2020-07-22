@@ -1,4 +1,3 @@
-from typing import *
 import json
 import inspect
 from .models import *

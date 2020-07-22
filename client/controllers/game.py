@@ -19,13 +19,14 @@ class Game(Controller):
 
         # Game data
         self.player: Optional[models.Player] = None
-        self.others: Set[models.Player] = set()
+        self.objects_in_view: Set[Any] = set()
         self.ground_map: Optional[bytes] = None
+        self.size: Optional[Tuple[int, int]] = None
+        self.tick_rate: Optional[int] = None
+
         self.ground_map_data: Dict[Tuple[int, int], chr] = {}
         self.solid_map_data: Dict[Tuple[int, int], chr] = {}
         self.roof_map_data: Dict[Tuple[int, int], chr] = {}
-        self.size: Optional[Tuple[int, int]] = None
-        self.tick_rate: Optional[int] = None
 
         self.logger: Log = Log()
 
@@ -72,14 +73,14 @@ class Game(Controller):
                     self.player = player
                 
                 # If the received player is somebody else, either update the other player or add a new one in
-                elif pid in [other.get_id() for other in self.others]:
-                    for oid, o in [(other.get_id(), other) for other in self.others]:
-                        if pid == oid:
-                            self.others.remove(o)
-                            self.others.add(player)
-
                 else:
-                    self.others.add(player)
+                    # If the received player is already in view, update them
+                    for o in self.objects_in_view:
+                        if isinstance(o, models.Player) and o.get_id() == pid:
+                            self.objects_in_view.remove(o)
+                            self.objects_in_view.add(player)
+                    # Otherwise, add them
+                    self.objects_in_view.add(player)
 
             elif isinstance(p, packet.ServerLogPacket):
                 self.logger.log(p.payloads[0].value)
@@ -87,9 +88,10 @@ class Game(Controller):
             # Another player has logged out or disconnected so we remove them from the game.
             elif isinstance(p, packet.LogoutPacket) or isinstance(p, packet.DisconnectPacket):
                 username: str = p.payloads[0].value
-                for ouname, o in [(other.get_username(), other) for other in self.others]:
-                    if ouname == username:
-                        self.others.remove(o)
+                for obj in self.objects_in_view:
+                    if isinstance(obj, models.Player) and obj.get_username() == username and obj in self.objects_in_view:
+                        self.objects_in_view.remove(obj)
+                        break
 
             # Server sent back a goodbye packet indicating it's OK for us to exit the game.
             elif isinstance(p, packet.GoodbyePacket):
