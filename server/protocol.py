@@ -54,7 +54,7 @@ class Moonlapse(NetstringReceiver):
         self.username: Optional[str] = None
         self.password: Optional[str] = None
         self.player: Optional[models.Player] = None
-        self.players_visible_objects: Set[Any] = {}
+        self.players_visible_objects: Set[Any] = set()
         self.logged_in: bool = False
 
         # The state of the protocol which gets called as a function to process only the packets 
@@ -147,6 +147,8 @@ class Moonlapse(NetstringReceiver):
             self.logout(p)
         elif isinstance(p, packet.DisconnectPacket):
             self.disconnect_other(p)
+        elif isinstance(p, packet.ServerLogPacket):
+            self.sendPacket(p)
 
     def _GETENTRY(self, p: Union[packet.LoginPacket, packet.RegisterPacket]) -> None:
         """
@@ -203,19 +205,9 @@ class Moonlapse(NetstringReceiver):
             raise EntryError("Incorrect password")
         
         self.sendPacket(packet.OkPacket())
-
         self.username = username
-
         self.users[self.username] = self
-
-        # Assign the lowest available ID to this new player
-        ids: List[int] = [-1 if protocol.player is None else protocol.player.get_id() for protocol in self.users.values()]
-        id = 0
-        while id in ids:
-            id += 1
-        self.player = models.Player(id)
-
-        self.player.assign_username(self.username)
+        self.player = models.Player(self.username)
         
         return self.database.get_player_pos(self.player)
 
@@ -235,10 +227,8 @@ class Moonlapse(NetstringReceiver):
         self.sendPacket(packet.ServerPlayerPacket(self.player))
 
         self.state = self._PLAY
-        for name, protocol in self.users.items():
-            if protocol != self:
-                protocol.processPacket(packet.HelloPacket(self.player))
-        self.broadcast(f"{self.username} has arrived.")
+        self.broadcast(packet.HelloPacket(self.player), except_names=(self.player.get_username(),))
+        self.broadcast(packet.ServerLogPacket(f"{self.username} has arrived."))
         self.logged_in = True
 
     def logout(self, p: packet.LogoutPacket):
@@ -317,14 +307,15 @@ class Moonlapse(NetstringReceiver):
             if protocol != self:
                 protocol.processPacket(p)
 
-    def broadcast(self, message: str) -> None:
+    def broadcast(self, *packets: packet.Packet, except_names: Iterable[str] = None) -> None:
         """
-        Sends a message to all clients connected to the server.
+        Sends packets to all protocols except for the ones for the usernames specified
         """
+        print(f"[{self.username}][{self.state.__name__}][{self.users.keys()}]: Broadcasting {packets} to everyone except {except_names}")
         for name, protocol in self.users.items():
-            protocol.sendPacket(packet.ServerLogPacket(message))
-
-        self.logger.log(message)
+            if not except_names or name not in except_names:
+                for p in packets:
+                    protocol.processPacket(p)
 
     def chat(self, p: packet.ChatPacket) -> None:
         """
@@ -334,7 +325,8 @@ class Moonlapse(NetstringReceiver):
         message: str = p.payloads[0].value
         if message.strip() != '':
             message: str = f"{self.username} says: {message[:80]}"
-            self.broadcast(message)
+            self.broadcast(packet.ServerLogPacket(message))
+            self.logger.log(message)
 
     def move(self, p: packet.MovePacket) -> None:
         """
@@ -362,8 +354,7 @@ class Moonlapse(NetstringReceiver):
             self.player.set_position(dest)
             self.database.update_player_pos(self.player, dest[0], dest[1])
 
-            for name, protocol in self.users.items():
-                protocol.processPacket(packet.ServerPlayerPacket(self.player))
+            self.broadcast(packet.ServerPlayerPacket(self.player))
         else:
             self.sendPacket(packet.DenyPacket("can't move there"))
 

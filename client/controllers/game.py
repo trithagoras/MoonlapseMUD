@@ -65,22 +65,17 @@ class Game(Controller):
             p: packet.Packet = packet.receive(self.s)
 
             if isinstance(p, packet.ServerPlayerPacket):
-                player: models.Player = p.payloads[0].value
-                pid: int = player.get_id()
+                other_player: models.Player = p.payloads[0].value
 
                 # If the received player is ourselves, update our player
-                if pid == self.player.get_id():
-                    self.player = player
+                if other_player.get_username() == self.player.get_username():
+                    self.player = other_player
                 
                 # If the received player is somebody else, either update the other player or add a new one in
                 else:
-                    # If the received player is already in view, update them
-                    for o in self.objects_in_view:
-                        if isinstance(o, models.Player) and o.get_id() == pid:
-                            self.objects_in_view.remove(o)
-                            self.objects_in_view.add(player)
-                    # Otherwise, add them
-                    self.objects_in_view.add(player)
+                    if other_player in self.objects_in_view:
+                        self.objects_in_view.remove(other_player)
+                    self.objects_in_view.add(other_player)
 
             elif isinstance(p, packet.ServerLogPacket):
                 self.logger.log(p.payloads[0].value)
@@ -100,8 +95,8 @@ class Game(Controller):
 
     def construct_map_data(self, map_file: List[str], mattype: str):
         """Load the coordinates of each type of ground material into a dictionary
-           Should be accessed like self.ground_map_data[maps.STONE] which will return all coordinates where
-           stone is found."""
+           Should be accessed like self.ground_map_data[(y, x)] which returns a character that can be checked against
+           maps.STONE, maps.WOOD, etc.."""
         asciilist = maps.ml2asciilist(map_file)
         self.size = len(asciilist), len(asciilist[0])
         for y, row in enumerate(asciilist):
