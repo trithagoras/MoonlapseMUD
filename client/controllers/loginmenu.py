@@ -48,7 +48,7 @@ class LoginMenu(Menu):
             self.view.title = "Got response..."
             if isinstance(response, packet.OkPacket):
                 self.view.title = "Entering game..."
-                Game(self.s).start()
+                Game(self.s, self.username).start()
                 self.start()       
             elif isinstance(response, packet.DenyPacket):
                 self.view.title = response.payloads[0].value

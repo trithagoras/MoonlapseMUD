@@ -54,7 +54,7 @@ class Moonlapse(NetstringReceiver):
         self.username: Optional[str] = None
         self.password: Optional[str] = None
         self.player: Optional[models.Player] = None
-        self.players_visible_objects: Set[Any] = set()
+        self.players_visible_objects: List[Any] = []
         self.logged_in: bool = False
 
         # The state of the protocol which gets called as a function to process only the packets 
@@ -139,8 +139,8 @@ class Moonlapse(NetstringReceiver):
         """
         if isinstance(p, packet.MovePacket):
             self.move(p)
-        elif isinstance(p, packet.ServerPlayerPacket) or isinstance(p, packet.HelloPacket):
-            self.update_player(p)
+        elif isinstance(p, packet.ServerPlayerPacket):
+            self.player_exchange(p)
         elif isinstance(p, packet.ChatPacket):
             self.chat(p)
         elif isinstance(p, packet.LogoutPacket):
@@ -224,10 +224,9 @@ class Moonlapse(NetstringReceiver):
         self.sendPacket(packet.ServerGroundMapFilePacket(self.ground_map_file))
         self.sendPacket(packet.ServerSolidMapFilePacket(self.solid_map_file))
         self.sendPacket(packet.ServerTickRatePacket(100))
-        self.sendPacket(packet.ServerPlayerPacket(self.player))
 
         self.state = self._PLAY
-        self.broadcast(packet.HelloPacket(self.player), except_names=(self.player.get_username(),))
+        self.broadcast(packet.ServerPlayerPacket(self.player))
         self.broadcast(packet.ServerLogPacket(f"{self.username} has arrived."))
         self.logged_in = True
 
@@ -307,15 +306,30 @@ class Moonlapse(NetstringReceiver):
             if protocol != self:
                 protocol.processPacket(p)
 
-    def broadcast(self, *packets: packet.Packet, except_names: Iterable[str] = None) -> None:
+    def broadcast(self, *packets: packet.Packet, including: Tuple[str] = tuple(), excluding: Tuple[str] = tuple()) -> None:
         """
-        Sends packets to all protocols except for the ones for the usernames specified
+        Sends packets to all protocols specified in "including" except for the ones for the usernames specified in
+        "excluding", if any.
+        If no protocols are specified in "including", the default behaviour is to send to *all* protocols on the server
+        except for the ones specified in "excluding", if any.
+
+        Examples:
+            * broadcast(packet.ServerLogPacket("Hello"), excluding=("Josh",)) will send to every but Josh
+            * broadcast(packet.ServerLogPacket("Hello"), including=("Sue", "James")) will send to only Sue and James
+            * broadcast(packet.ServerLogPacket("Hello"), including=("Mary",), excluding=("Mary",)) will send to noone
         """
-        print(f"[{self.username}][{self.state.__name__}][{self.users.keys()}]: Broadcasting {packets} to everyone except {except_names}")
-        for name, protocol in self.users.items():
-            if not except_names or name not in except_names:
-                for p in packets:
-                    protocol.processPacket(p)
+        print(f"[{self.username}][{self.state.__name__}][{self.users.keys()}]: Broadcasting {packets} to {including if including else 'everyone'} except {excluding}")
+
+        sendto: Dict[str, 'Moonlapse'] = self.users
+        for username in excluding:
+            sendto.pop(username)
+
+        if including:
+            sendto = {k: v for k, v in sendto.items() if k in including}
+
+        for name, protocol in sendto.items():
+            for p in packets:
+                protocol.processPacket(p)
 
     def chat(self, p: packet.ChatPacket) -> None:
         """
@@ -354,24 +368,40 @@ class Moonlapse(NetstringReceiver):
             self.player.set_position(dest)
             self.database.update_player_pos(self.player, dest[0], dest[1])
 
-            self.broadcast(packet.ServerPlayerPacket(self.player))
+            usernames_in_view: Tuple(str) = self.get_usernames_in_view()
+
+            # For players who were previously in our view but aren't any more, tell them to remove us from their view
+            # Also remove them from our view
+            for obj in reversed(self.players_visible_objects):
+                if isinstance(obj, models.Player) and obj.get_username() not in usernames_in_view:
+                    fake_player: models.Player = models.Player(self.username)
+                    fake_player.set_position([-1, -1])
+                    self.broadcast(packet.ServerPlayerPacket(fake_player), including=(obj.get_username(),))
+                    self.players_visible_objects.remove(obj)
+
+            # Tell everyone in view our position has updated or we have entered their view
+            self.broadcast(packet.ServerPlayerPacket(self.player), including=usernames_in_view)
+
         else:
             self.sendPacket(packet.DenyPacket("can't move there"))
 
-    def update_player(self, p: Union[packet.ServerPlayerPacket, packet.HelloPacket]):
-        other_player: models.Player = p.payloads[0].value
+    def player_exchange(self, p: packet.ServerPlayerPacket):
+        self.sendPacket(p)
 
-        # Check if the other player is visible to our client
-        visible = within_bounds(other_player.get_position(), self.player.get_view_range_topleft(), self.player.get_view_range_botright())
+        other: models.Player = p.payloads[0].value
+        if other not in self.players_visible_objects:
+            self.players_visible_objects.append(other)
 
-        if visible:
-            # If the incoming player has just connected, send the new player information about our player
-            if isinstance(p, packet.HelloPacket):
-                other_protocol = self.users[other_player.get_username()]
-                other_protocol.processPacket(packet.ServerPlayerPacket(self.player))
+            other_username: str = other.get_username()
+            if other_username != self.username:
+                self.broadcast(packet.ServerPlayerPacket(self.player), including=(other_username,))
 
-            # Regardless, send our client the new player's information
-            self.sendPacket(packet.ServerPlayerPacket(other_player))
+    def get_usernames_in_view(self) -> Tuple[str]:
+        return tuple([username for username in self.users if within_bounds(
+            self.users[username].player.get_position(),
+            self.player.get_view_range_topleft(),
+            self.player.get_view_range_botright()
+        )])
 
 
 class EntryError(Exception):

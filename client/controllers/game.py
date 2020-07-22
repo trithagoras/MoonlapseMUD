@@ -13,9 +13,10 @@ from ..views.gameview import GameView
 
 
 class Game(Controller):
-    def __init__(self, s: socket.socket):
+    def __init__(self, s: socket.socket, username: str):
         super().__init__()
         self.s: socket.socket = s
+        self.username = username
 
         # Game data
         self.player: Optional[models.Player] = None
@@ -53,7 +54,7 @@ class Game(Controller):
             while not self.ready() and self._logged_in:
                 p: packet.Packet = packet.receive(self.s)
                 if isinstance(p, packet.ServerPlayerPacket):
-                    self.player = p.payloads[0].value
+                    self.player_exchange(p.payloads[0].value)
                 elif isinstance(p, packet.ServerGroundMapFilePacket):
                     self.construct_map_data(p.payloads[0].value, mattype='ground')
                 elif isinstance(p, packet.ServerSolidMapFilePacket):
@@ -65,17 +66,7 @@ class Game(Controller):
             p: packet.Packet = packet.receive(self.s)
 
             if isinstance(p, packet.ServerPlayerPacket):
-                other_player: models.Player = p.payloads[0].value
-
-                # If the received player is ourselves, update our player
-                if other_player.get_username() == self.player.get_username():
-                    self.player = other_player
-                
-                # If the received player is somebody else, either update the other player or add a new one in
-                else:
-                    if other_player in self.objects_in_view:
-                        self.objects_in_view.remove(other_player)
-                    self.objects_in_view.add(other_player)
+                self.player_exchange(p.payloads[0].value)
 
             elif isinstance(p, packet.ServerLogPacket):
                 self.logger.log(p.payloads[0].value)
@@ -92,6 +83,17 @@ class Game(Controller):
             elif isinstance(p, packet.GoodbyePacket):
                 self.stop()
                 break
+
+    def player_exchange(self, other_player: models.Player):
+        # If the received player is ourselves, update our player
+        if other_player.get_username() == self.username:
+            self.player = other_player
+
+        # If the received player is somebody else, either update the other player or add a new one in
+        else:
+            if other_player in self.objects_in_view:
+                self.objects_in_view.remove(other_player)
+            self.objects_in_view.add(other_player)
 
     def construct_map_data(self, map_file: List[str], mattype: str):
         """Load the coordinates of each type of ground material into a dictionary

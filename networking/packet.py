@@ -199,16 +199,6 @@ class ServerPlayerPacket(Packet):
         super().__init__(Payload(player))
 
 
-class HelloPacket(Packet):
-    """
-    A packet sent from a protocol to another protocol when a player first connects. 
-    Each protocol can then update their clients accordingly, i.e. sending their Players 
-    in return and telling their clients to add the new Player to the game.
-    """
-    def __init__(self, player: Player):
-        super().__init__(Payload(player))
-
-
 class ServerGroundMapFilePacket(Packet):
     """
     A packet sent from a protocol to its client describing the
