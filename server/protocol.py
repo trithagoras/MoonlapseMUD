@@ -14,6 +14,14 @@ import os
 import maps
 
 
+def within_bounds(coords: Tuple[int, int], topleft: Tuple[int, int], botright: Tuple[int, int]) -> bool:
+    """
+    Checks if the given coordinates are inside the square defined by the top left and bottom right corners.
+    Includes all values in the square, even right/bottom-most parts.
+    """
+    return topleft[0] <= coords[0] <= botright[0] and topleft[1] <= coords[1] <= botright[1]
+
+
 class Moonlapse(NetstringReceiver):
     """
     A protocol that sends and receives netstrings. See http://cr.yp.to/proto/netstrings.txt for the 
@@ -46,6 +54,7 @@ class Moonlapse(NetstringReceiver):
         self.username: Optional[str] = None
         self.password: Optional[str] = None
         self.player: Optional[models.Player] = None
+        self.players_visible_objects: Set[Any] = {}
         self.logged_in: bool = False
 
         # The state of the protocol which gets called as a function to process only the packets 
@@ -70,26 +79,20 @@ class Moonlapse(NetstringReceiver):
         asciilist = maps.ml2asciilist(self.ground_map_file)
         self.map_height = len(asciilist)
         self.map_width = len(asciilist[0])
-        self.ground_map_data: Dict[chr, Set[Tuple[int, int]]] = {}
+        self.ground_map_data: Dict[Tuple[int, int], chr] = {}
         for y, row in enumerate(asciilist):
             for x, c in enumerate(row):
                 if c != maps.NOTHING:
-                    if c in self.ground_map_data.keys():
-                        self.ground_map_data[c].add((y, x))
-                    else:
-                        self.ground_map_data[c] = {(y, x)}
+                    self.ground_map_data[(y, x)] = c
 
 
         # Repeat for solid and roof map data
         asciilist = maps.ml2asciilist(self.solid_map_file)
-        self.solid_map_data: Dict[chr, Set[Tuple[int, int]]] = {}
+        self.solid_map_data: Dict[Tuple[int, int], chr] = {}
         for y, row in enumerate(asciilist):
             for x, c in enumerate(row):
                 if c != maps.NOTHING:
-                    if c in self.solid_map_data.keys():
-                        self.solid_map_data[c].add((y, x))
-                    else:
-                        self.solid_map_data[c] = {(y, x)}
+                    self.solid_map_data[(y, x)] = c
 
     def connectionMade(self) -> None:
         super().connectionMade()
@@ -136,10 +139,10 @@ class Moonlapse(NetstringReceiver):
         """
         if isinstance(p, packet.MovePacket):
             self.move(p)
+        elif isinstance(p, packet.ServerPlayerPacket) or isinstance(p, packet.HelloPacket):
+            self.update_player(p)
         elif isinstance(p, packet.ChatPacket):
             self.chat(p)
-        elif isinstance(p, packet.HelloPacket):
-            self.welcome(p)
         elif isinstance(p, packet.LogoutPacket):
             self.logout(p)
         elif isinstance(p, packet.DisconnectPacket):
@@ -151,13 +154,10 @@ class Moonlapse(NetstringReceiver):
         This should never be called directly and is instead handled by 
         stringReceived.
         """
-        username: str = p.payloads[0].value
-        password: str = p.payloads[1].value
-
         if isinstance(p, packet.LoginPacket):
-            self._handle_login(username, password)
+            self._handle_login(p.payloads[0].value, p.payloads[1].value)
         elif isinstance(p, packet.RegisterPacket):
-            self._handle_registration(username, password)
+            self._handle_registration(p.payloads[0].value, p.payloads[1].value)
 
     def _handle_login(self, username: str, password: str) -> None:
         """
@@ -222,7 +222,8 @@ class Moonlapse(NetstringReceiver):
     def _establish_player_in_world(self, init_pos: List[Tuple[int]]) -> None:
         print(f"[{self.username}][{self.state.__name__}][{self.users.keys()}]: Got", init_pos)
         init_pos = init_pos[0]
-        self.player.assign_location(list(init_pos), list(self.solid_map_data.keys()), self.map_height, self.map_width)
+        self.player.assign_location(list(init_pos), list(self.solid_map_data.values()), self.map_height, self.map_width)
+        self.player.set_view_radius(10)
 
         if init_pos == (None, None):
             pos = self.player.get_position()
@@ -233,13 +234,12 @@ class Moonlapse(NetstringReceiver):
         self.sendPacket(packet.ServerTickRatePacket(100))
         self.sendPacket(packet.ServerPlayerPacket(self.player))
 
-        for protocol in self.users.values():
+        self.state = self._PLAY
+        for name, protocol in self.users.items():
             if protocol != self:
                 protocol.processPacket(packet.HelloPacket(self.player))
-
         self.broadcast(f"{self.username} has arrived.")
         self.logged_in = True
-        self.state = self._PLAY
 
     def logout(self, p: packet.LogoutPacket):
         username: str = p.payloads[0].value
@@ -345,7 +345,7 @@ class Moonlapse(NetstringReceiver):
               information than is required. A client will know all the information 
               about every player connected to the server even if they are not in view.
         """
-        pos: Tuple[int] = self.player.get_position()
+        pos: Tuple[int, int] = self.player.get_position()
 
         # Calculate the desired destination
         dest: List[int] = list(pos)
@@ -358,46 +358,29 @@ class Moonlapse(NetstringReceiver):
         elif isinstance(p, packet.MoveLeftPacket):
             dest[1] -= 1
 
-        all_solid_coords = set()
-        for coords in self.solid_map_data.values():
-            all_solid_coords.update(coords)
-        if self._within_bounds(dest) and tuple(dest) not in all_solid_coords:
+        if within_bounds(tuple(dest), (0, 0), (self.map_height - 1, self.map_width - 1)) and tuple(dest) not in self.solid_map_data:
             self.player.set_position(dest)
-            d: Deferred = self.database.update_player_pos(self.player, dest[0], dest[1])
+            self.database.update_player_pos(self.player, dest[0], dest[1])
 
             for name, protocol in self.users.items():
-                protocol.sendPacket(packet.ServerPlayerPacket(self.player))
+                protocol.processPacket(packet.ServerPlayerPacket(self.player))
         else:
             self.sendPacket(packet.DenyPacket("can't move there"))
 
-    def _within_bounds(self, coords: List[int]) -> bool:
-        return 0 <= coords[0] < self.map_height and 0 <= coords[1] < self.map_width
+    def update_player(self, p: Union[packet.ServerPlayerPacket, packet.HelloPacket]):
+        other_player: models.Player = p.payloads[0].value
 
-    def welcome(self, p: packet.HelloPacket):
-        """
-        Called whenever a new protocol joins the server. They will tell this protocol about their 
-        player and this protocol tells them about its player in return.
-        """
-        new_player: models.Player = p.payloads[0].value
-        new_protocol: Optional['Moonlapse'] = None
+        # Check if the other player is visible to our client
+        visible = within_bounds(other_player.get_position(), self.player.get_view_range_topleft(), self.player.get_view_range_botright())
 
-        # Get the protocol which sent the packet
-        for protocol in self.users.values():
-            if protocol.player == new_player:
-                new_protocol = protocol
-                break
-        
-        # Return if no match found
-        if not new_protocol:
-            print(f"[{self.player.get_username()}] Could not find protocol attached to new player to welcome ({new_player.get_username()})")
-            return
+        if visible:
+            # If the incoming player has just connected, send the new player information about our player
+            if isinstance(p, packet.HelloPacket):
+                other_protocol = self.users[other_player.get_username()]
+                other_protocol.processPacket(packet.ServerPlayerPacket(self.player))
 
-        # Send the client player information for the newly connecting protocol
-        self.sendPacket(packet.ServerPlayerPacket(new_player))
-        
-        # Send the newly connecting protocol information for this protocol's player
-        new_protocol.sendPacket(packet.ServerPlayerPacket(self.player))
-        print(f"[{self.player.get_username()}] Welcomed new player {new_player.get_username()}")
+            # Regardless, send our client the new player's information
+            self.sendPacket(packet.ServerPlayerPacket(other_player))
 
 
 class EntryError(Exception):
