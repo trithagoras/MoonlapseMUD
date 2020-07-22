@@ -83,7 +83,7 @@ class Moonlapse(NetstringReceiver):
         for y, row in enumerate(asciilist):
             for x, c in enumerate(row):
                 if c != maps.NOTHING:
-                    self.ground_map_data[(x, y)] = c
+                    self.ground_map_data[(y, x)] = c
 
 
         # Repeat for solid and roof map data
@@ -92,7 +92,7 @@ class Moonlapse(NetstringReceiver):
         for y, row in enumerate(asciilist):
             for x, c in enumerate(row):
                 if c != maps.NOTHING:
-                    self.solid_map_data[(x, y)] = c
+                    self.solid_map_data[(y, x)] = c
 
     def connectionMade(self) -> None:
         super().connectionMade()
@@ -358,10 +358,7 @@ class Moonlapse(NetstringReceiver):
         elif isinstance(p, packet.MoveLeftPacket):
             dest[1] -= 1
 
-        all_solid_coords = set()
-        for coords in self.solid_map_data.values():
-            all_solid_coords.update(coords)
-        if within_bounds(tuple(dest), (0, 0), (self.map_height - 1, self.map_width - 1)) and tuple(dest) not in all_solid_coords:
+        if within_bounds(tuple(dest), (0, 0), (self.map_height - 1, self.map_width - 1)) and tuple(dest) not in self.solid_map_data:
             self.player.set_position(dest)
             self.database.update_player_pos(self.player, dest[0], dest[1])
 
