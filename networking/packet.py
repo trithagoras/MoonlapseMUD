@@ -4,6 +4,15 @@ import traceback
 from .payload import *
 from .models import *
 
+# Required to import from shared modules
+import sys
+from pathlib import Path
+file = Path(__file__).resolve()
+parent, root = file.parent, file.parents[1]
+sys.path.append(str(root))
+
+from maps import Room
+
 
 class Packet:
     """
@@ -207,31 +216,13 @@ class ServerUserPositionPacket(Packet):
         super().__init__(Payload(username), Payload(position))
 
 
-class ServerGroundMapFilePacket(Packet):
+class ServerRoomPacket(Packet):
     """
-    A packet sent from a protocol to its client describing the
+    A packet sent from a protocol to its client describing the room. Note: Be sure to call room.pack() before you send
+    a room over the network and the client should call room.unpack() after receiving.
     """
-    def __init__(self, mapfile: List[str]):
-        super().__init__(Payload(mapfile))
-
-
-class ServerSolidMapFilePacket(Packet):
-    """
-    A packet sent from a protocol to its client describing the
-    """
-    def __init__(self, mapfile: List[str]):
-        super().__init__(Payload(mapfile))
-
-
-class ServerMapSizePacket(Packet):
-    """
-    A packet sent from a protocol to its client describing the height and width of the room it's connected 
-    to. Ths should be interpreted by the game client for drawing to the screen, etc.
-    """
-    def __init__(self, height: int, width: int):
-        pheight: Payload = Payload(height)
-        pwidth: Payload = Payload(width)
-        super().__init__(pheight, pwidth)
+    def __init__(self, room: Room):
+        super().__init__(Payload(room))
 
 
 class ServerTickRatePacket(Packet):

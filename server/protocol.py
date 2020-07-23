@@ -10,8 +10,7 @@ from networking.logger import Log
 
 from typing import *
 import time
-import os
-import maps
+from maps import Room
 
 
 def within_bounds(coords: Tuple[int, int], topleft: Tuple[int, int], botright: Tuple[int, int]) -> bool:
@@ -41,11 +40,10 @@ class Moonlapse(NetstringReceiver):
     The self.processPacket method is used to tell another protocol on the server to process a packet which 
     doesn't necessarily have to be sent to any clients.
     """
-    def __init__(self, server: MoonlapseServer, database: Database, users: Dict[str, 'Moonlapse']):
+    def __init__(self, server: MoonlapseServer, database: Database, users: Dict[str, 'Moonlapse'], room: Room):
         super().__init__()
         self._server: MoonlapseServer = server
         self.database: Database = database
-        self.logger: Log = Log()
 
         # A volatile dictionary of usernames to protocols passed in by the server.
         self.users: Dict[str, 'Moonlapse'] = users
@@ -63,36 +61,10 @@ class Moonlapse(NetstringReceiver):
         # a packet.
         self.state: Callable = self._GETENTRY
 
-        # Load in the map files and convert them to palatable data types to be sent out to the client.
-        pwd: str = os.path.dirname(__file__)
-        ground_map_fn: str = os.path.join(pwd, '..', 'maps', 'forest_ground.ml')
-        with open(ground_map_fn, 'r') as f:
-            self.ground_map_file = [line.strip('\n') for line in f.readlines()]
+        self.room = room
+        self.room.unpack()
 
-        solid_map_fn: str = os.path.join(pwd, '..', 'maps', 'forest_solid.ml')
-        with open(solid_map_fn, 'r') as f:
-            self.solid_map_file = [line.strip('\n') for line in f.readlines()]
-
-        # Load the coordinates of each type of ground material into a dictionary
-        # Should be accessed like self.ground_map_data[maps.STONE] which will return all coordinates where
-        # stone is found.
-        asciilist = maps.ml2asciilist(self.ground_map_file)
-        self.map_height = len(asciilist)
-        self.map_width = len(asciilist[0])
-        self.ground_map_data: Dict[Tuple[int, int], chr] = {}
-        for y, row in enumerate(asciilist):
-            for x, c in enumerate(row):
-                if c != maps.NOTHING:
-                    self.ground_map_data[(y, x)] = c
-
-
-        # Repeat for solid and roof map data
-        asciilist = maps.ml2asciilist(self.solid_map_file)
-        self.solid_map_data: Dict[Tuple[int, int], chr] = {}
-        for y, row in enumerate(asciilist):
-            for x, c in enumerate(row):
-                if c != maps.NOTHING:
-                    self.solid_map_data[(y, x)] = c
+        self.logger: Log = Log()
 
     def connectionMade(self) -> None:
         super().connectionMade()
@@ -211,18 +183,23 @@ class Moonlapse(NetstringReceiver):
         
         return self.database.get_player_pos(self.player)
 
-    def _establish_player_in_world(self, init_pos: List[Tuple[float]]) -> None:
+    def _establish_player_in_world(self, init_pos: List[Tuple[Optional[float], Optional[float]]]) -> None:
+        init_pos: Tuple[Optional[float], Optional[float]] = init_pos[0]
         print(f"[{self.username}][{self.state.__name__}][{self.users.keys()}]: Got", init_pos)
-        init_pos = (int(init_pos[0][0]), int(init_pos[0][1]))
-        self.player.assign_location(init_pos, list(self.solid_map_data.values()), self.map_height, self.map_width)
         self.player.set_view_radius(10)
 
-        if init_pos == (None, None):
-            pos = self.player.get_position()
-            self.database.update_player_pos(self.player, pos[0], pos[1])
+        if None in init_pos:
+            self.player.assign_location(init_pos, self.room)
+            new_pos: Tuple[int, int] = self.player.get_position()
+            self.database.update_player_pos(self.player, new_pos[0], new_pos[1])
+        else:
+            init_pos = (int(init_pos[0]), int(init_pos[1]))
+            self.player.assign_location(init_pos, self.room)
 
-        self.sendPacket(packet.ServerGroundMapFilePacket(self.ground_map_file))
-        self.sendPacket(packet.ServerSolidMapFilePacket(self.solid_map_file))
+        self.room.pack()
+        self.sendPacket(packet.ServerRoomPacket(self.room))
+        self.room.unpack()
+
         self.sendPacket(packet.ServerTickRatePacket(100))
         self.sendPacket(packet.ServerPlayerPacket(self.player))
 
@@ -362,7 +339,7 @@ class Moonlapse(NetstringReceiver):
         elif isinstance(p, packet.MoveLeftPacket):
             dest[1] -= 1
 
-        if within_bounds(tuple(dest), (0, 0), (self.map_height - 1, self.map_width - 1)) and tuple(dest) not in self.solid_map_data:
+        if within_bounds(tuple(dest), (0, 0), (self.room.height - 1, self.room.width - 1)) and tuple(dest) not in self.room.solidmap:
             self.player.set_position(dest)
             self.database.update_player_pos(self.player, dest[0], dest[1])
 

@@ -1,5 +1,6 @@
 import random
 from typing import *
+from maps import Room
 
 
 class Player:
@@ -12,11 +13,13 @@ class Player:
     def ready(self) -> bool:
         return None not in (self._username, self._position, self._char)
 
-    def assign_location(self, position: Tuple[int, int], walls: List[Tuple[int, int]], max_height: int, max_width: int) -> None:
+    def assign_location(self, position: Tuple[Optional[int], Optional[int]], room: Room) -> None:
         if position == (None, None):
+            room.unpack()
             while True:
-                self._position = random.randint(1, max_height), random.randint(1, max_width)
-                if self._position not in walls:
+                self._position = random.randint(1, room.height), random.randint(1, room.width)
+                if self._position not in room.solidmap.values():
+                    room.pack()
                     break
         else:
             self._position = (position[0], position[1])

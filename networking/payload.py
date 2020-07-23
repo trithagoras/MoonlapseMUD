@@ -39,14 +39,8 @@ class Payload:
             constructor: Type = globals()[classkey]
             required_params = list(inspect.signature(constructor).parameters.values())
 
-            # TODO: Remember this might cause unexpected bugs if constructors need to do something meaningful with a
-            #       non-null parameter
-            constructor_args = []
-            for p in required_params:
-                if p.default is p.empty:
-                    constructor_args.append(None)
-
-            value = constructor(*constructor_args)
+            # TODO: This is horrible, think of a better way
+            value = constructor.__new__(constructor)
             for k, v in attrs.items():
                 setattr(value, k, v)
 
