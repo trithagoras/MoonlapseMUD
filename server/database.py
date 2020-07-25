@@ -1,5 +1,6 @@
 import datetime
 import json
+from maps import Room
 from networking import models
 from twisted.enterprise import adbapi
 from twisted.internet.defer import Deferred
@@ -93,6 +94,38 @@ class Database:
                 SELECT p.entityid
                 FROM players as p 
                 INNER JOIN users AS u 
+                ON p.userid = u.id AND u.username = '{player.get_username()}'
+            )
+        """)
+
+    def set_player_room(self, player: models.Player, room: Room):
+        print(f"Updating player room ({player.get_username()})...")
+        return self.dbpool.runOperation(f"""
+                    UPDATE entities
+                    SET roomid = (
+                        SELECT id
+                        FROM rooms
+                        WHERE name = '{room.name}'
+                    )
+                    WHERE id IN (
+                        SELECT p.entityid
+                        FROM players AS p
+                        INNER JOIN users AS u 
+                        ON p.userid = u.id and u.username = '{player.get_username()}' 
+                    )
+                """)
+
+    def get_player_roomname(self, player: models.Player) -> Deferred:
+        print(f"Getting player room ({player.get_username()})...", end='')
+        return self.dbpool.runQuery(f"""
+            SELECT name 
+            FROM rooms
+            WHERE id IN (
+                SELECT roomid
+                FROM entities AS e
+                INNER JOIN players AS p
+                ON e.id = p.entityid
+                INNER JOIN users AS u
                 ON p.userid = u.id AND u.username = '{player.get_username()}'
             )
         """)

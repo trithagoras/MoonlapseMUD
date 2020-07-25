@@ -106,6 +106,7 @@ class GameView(View):
         view_radius = self.game.player.get_view_radius()
         win1_hwidth, win1_hheight = self.win1_width // 2, self.win1_height // 2
         player_pos = self.game.player.get_position()
+        room = self.game.player.get_room()
 
         for row in range(-view_radius, view_radius + 1):
             for col in range(-view_radius, view_radius + 1):
@@ -114,7 +115,7 @@ class GameView(View):
 
                 if self.coordinate_exists(*pos):
                     cy, cx = win1_hheight + row, win1_hwidth + col * 2
-                    for map_data in (self.game.room.groundmap, self.game.room.solidmap):
+                    for map_data in (room.groundmap, room.solidmap):
                         if pos not in map_data:
                             continue
                         c = map_data[pos]
@@ -134,7 +135,7 @@ class GameView(View):
                             color_addch(self.win1, cy, cx, '·', Color.YELLOW)
 
                     # Overrides: Enter in here if solid must look different from ground, for example
-                    map_data = self.game.room.solidmap
+                    map_data = room.solidmap
                     if pos in map_data:
                         c = map_data[pos]
                         if c == maps.STONE:
@@ -211,7 +212,7 @@ class GameView(View):
         self.stdscr.vline(self.chatwin_y - 1, self.width - 1, curses.ACS_VLINE, 1)
 
     def coordinate_exists(self, y: int, x: int) -> bool:
-        return 0 <= y < self.game.room.height and 0 <= x < self.game.room.width
+        return 0 <= y < self.game.player.get_room().height and 0 <= x < self.game.player.get_room().width
 
     @staticmethod
     def progress_bar(value: float, max_value: float) -> str:

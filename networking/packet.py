@@ -1,7 +1,9 @@
 import socket
 import traceback
+import json
 
-from .payload import *
+from . import payload
+from .payload import Payload
 from .models import *
 
 # Required to import from shared modules
@@ -255,7 +257,7 @@ def frombytes(data: bytes) -> Packet:
 
         elif key[0] == 'p':
             index: int = int(key[1:])
-            payloads_values.insert(index, Payload.deserialize(value).value)
+            payloads_values.insert(index, payload.deserialize(value).value)
     
     # Use reflection to construct the specific packet type we're looking for
     specificPacketClassName: str = action

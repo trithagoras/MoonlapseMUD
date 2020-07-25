@@ -40,7 +40,7 @@ class Moonlapse(NetstringReceiver):
     The self.processPacket method is used to tell another protocol on the server to process a packet which 
     doesn't necessarily have to be sent to any clients.
     """
-    def __init__(self, server: MoonlapseServer, database: Database, users: Dict[str, 'Moonlapse'], room: Room):
+    def __init__(self, server: MoonlapseServer, database: Database, users: Dict[str, 'Moonlapse']):
         super().__init__()
         self._server: MoonlapseServer = server
         self.database: Database = database
@@ -60,9 +60,6 @@ class Moonlapse(NetstringReceiver):
         # self.stringReceived method every time a complete netstring is received and converted to 
         # a packet.
         self.state: Callable = self._GETENTRY
-
-        self.room = room
-        self.room.unpack()
 
         self.logger: Log = Log()
 
@@ -161,11 +158,15 @@ class Moonlapse(NetstringReceiver):
             callbackArgs=(username,), 
             errback = lambda e: self.sendPacket(packet.DenyPacket(e.getErrorMessage())) # Catch check_password_correct
         ).addCallbacks(
+            callback = self._set_player_room,
+            errback = lambda e: self.sendPacket(packet.DenyPacket(e.getErrorMessage())) # Catch initialise_new_player
+        ).addCallbacks(
             callback = self._establish_player_in_world, 
-            errback = lambda e: self.sendPacket(packet.DenyPacket(e.getErrorMessage()))  # Catch initialise_new_player
+            errback = lambda e: self.sendPacket(packet.DenyPacket(e.getErrorMessage())) # Catch set_player_room
         )
 
     def _check_password_correct(self, user_exists: List[Tuple[bool]], username: str, password: str) -> Deferred:
+        print(f"_check_password_correct(user_exists={user_exists}, username={username}, password={password})")
         if not user_exists[0][0]:
             raise EntryError("I don't know anybody by that name")
 
@@ -175,33 +176,38 @@ class Moonlapse(NetstringReceiver):
         print(f"_initialise_player(password_correct={password_correct}, username={username})")
         if not password_correct[0][0]:
             raise EntryError("Incorrect password")
-        
-        self.sendPacket(packet.OkPacket())
+
         self.username = username
         self.users[self.username] = self
         self.player = models.Player(self.username)
-        
+
+        return self.database.get_player_roomname(self.player)
+
+    def _set_player_room(self, roomname: List[Tuple[str]]) -> Deferred:
+        print(f"_set_player_room(roomname={roomname})")
+        self.player.set_room(Room(roomname[0][0]))
         return self.database.get_player_pos(self.player)
 
     def _establish_player_in_world(self, init_pos: List[Tuple[Optional[float], Optional[float]]]) -> None:
+        print(f"_establish_player_in_world(init_pos={init_pos})")
+        self.sendPacket(packet.OkPacket())
+
         init_pos: Tuple[Optional[float], Optional[float]] = init_pos[0]
         print(f"[{self.username}][{self.state.__name__}][{self.users.keys()}]: Got", init_pos)
         self.player.set_view_radius(10)
 
         if None in init_pos:
-            self.player.assign_location(init_pos, self.room)
+            self.player.assign_location(init_pos)
             new_pos: Tuple[int, int] = self.player.get_position()
             self.database.update_player_pos(self.player, new_pos[0], new_pos[1])
         else:
             init_pos = (int(init_pos[0]), int(init_pos[1]))
-            self.player.assign_location(init_pos, self.room)
-
-        self.room.pack()
-        self.sendPacket(packet.ServerRoomPacket(self.room))
-        self.room.unpack()
+            self.player.assign_location(init_pos)
 
         self.sendPacket(packet.ServerTickRatePacket(100))
+        self.player.get_room().pack()
         self.sendPacket(packet.ServerPlayerPacket(self.player))
+        self.player.get_room().unpack()
 
         self.state = self._PLAY
         self.broadcast(packet.ServerUserPositionPacket(self.username, self.player.get_position()), excluding=(self.username,))
@@ -339,7 +345,8 @@ class Moonlapse(NetstringReceiver):
         elif isinstance(p, packet.MoveLeftPacket):
             dest[1] -= 1
 
-        if within_bounds(tuple(dest), (0, 0), (self.room.height - 1, self.room.width - 1)) and tuple(dest) not in self.room.solidmap:
+        room = self.player.get_room()
+        if within_bounds(tuple(dest), (0, 0), (room.height - 1, room.width - 1)) and tuple(dest) not in room.solidmap:
             self.player.set_position(dest)
             self.database.update_player_pos(self.player, dest[0], dest[1])
 

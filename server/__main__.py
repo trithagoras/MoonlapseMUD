@@ -16,17 +16,15 @@ from server import protocol
 
 
 class MoonlapseServer(Factory):
-    def __init__(self, connectionstringspath, room):
+    def __init__(self, connectionstringspath):
         self.database: database.Database = database.Database(connectionstringspath)
         self.database.connect()
-
-        self.room = room
 
         self.users: Dict[str, protocol.Moonlapse] = {}
 
     def buildProtocol(self, addr):
         print("Adding a new client. Sending users:", self.users.items())
-        return protocol.Moonlapse(self, self.database, self.users, self.room)
+        return protocol.Moonlapse(self, self.database, self.users)
 
 
 if __name__ == '__main__':
@@ -34,11 +32,5 @@ if __name__ == '__main__':
 
     connectionstringspath: str = os.path.join(pwd, 'connectionstrings.json')
 
-    groundmappath = os.path.join(pwd, '..', 'maps', 'tavern_ground.ml')
-    solidmappath = os.path.join(pwd, '..', 'maps', 'tavern_solid.ml')
-    roofmappath = os.path.join(pwd, '..', 'maps', 'tavern_roof.ml')
-    room = Room(groundmappath, solidmappath, roofmappath)
-
-
-    reactor.listenTCP(42523, MoonlapseServer(connectionstringspath, room))
+    reactor.listenTCP(42523, MoonlapseServer(connectionstringspath))
     reactor.run()

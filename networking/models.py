@@ -7,13 +7,18 @@ class Player:
     def __init__(self, username: str):
         self._username: str = username
         self._position: Optional[Tuple[int, int]] = None
+        self._room: Optional[Room] = None
         self._char: chr = '@'
         self._view_radius: Optional[int] = None
 
     def ready(self) -> bool:
         return None not in (self._username, self._position, self._char)
 
-    def assign_location(self, position: Tuple[Optional[int], Optional[int]], room: Room) -> None:
+    def assign_location(self, position: Tuple[Optional[int], Optional[int]]) -> None:
+        if not self.get_room():
+            raise ValueError("Cannot assign location without a room. Must set the room first.")
+
+        room = self.get_room()
         if position == (None, None):
             room.unpack()
             while True:
@@ -32,6 +37,12 @@ class Player:
 
     def set_position(self, destination: List[int]) -> None:
         self._position = destination
+
+    def get_room(self) -> Room:
+        return self._room
+
+    def set_room(self, room: Room) -> None:
+        self._room = room
 
     def get_char(self) -> chr:
         return self._char

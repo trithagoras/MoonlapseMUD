@@ -24,8 +24,6 @@ class Game(Controller):
         self.ground_map: Optional[bytes] = None
         self.tick_rate: Optional[int] = None
 
-        self.room: Optional[Room] = None
-
         self.logger: Log = Log()
 
         # UI
@@ -48,16 +46,13 @@ class Game(Controller):
     def receive_data(self) -> None:
         while self._logged_in:
             # Get initial room data if not already done
-            ready = self.ready()
             while not self.ready() and self._logged_in:
                 p: packet.Packet = packet.receive(self.s)
                 if isinstance(p, packet.ServerPlayerPacket):
                     self.player = p.payloads[0].value
+                    self.player.get_room().unpack()
                 elif isinstance(p, packet.ServerUserPositionPacket):
                     self.user_exchange(p.payloads[0].value, p.payloads[1].value)
-                elif isinstance(p, packet.ServerRoomPacket):
-                    self.room = p.payloads[0].value
-                    self.room.unpack()
                 elif isinstance(p, packet.ServerTickRatePacket):
                     self.tick_rate = p.payloads[0].value
 
@@ -141,7 +136,7 @@ class Game(Controller):
         packet.send(packet.ChatPacket(message), self.s)
 
     def ready(self) -> bool:
-        return False not in [bool(data) for data in (self.player, self.room, self.tick_rate)] and self.room.is_unpacked()
+        return False not in [bool(data) for data in (self.player, self.tick_rate)] and self.player.get_room().is_unpacked()
 
     def stop(self) -> None:
         self._logged_in = False

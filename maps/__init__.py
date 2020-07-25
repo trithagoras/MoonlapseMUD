@@ -1,4 +1,5 @@
 from typing import *
+import os
 
 _ = ' '
 _ = '!'
@@ -143,7 +144,15 @@ def mappathtodict(mappath) -> List[str]:
 
 
 class Room:
-    def __init__(self, groundmappath, solidmappath, roofmappath):
+    def __init__(self, name: str):
+        self.name = name
+
+        pwd: str = os.path.dirname(__file__)
+        path_to_room_dir = os.path.join(pwd, name)
+        groundmappath = os.path.join(path_to_room_dir, 'ground.data')
+        solidmappath = os.path.join(path_to_room_dir, 'solid.data')
+        roofmappath = os.path.join(path_to_room_dir, 'roof.data')
+
         self.grounddata: List[str] = mappathtodict(groundmappath)
         self.soliddata: List[str] = mappathtodict(solidmappath)
         self.roofdata: List[str] = mappathtodict(roofmappath)
