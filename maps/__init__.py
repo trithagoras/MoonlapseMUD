@@ -144,7 +144,11 @@ def mappathtodict(mappath) -> List[str]:
 
 
 class Room:
+    DEFAULT: str = 'forest'
+
     def __init__(self, name: str):
+        if not name:
+            name = self.DEFAULT
         self.name = name
 
         pwd: str = os.path.dirname(__file__)
