@@ -40,10 +40,11 @@ class Moonlapse(NetstringReceiver):
     The self.processPacket method is used to tell another protocol on the server to process a packet which 
     doesn't necessarily have to be sent to any clients.
     """
-    def __init__(self, server: MoonlapseServer, database: Database, users: Dict[str, 'Moonlapse']):
+    def __init__(self, server: MoonlapseServer, database: Database, users: Dict[str, 'Moonlapse'], roomname: Optional[str] = None):
         super().__init__()
         self._server: MoonlapseServer = server
         self.database: Database = database
+        self.roomname = roomname
 
         # A volatile dictionary of usernames to protocols passed in by the server.
         self.users: Dict[str, 'Moonlapse'] = users
@@ -81,29 +82,29 @@ class Moonlapse(NetstringReceiver):
         on dataReceived.
         """
         p: packet.Packet = packet.frombytes(string)
-        print(f"[{self.username}][{self.state.__name__}][{self.users.keys()}]: Received packet from my client {p}")
+        print(f"[{self.username}][{self.state.__name__}][{self.roomname}]: Received packet from my client {p}")
         self.state(p)
 
     def sendPacket(self, p: packet.Packet) -> None:
         """
-        Sends a packet to this protocol's client. 
+        Sends a packet to this protocol's client.
         Call this to communicate information back to the game client application.
         """
         self.transport.write(p.tobytes())
-        print(f"[{self.username}][{self.state.__name__}][{self.users.keys()}]: Sent data to my client: {p.tobytes()}")
+        print(f"[{self.username}][{self.state.__name__}][{self.roomname}]: Sent data to my client: {p.tobytes()}")
 
     def processPacket(self, p: packet.Packet) -> None:
         """
         Processes packets sent to this protocol from another protocol.
         Call this to communicate with other protocols connected to the main server.
         """
-        print(f"[{self.username}][{self.state.__name__}][{self.users.keys()}]: Received packet from a protocol {p}")
+        print(f"[{self.username}][{self.state.__name__}][{self.roomname}]: Received packet from a protocol {p}")
         self.state(p)
 
     def _PLAY(self, p: packet.Packet) -> None:
         """
         Handles packets received when this protocol is in the PLAY state.
-        This should never be called directly and is instead handled by 
+        This should never be called directly and is instead handled by
         stringReceived.
         """
         if isinstance(p, packet.MovePacket):
@@ -118,11 +119,13 @@ class Moonlapse(NetstringReceiver):
             self.disconnect_other(p)
         elif isinstance(p, packet.ServerLogPacket):
             self.sendPacket(p)
+        elif isinstance(p, packet.MoveRoomsPacket):
+            self.move_rooms(p)
 
     def _GETENTRY(self, p: Union[packet.LoginPacket, packet.RegisterPacket]) -> None:
         """
         Handles packets received when this protocol is in the GETENTRY state.
-        This should never be called directly and is instead handled by 
+        This should never be called directly and is instead handled by
         stringReceived.
         """
         if isinstance(p, packet.LoginPacket):
@@ -136,12 +139,12 @@ class Moonlapse(NetstringReceiver):
         1. Check if the given username is already connected to the server
         2. Check if the given username exists in the database
         3. Check if the given password is correct for the given username
-        4. Initialises the new player in this protocol by setting some instance 
+        4. Initialises the new player in this protocol by setting some instance
            variables
-        5. Establishes the new player in the room and sends information back to the 
+        5. Establishes the new player in the room and sends information back to the
            game client
 
-        If an error occurs at any point in the process, it is sent as a Deny Packet back 
+        If an error occurs at any point in the process, it is sent as a Deny Packet back
         to the client with an appropriate error message.
         """
         if username in self.users.keys():
@@ -150,31 +153,31 @@ class Moonlapse(NetstringReceiver):
 
         self.database.user_exists(username
         ).addCallbacks(
-            callback = self._check_password_correct, 
+            callback = self._check_password_correct,
             callbackArgs = (username, password),
             errback = lambda e: self.sendPacket(packet.DenyPacket(e.getErrorMessage())) # Catch user_exists
         ).addCallbacks(
-            callback = self._initialise_player, 
-            callbackArgs=(username,), 
+            callback = self._initialise_player,
+            callbackArgs=(username,),
             errback = lambda e: self.sendPacket(packet.DenyPacket(e.getErrorMessage())) # Catch check_password_correct
         ).addCallbacks(
             callback = self._set_player_room,
             errback = lambda e: self.sendPacket(packet.DenyPacket(e.getErrorMessage())) # Catch initialise_new_player
         ).addCallbacks(
-            callback = self._establish_player_in_world, 
+            callback = self._establish_player_in_world,
             errback = lambda e: self.sendPacket(packet.DenyPacket(e.getErrorMessage())) # Catch set_player_room
         )
 
     def _check_password_correct(self, user_exists: List[Tuple[bool]], username: str, password: str) -> Deferred:
         print(f"_check_password_correct(user_exists={user_exists}, username={username}, password={password})")
-        if not user_exists[0][0]:
+        if user_exists and not user_exists[0][0]:
             raise EntryError("I don't know anybody by that name")
 
         return self.database.password_correct(username, password)
 
     def _initialise_player(self, password_correct: List[Tuple[bool]], username: str) -> Deferred:
         print(f"_initialise_player(password_correct={password_correct}, username={username})")
-        if not password_correct[0][0]:
+        if password_correct and not password_correct[0][0]:
             raise EntryError("Incorrect password")
 
         self.username = username
@@ -185,24 +188,28 @@ class Moonlapse(NetstringReceiver):
 
     def _set_player_room(self, roomname: List[Tuple[str]]) -> Deferred:
         print(f"_set_player_room(roomname={roomname})")
-        self.player.set_room(Room(roomname[0][0]))
+        room: Room = Room(None)
+        if roomname:
+            room = Room(roomname[0][0])
+        self.player.set_room(room)
         return self.database.get_player_pos(self.player)
 
     def _establish_player_in_world(self, init_pos: List[Tuple[Optional[float], Optional[float]]]) -> None:
         print(f"_establish_player_in_world(init_pos={init_pos})")
         self.sendPacket(packet.OkPacket())
 
-        init_pos: Tuple[Optional[float], Optional[float]] = init_pos[0]
-        print(f"[{self.username}][{self.state.__name__}][{self.users.keys()}]: Got", init_pos)
-        self.player.set_view_radius(10)
+        if init_pos:
+            init_pos: Tuple[Optional[float], Optional[float]] = init_pos[0]
+            print(f"[{self.username}][{self.state.__name__}][{self.roomname}]: Got", init_pos)
+            self.player.set_view_radius(10)
 
-        if None in init_pos:
-            self.player.assign_location(init_pos)
-            new_pos: Tuple[int, int] = self.player.get_position()
-            self.database.update_player_pos(self.player, new_pos[0], new_pos[1])
-        else:
-            init_pos = (int(init_pos[0]), int(init_pos[1]))
-            self.player.assign_location(init_pos)
+            if None in init_pos:
+                self.player.assign_location(init_pos)
+                new_pos: Tuple[int, int] = self.player.get_position()
+                self.database.update_player_pos(self.player, new_pos[0], new_pos[1])
+            else:
+                init_pos = (int(init_pos[0]), int(init_pos[1]))
+                self.player.assign_location(init_pos)
 
         self.sendPacket(packet.ServerTickRatePacket(100))
         self.player.get_room().pack()
@@ -252,7 +259,7 @@ class Moonlapse(NetstringReceiver):
         2. Write the new username and password into the database
         3. Tell the client the registration was successful
 
-        If an error occurs at any point in the process, it is sent as a Deny Packet back 
+        If an error occurs at any point in the process, it is sent as a Deny Packet back
         to the client with an appropriate error message.
         """
         self.database.user_exists(username
@@ -268,22 +275,22 @@ class Moonlapse(NetstringReceiver):
     def _register_user(self, user_exists: List[Tuple[bool]], username: str, password: str) -> Deferred:
         if user_exists[0][0]:
             raise EntryError(f"Somebody else already goes by that name")
-        
+
         return self.database.register_user(username, password)
 
     def _DISCONNECT(self, p: packet.DisconnectPacket):
         """
         Handles packets received when this protocol is in the DISCONNECT state.
-        Releases this protocol from the server and informs all other protocols 
+        Releases this protocol from the server and informs all other protocols
         of this disconnection. No more code should be executed from this protocol.
 
-        This should never be called directly. Instead it should be handleded by 
+        This should never be called directly. Instead it should be handleded by
         self.connectionLost.
         """
         # Release this protocol from the server
         if self.username in self.users.keys():
             del self.users[self.username]
-            print(f"[{self.username}][{self.state.__name__}][{self.users.keys()}]: Deleted self from users list")
+            print(f"[{self.username}][{self.state.__name__}][{self.roomname}]: Deleted self from users list")
 
         # Tell all still connected protocols about this disconnection
         for protocol in self.users.values():
@@ -302,7 +309,7 @@ class Moonlapse(NetstringReceiver):
             * broadcast(packet.ServerLogPacket("Hello"), including=("Sue", "James")) will send to only Sue and James
             * broadcast(packet.ServerLogPacket("Hello"), including=("Mary",), excluding=("Mary",)) will send to noone
         """
-        print(f"[{self.username}][{self.state.__name__}][{self.users.keys()}]: Broadcasting {packets} to {including if including else 'everyone'} except {excluding}")
+        print(f"[{self.username}][{self.state.__name__}][{self.roomname}]: Broadcasting {packets} to {including if including else 'everyone'} except {excluding}")
 
         sendto: Dict[str, 'Moonlapse'] = {u: p for u, p in self.users.items() if u not in excluding}
         if including:
@@ -384,6 +391,30 @@ class Moonlapse(NetstringReceiver):
             self.player.get_view_range_topleft(),
             self.player.get_view_range_botright()
         )])
+
+    def move_rooms(self, p: packet.MoveRoomsPacket):
+        roomname: str = p.payloads[0].value
+        self._server.moveProtocols(self, roomname)
+        self.sendPacket(packet.OkPacket())
+        self.database.set_player_room(self.player, roomname
+        ).addCallbacks(
+            callback = self._initialise_player,
+            callbackArgs = (self.username,),
+            errback = lambda e: self.sendPacket(packet.DenyPacket(e.getErrorMessage()))  # Catch set_player_room
+        ).addCallbacks(
+            callback = self._set_player_room,   # I know we set room above, but this flow already works
+            errback = lambda e: self.sendPacket(packet.DenyPacket(e.getErrorMessage()))  # Catch initialise_new_player
+        ).addCallbacks(
+            callback=self._establish_player_in_world,
+            errback = lambda e: self.sendPacket(packet.DenyPacket(e.getErrorMessage()))  # Catch set_player_room
+        )
+
+    def reinitialize(self, newusers: Dict[str, 'Moonlapse'], newroomname: str):
+        self.users = newusers
+        self.roomname = newroomname
+
+        self.players_visible_users: Dict[str, Tuple[int, int]] = {}
+
 
 
 class EntryError(Exception):

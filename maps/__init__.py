@@ -146,13 +146,15 @@ def mappathtodict(mappath) -> List[str]:
 class Room:
     DEFAULT: str = 'forest'
 
-    def __init__(self, name: str):
-        if not name:
+    def __init__(self, name: Optional[str]):
+        pwd: str = os.path.dirname(__file__)
+
+        if not name or name not in os.listdir(pwd):
             name = self.DEFAULT
         self.name = name
 
-        pwd: str = os.path.dirname(__file__)
-        path_to_room_dir = os.path.join(pwd, name)
+        path_to_room_dir = os.path.join(pwd, self.name)
+
         groundmappath = os.path.join(path_to_room_dir, 'ground.data')
         solidmappath = os.path.join(path_to_room_dir, 'solid.data')
         roofmappath = os.path.join(path_to_room_dir, 'roof.data')
@@ -195,6 +197,9 @@ class Room:
         self.roofmap = {}
 
         self._is_unpacked = False
+
+    def __eq__(self, o: object) -> bool:
+        return isinstance(o, Room) and o.name == self.name
 
 
 if __name__ == '__main__':

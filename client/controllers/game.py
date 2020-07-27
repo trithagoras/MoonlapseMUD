@@ -3,7 +3,7 @@ import curses.ascii
 import socket
 import threading
 import time
-from maps import Room
+from enum import Enum
 from typing import *
 from networking import packet
 from networking import models
@@ -12,16 +12,20 @@ from .controller import Controller
 from ..views.gameview import GameView
 
 
+class Action(Enum):
+    MOVE_ROOMS = 1
+
+
 class Game(Controller):
     def __init__(self, s: socket.socket, username: str):
         super().__init__()
         self.s: socket.socket = s
         self.username = username
+        self.action: Optional[Action] = None
 
         # Game data
         self.player: Optional[models.Player] = None
         self.visible_users: Dict[str, Tuple[int, int]] = {}
-        self.ground_map: Optional[bytes] = None
         self.tick_rate: Optional[int] = None
 
         self.logger: Log = Log()
@@ -78,6 +82,22 @@ class Game(Controller):
                 self.stop()
                 break
 
+            elif isinstance(p, packet.OkPacket):
+                if self.action == Action.MOVE_ROOMS:
+                    self.action = None
+                    self.reinitialize()
+                # Extend custom followup behaviours here, e.g.
+                # elif self.action == Action.DO_THIS:
+                #   self.action = None
+                #   self.do_that()
+
+            elif isinstance(p, packet.DenyPacket):
+                pass
+                # Define custom followup behaviours here, e.g.
+                # if self.action == Action.DO_THIS:
+                #   self.action = None
+                #   self.action = do_that()
+
     def user_exchange(self, username: str, position: Tuple[int, int]):
         # If the received username is ourselves, update ourself
         if username == self.username:
@@ -121,6 +141,16 @@ class Game(Controller):
         elif key == ord('j'):
             self.view.win2_focus = GameView.Window2Focus.JOURNAL
 
+        # TODO: Remove this
+        # Moving rooms (just a test)
+        elif key == ord('f'):
+            self.action = Action.MOVE_ROOMS
+            packet.send(packet.MoveRoomsPacket('forest'), self.s)
+        elif key == ord('t'):
+            self.action = Action.MOVE_ROOMS
+            packet.send(packet.MoveRoomsPacket('tavern'), self.s)
+
+
         # Chat
         elif key in (curses.KEY_ENTER, curses.ascii.LF, curses.ascii.CR):
             self.view.chatbox.modal()
@@ -137,6 +167,11 @@ class Game(Controller):
 
     def ready(self) -> bool:
         return False not in [bool(data) for data in (self.player, self.tick_rate)] and self.player.get_room().is_unpacked()
+
+    def reinitialize(self):
+        self.player = None
+        self.visible_users = {}
+        self.tick_rate = None
 
     def stop(self) -> None:
         self._logged_in = False

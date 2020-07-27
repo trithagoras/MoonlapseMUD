@@ -174,6 +174,11 @@ class MoveRightPacket(MovePacket):
     pass
 
 
+class MoveRoomsPacket(Packet):
+    def __init__(self, roomname: str):
+        super().__init__(Payload(roomname))
+
+
 class DisconnectPacket(Packet):
     """
     A packet sent to signify the client's connection has been lost. An optional reason

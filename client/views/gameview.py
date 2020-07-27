@@ -6,7 +6,7 @@ import random
 from typing import *
 from .view import View, Color
 from ..curses_helper import TextBox
-from ..curses_helper import color_addch
+from ..curses_helper import color_addch, color_addstr
 
 
 class GameView(View):
@@ -56,6 +56,11 @@ class GameView(View):
 
     def draw(self) -> None:
         super().draw()
+
+        if not self.game.ready():
+            msg: str = "Loading, please wait..."
+            color_addstr(self.stdscr, self.height // 2, (self.width - len(msg)) // 2, msg, Color.WHITE)
+            return
 
         # Focus control labels
         self.stdscr.hline(0, 0, curses.ACS_HLINE, self.width)

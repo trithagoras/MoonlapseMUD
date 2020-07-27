@@ -98,14 +98,14 @@ class Database:
             )
         """)
 
-    def set_player_room(self, player: models.Player, room: Room):
+    def set_player_room(self, player: models.Player, roomname: str) -> Deferred:
         print(f"Updating player room ({player.get_username()})...")
         return self.dbpool.runOperation(f"""
                     UPDATE entities
                     SET roomid = (
                         SELECT id
                         FROM rooms
-                        WHERE name = '{room.name}'
+                        WHERE name = '{roomname}'
                     )
                     WHERE id IN (
                         SELECT p.entityid
