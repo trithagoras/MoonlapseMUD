@@ -20,24 +20,22 @@ class MoonlapseServer(Factory):
         self.database: database.Database = database.Database(connectionstringspath)
         self.database.connect()
 
-        self.roomnames_users: Dict[Optional[str], [str, protocol.Moonlapse]] = {None: {}}
+        self.roomnames_users: Dict[Optional[str], [str, protocol.Moonlapse]] = {}
 
     def buildProtocol(self, addr):
-        print("Adding a new client. Sending users:", self.roomnames_users[None].items())
-        return protocol.Moonlapse(self, self.database, self.roomnames_users[None])
+        print("Adding a new client.")
+        return protocol.Moonlapse(self, self.database)
 
     def moveProtocols(self, proto, roomname: str):
         # Remove the player from the old room
-        self.roomnames_users[proto.roomname].pop(proto.username)
+        if proto.roomname and proto.username in self.roomnames_users[proto.roomname]:
+            self.roomnames_users[proto.roomname].pop(proto.username)
 
         # Add the player to the new room
         if roomname in self.roomnames_users:
             self.roomnames_users[roomname][proto.username] = proto
         else:
             self.roomnames_users[roomname] = {proto.username: proto}
-
-        # Reinitialise the player
-        proto.reinitialize(self.roomnames_users[roomname], roomname)
 
 
 

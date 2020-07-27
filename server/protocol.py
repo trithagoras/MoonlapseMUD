@@ -40,14 +40,14 @@ class Moonlapse(NetstringReceiver):
     The self.processPacket method is used to tell another protocol on the server to process a packet which 
     doesn't necessarily have to be sent to any clients.
     """
-    def __init__(self, server: MoonlapseServer, database: Database, users: Dict[str, 'Moonlapse'], roomname: Optional[str] = None):
+    def __init__(self, server: MoonlapseServer, database: Database, roomname: Optional[str] = None):
         super().__init__()
         self._server: MoonlapseServer = server
         self.database: Database = database
         self.roomname = roomname
 
         # A volatile dictionary of usernames to protocols passed in by the server.
-        self.users: Dict[str, 'Moonlapse'] = users
+        self.users: Dict[str, 'Moonlapse'] = {}
 
         # Information specific to the player using this protocol
         self.username: Optional[str] = None
@@ -139,10 +139,7 @@ class Moonlapse(NetstringReceiver):
         1. Check if the given username is already connected to the server
         2. Check if the given username exists in the database
         3. Check if the given password is correct for the given username
-        4. Initialises the new player in this protocol by setting some instance
-           variables
-        5. Establishes the new player in the room and sends information back to the
-           game client
+        4.
 
         If an error occurs at any point in the process, it is sent as a Deny Packet back
         to the client with an appropriate error message.
@@ -155,47 +152,54 @@ class Moonlapse(NetstringReceiver):
         ).addCallbacks(
             callback = self._check_password_correct,
             callbackArgs = (username, password),
-            errback = lambda e: self.sendPacket(packet.DenyPacket(e.getErrorMessage())) # Catch user_exists
+            errback = lambda e: self.sendPacket(packet.DenyPacket(e.getErrorMessage()))  # Catch user_exists
         ).addCallbacks(
-            callback = self._initialise_player,
-            callbackArgs=(username,),
-            errback = lambda e: self.sendPacket(packet.DenyPacket(e.getErrorMessage())) # Catch check_password_correct
+            callback = self._initialise_player_and_query_room,
+            callbackArgs = (username,)#,
+            #errback = lambda e: self.sendPacket(packet.DenyPacket(e.getErrorMessage()))  # Catch check_password_correct
         ).addCallbacks(
-            callback = self._set_player_room,
-            errback = lambda e: self.sendPacket(packet.DenyPacket(e.getErrorMessage())) # Catch initialise_new_player
+            callback = self.move_rooms#,
+            #errback = lambda e: self.sendPacket(packet.DenyPacket(e.getErrorMessage()))  # Catch initialise_player_and_query_room
         ).addCallbacks(
-            callback = self._establish_player_in_world,
-            errback = lambda e: self.sendPacket(packet.DenyPacket(e.getErrorMessage())) # Catch set_player_room
+            callback=self.query_player_position#,
+            # errback=lambda e: self.sendPacket(packet.DenyPacket(e.getErrorMessage()))  # Catch move_rooms
+        ).addCallbacks(
+            callback=self._establish_player_in_world#,
+            #errback=lambda e: self.sendPacket(packet.DenyPacket(e.getErrorMessage()))  # Catch query_player_position
         )
 
     def _check_password_correct(self, user_exists: List[Tuple[bool]], username: str, password: str) -> Deferred:
-        print(f"_check_password_correct(user_exists={user_exists}, username={username}, password={password})")
+        print(f"\n_check_password_correct(user_exists={user_exists}, username={username}, password={password})\n")
         if user_exists and not user_exists[0][0]:
             raise EntryError("I don't know anybody by that name")
 
         return self.database.password_correct(username, password)
 
-    def _initialise_player(self, password_correct: List[Tuple[bool]], username: str) -> Deferred:
-        print(f"_initialise_player(password_correct={password_correct}, username={username})")
+    def _initialise_player_and_query_room(self, password_correct: List[Tuple[bool]], username: str) -> Deferred:
+        print(f"\n_initialise_player_and_query_room(password_correct={password_correct}, username={username})\n")
         if password_correct and not password_correct[0][0]:
             raise EntryError("Incorrect password")
 
         self.username = username
-        self.users[self.username] = self
         self.player = models.Player(self.username)
 
-        return self.database.get_player_roomname(self.player)
+        return self.database.get_player_roomname(username)
 
-    def _set_player_room(self, roomname: List[Tuple[str]]) -> Deferred:
-        print(f"_set_player_room(roomname={roomname})")
-        room: Room = Room(None)
-        if roomname:
-            room = Room(roomname[0][0])
-        self.player.set_room(room)
-        return self.database.get_player_pos(self.player)
+    def move_rooms(self, roomname: List[Tuple[str]]) -> Deferred:
+        print(f"\nmove_rooms(roomname={roomname})\n")
+        roomname = roomname[0][0]
+        self._server.moveProtocols(self, roomname)
+        self.roomname = roomname
+        self.users = self._server.roomnames_users[roomname]
+        self.player.set_room(Room(roomname))
+        return self.database.set_player_room(self.username, roomname)
+
+    def query_player_position(self, _):
+        print(f"\nquery_player_position(_={_})\n")
+        return self.database.get_player_pos(self.username)
 
     def _establish_player_in_world(self, init_pos: List[Tuple[Optional[float], Optional[float]]]) -> None:
-        print(f"_establish_player_in_world(init_pos={init_pos})")
+        print(f"\n_establish_player_in_world(init_pos={init_pos})\n")
         self.sendPacket(packet.OkPacket())
 
         if init_pos:
@@ -206,7 +210,7 @@ class Moonlapse(NetstringReceiver):
             if None in init_pos:
                 self.player.assign_location(init_pos)
                 new_pos: Tuple[int, int] = self.player.get_position()
-                self.database.update_player_pos(self.player, new_pos[0], new_pos[1])
+                self.database.update_player_pos(self.username, new_pos[0], new_pos[1])
             else:
                 init_pos = (int(init_pos[0]), int(init_pos[1]))
                 self.player.assign_location(init_pos)
@@ -391,30 +395,6 @@ class Moonlapse(NetstringReceiver):
             self.player.get_view_range_topleft(),
             self.player.get_view_range_botright()
         )])
-
-    def move_rooms(self, p: packet.MoveRoomsPacket):
-        roomname: str = p.payloads[0].value
-        self._server.moveProtocols(self, roomname)
-        self.sendPacket(packet.OkPacket())
-        self.database.set_player_room(self.player, roomname
-        ).addCallbacks(
-            callback = self._initialise_player,
-            callbackArgs = (self.username,),
-            errback = lambda e: self.sendPacket(packet.DenyPacket(e.getErrorMessage()))  # Catch set_player_room
-        ).addCallbacks(
-            callback = self._set_player_room,   # I know we set room above, but this flow already works
-            errback = lambda e: self.sendPacket(packet.DenyPacket(e.getErrorMessage()))  # Catch initialise_new_player
-        ).addCallbacks(
-            callback=self._establish_player_in_world,
-            errback = lambda e: self.sendPacket(packet.DenyPacket(e.getErrorMessage()))  # Catch set_player_room
-        )
-
-    def reinitialize(self, newusers: Dict[str, 'Moonlapse'], newroomname: str):
-        self.users = newusers
-        self.roomname = newroomname
-
-        self.players_visible_users: Dict[str, Tuple[int, int]] = {}
-
 
 
 class EntryError(Exception):
