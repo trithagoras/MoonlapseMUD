@@ -120,7 +120,7 @@ class Moonlapse(NetstringReceiver):
         elif isinstance(p, packet.ServerLogPacket):
             self.sendPacket(p)
         elif isinstance(p, packet.MoveRoomsPacket):
-            self.move_rooms(p)
+            self.move_rooms([(p.payloads[0].value,)])
 
     def _GETENTRY(self, p: Union[packet.LoginPacket, packet.RegisterPacket]) -> None:
         """
@@ -139,7 +139,10 @@ class Moonlapse(NetstringReceiver):
         1. Check if the given username is already connected to the server
         2. Check if the given username exists in the database
         3. Check if the given password is correct for the given username
-        4.
+        4. Initialise the player
+        5. Move the player to the server room the database has them in
+        6. Move the player to the position the database has them in
+        7. Send all of the gathered information to the client
 
         If an error occurs at any point in the process, it is sent as a Deny Packet back
         to the client with an appropriate error message.
@@ -155,17 +158,11 @@ class Moonlapse(NetstringReceiver):
             errback = lambda e: self.sendPacket(packet.DenyPacket(e.getErrorMessage()))  # Catch user_exists
         ).addCallbacks(
             callback = self._initialise_player_and_query_room,
-            callbackArgs = (username,)#,
-            #errback = lambda e: self.sendPacket(packet.DenyPacket(e.getErrorMessage()))  # Catch check_password_correct
+            callbackArgs = (username,),
+            errback = lambda e: self.sendPacket(packet.DenyPacket(e.getErrorMessage()))  # Catch check_password_correct
         ).addCallbacks(
-            callback = self.move_rooms#,
-            #errback = lambda e: self.sendPacket(packet.DenyPacket(e.getErrorMessage()))  # Catch initialise_player_and_query_room
-        ).addCallbacks(
-            callback=self.query_player_position#,
-            # errback=lambda e: self.sendPacket(packet.DenyPacket(e.getErrorMessage()))  # Catch move_rooms
-        ).addCallbacks(
-            callback=self._establish_player_in_world#,
-            #errback=lambda e: self.sendPacket(packet.DenyPacket(e.getErrorMessage()))  # Catch query_player_position
+            callback = self.move_rooms,
+            errback = lambda e: self.sendPacket(packet.DenyPacket(e.getErrorMessage()))  # Catch initialise_player_and_query_room
         )
 
     def _check_password_correct(self, user_exists: List[Tuple[bool]], username: str, password: str) -> Deferred:
@@ -185,14 +182,22 @@ class Moonlapse(NetstringReceiver):
 
         return self.database.get_player_roomname(username)
 
-    def move_rooms(self, roomname: List[Tuple[str]]) -> Deferred:
+    def move_rooms(self, roomname: List[Tuple[str]]):
         print(f"\nmove_rooms(roomname={roomname})\n")
         roomname = roomname[0][0]
         self._server.moveProtocols(self, roomname)
         self.roomname = roomname
         self.users = self._server.roomnames_users[roomname]
         self.player.set_room(Room(roomname))
-        return self.database.set_player_room(self.username, roomname)
+
+        self.database.set_player_room(self.username, roomname
+        ).addCallbacks(
+            callback=self.query_player_position,
+            errback=lambda e: self.sendPacket(packet.DenyPacket(e.getErrorMessage()))  # Catch move_rooms
+        ).addCallbacks(
+            callback=self._establish_player_in_world,
+            errback=lambda e: self.sendPacket(packet.DenyPacket(e.getErrorMessage()))  # Catch query_player_position
+        )
 
     def query_player_position(self, _):
         print(f"\nquery_player_position(_={_})\n")
