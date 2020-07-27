@@ -185,6 +185,8 @@ class Moonlapse(NetstringReceiver):
     def move_rooms(self, roomname: List[Tuple[str]]):
         print(f"\nmove_rooms(roomname={roomname})\n")
         roomname = roomname[0][0]
+        # TODO: Don't use disconnect packet here, either rename the packet or use a new one
+        self.broadcast(packet.DisconnectPacket(self.username), excluding=(self.username,))
         self._server.moveProtocols(self, roomname)
         self.roomname = roomname
         self.users = self._server.roomnames_users[roomname]
