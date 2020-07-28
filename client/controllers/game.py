@@ -14,6 +14,7 @@ from ..views.gameview import GameView
 
 class Action(Enum):
     MOVE_ROOMS = 1
+    LOGOUT = 2
 
 
 class Game(Controller):
@@ -71,25 +72,20 @@ class Game(Controller):
             elif isinstance(p, packet.ServerLogPacket):
                 self.logger.log(p.payloads[0].value)
 
-            # Another player has logged out or disconnected so we remove them from the game.
-            elif isinstance(p, packet.LogoutPacket) or isinstance(p, packet.DisconnectPacket):
+            # Another player has logged out, left the room, or disconnected so we remove them from the game.
+            elif isinstance(p, packet.LogoutPacket) or isinstance(p, packet.GoodbyePacket):
                 username: str = p.payloads[0].value
                 if username in self.visible_users:
                     self.visible_users.pop(username)
-
-            # Server sent back a goodbye packet indicating it's OK for us to exit the game.
-            elif isinstance(p, packet.GoodbyePacket):
-                self.stop()
-                break
 
             elif isinstance(p, packet.OkPacket):
                 if self.action == Action.MOVE_ROOMS:
                     self.action = None
                     self.reinitialize()
-                # Extend custom followup behaviours here, e.g.
-                # elif self.action == Action.DO_THIS:
-                #   self.action = None
-                #   self.do_that()
+                elif self.action == Action.LOGOUT:
+                    self.action = None
+                    self.stop()
+                    break
 
             elif isinstance(p, packet.DenyPacket):
                 pass
@@ -159,6 +155,7 @@ class Game(Controller):
         # Quit on Windows. TODO: Figure out how to make CTRL+C or ESC work.
         elif key == ord('q'):
             packet.send(packet.LogoutPacket(self.player.get_username()), self.s)
+            self.action = Action.LOGOUT
 
         return key
 

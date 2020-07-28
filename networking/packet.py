@@ -100,9 +100,11 @@ class WelcomePacket(Packet):
 
 class GoodbyePacket(Packet):
     """
-    A packet sent from a protocol to a client after a logout request is received.
+    A packet sent from a protocol to a client after a moving rooms. Can also be sent from a protocol to
+    a client to indicate someone else has left the room.
     """
-    pass
+    def __init__(self, username: str):
+        super().__init__(Payload(username))
 
 
 class LoginPacket(Packet):

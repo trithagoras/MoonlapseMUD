@@ -115,8 +115,8 @@ class Moonlapse(NetstringReceiver):
             self.chat(p)
         elif isinstance(p, packet.LogoutPacket):
             self.logout(p)
-        elif isinstance(p, packet.DisconnectPacket):
-            self.disconnect_other(p)
+        elif isinstance(p, packet.GoodbyePacket):
+            self.depart_other(p)
         elif isinstance(p, packet.ServerLogPacket):
             self.sendPacket(p)
         elif isinstance(p, packet.MoveRoomsPacket):
@@ -185,8 +185,7 @@ class Moonlapse(NetstringReceiver):
     def move_rooms(self, roomname: List[Tuple[str]]):
         print(f"\nmove_rooms(roomname={roomname})\n")
         roomname = roomname[0][0]
-        # TODO: Don't use disconnect packet here, either rename the packet or use a new one
-        self.broadcast(packet.DisconnectPacket(self.username), excluding=(self.username,))
+        self.broadcast(packet.GoodbyePacket(self.username), excluding=(self.username,))
         self._server.moveProtocols(self, roomname)
         self.roomname = roomname
         self.users = self._server.roomnames_users[roomname]
@@ -240,7 +239,7 @@ class Moonlapse(NetstringReceiver):
                 if protocol != self:
                     protocol.processPacket(p)
 
-            self.sendPacket(packet.GoodbyePacket())
+            self.sendPacket(packet.OkPacket())
             del self.users[self.username]
             self.username = None
             self.password = None
@@ -252,10 +251,9 @@ class Moonlapse(NetstringReceiver):
             # If the player to logout is not ourselves, handle things differently
             self.logout_other(p)
 
-    def disconnect_other(self, p: packet.DisconnectPacket):
+    def depart_other(self, p: packet.GoodbyePacket):
         other_name: str = p.payloads[0].value if p.payloads[0].value else 'Someone'
-        reason: Optional[str] = p.payloads[1].value
-        self.sendPacket(packet.ServerLogPacket(f"{other_name} has disconnected{': ' + reason if reason else ''}."))
+        self.sendPacket(packet.ServerLogPacket(f"{other_name} has departed."))
         self.sendPacket(p)
 
     def logout_other(self, p: packet.LogoutPacket):
@@ -306,7 +304,7 @@ class Moonlapse(NetstringReceiver):
         # Tell all still connected protocols about this disconnection
         for protocol in self.users.values():
             if protocol != self:
-                protocol.processPacket(p)
+                protocol.processPacket(packet.GoodbyePacket(self.username))
 
     def broadcast(self, *packets: packet.Packet, including: Tuple[str] = tuple(), excluding: Tuple[str] = tuple()) -> None:
         """
