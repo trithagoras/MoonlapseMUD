@@ -2,7 +2,6 @@ from twisted.internet.protocol import Factory
 from twisted.internet import reactor
 from typing import *
 import os
-from maps import Room
 
 # Required to import from shared modules
 import sys
