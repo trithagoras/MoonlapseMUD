@@ -71,3 +71,15 @@ class Player:
 
     def __repr__(self):
         return f"Player {self.get_username()}"
+
+
+class Portal:
+    def __init__(self, linked_room: Room, linked_position: Tuple[int, int]):
+        self._linked_room: Room = linked_room
+        self._linked_position: Tuple[int, int] = linked_position
+
+    def get_linked_room(self):
+        return self._linked_room
+
+    def get_linked_position(self):
+        return self._linked_position
