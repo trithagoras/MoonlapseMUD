@@ -364,7 +364,7 @@ class Moonlapse(NetstringReceiver):
         room = self.player.get_room()
         if within_bounds(tuple(dest), (0, 0), (room.height - 1, room.width - 1)) and tuple(dest) not in room.solidmap:
             self.player.set_position(dest)
-            self.database.update_player_pos(self.player, dest[0], dest[1])
+            self.database.update_player_pos(self.username, dest[0], dest[1])
 
             current_usernames_in_view: Tuple[str] = self.get_usernames_in_view()
 
