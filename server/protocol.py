@@ -147,7 +147,7 @@ class Moonlapse(NetstringReceiver):
         If an error occurs at any point in the process, it is sent as a Deny Packet back
         to the client with an appropriate error message.
         """
-        if username in self.users.keys():
+        if self.roomname and username in self.users:
             self.sendPacket(packet.DenyPacket("You are already inhabiting this realm"))
             return
 
@@ -182,23 +182,28 @@ class Moonlapse(NetstringReceiver):
 
         return self.database.get_player_roomname(username)
 
-    def move_rooms(self, roomname: List[Tuple[str]]):
+    def move_rooms(self, roomname: List[Tuple[Optional[str]]]):
         print(f"\nmove_rooms(roomname={roomname})\n")
         roomname = roomname[0][0]
-        self.broadcast(packet.GoodbyePacket(self.username), excluding=(self.username,))
+
         self._server.moveProtocols(self, roomname)
+
+        self.broadcast(packet.GoodbyePacket(self.username), excluding=(self.username,))
+        self.players_visible_users = {}
         self.roomname = roomname
         self.users = self._server.roomnames_users[roomname]
-        self.player.set_room(Room(roomname))
 
-        self.database.set_player_room(self.username, roomname
-        ).addCallbacks(
-            callback=self.query_player_position,
-            errback=lambda e: self.sendPacket(packet.DenyPacket(e.getErrorMessage()))  # Catch move_rooms
-        ).addCallbacks(
-            callback=self._establish_player_in_world,
-            errback=lambda e: self.sendPacket(packet.DenyPacket(e.getErrorMessage()))  # Catch query_player_position
-        )
+        # Only do the following if the user isn't going back to the lobby (None)
+        if self.roomname:
+            self.player.set_room(Room(roomname))
+            self.database.set_player_room(self.username, roomname
+            ).addCallbacks(
+                callback=self.query_player_position,
+                errback=lambda e: self.sendPacket(packet.DenyPacket(e.getErrorMessage()))  # Catch move_rooms
+            ).addCallbacks(
+                callback=self._establish_player_in_world,
+                errback=lambda e: self.sendPacket(packet.DenyPacket(e.getErrorMessage()))  # Catch query_player_position
+            )
 
     def query_player_position(self, _):
         print(f"\nquery_player_position(_={_})\n")
@@ -234,31 +239,17 @@ class Moonlapse(NetstringReceiver):
     def logout(self, p: packet.LogoutPacket):
         username: str = p.payloads[0].value
         if username == self.username:
-            # If the player to logout it ourselves, tell all other protocols
-            for protocol in self.users.values():
-                if protocol != self:
-                    protocol.processPacket(p)
-
+            # Tell our client it's OK to log out
             self.sendPacket(packet.OkPacket())
-            del self.users[self.username]
-            self.username = None
-            self.password = None
-            self.player = None
+            self.move_rooms([(None,)])
             self.logged_in = False
             self.state = self._GETENTRY
 
-        else:
-            # If the player to logout is not ourselves, handle things differently
-            self.logout_other(p)
-
     def depart_other(self, p: packet.GoodbyePacket):
-        other_name: str = p.payloads[0].value if p.payloads[0].value else 'Someone'
+        other_name: str = p.payloads[0].value
+        if other_name in self.players_visible_users:
+            self.players_visible_users.pop(other_name)
         self.sendPacket(packet.ServerLogPacket(f"{other_name} has departed."))
-        self.sendPacket(p)
-
-    def logout_other(self, p: packet.LogoutPacket):
-        other_name: str = p.payloads[0].value if p.payloads[0].value else 'Someone'
-        self.sendPacket(packet.ServerLogPacket(f"{other_name} has departed..."))
         self.sendPacket(p)
 
     def _handle_registration(self, username: str, password: str) -> None:
