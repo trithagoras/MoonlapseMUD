@@ -1,6 +1,5 @@
 import datetime
 import json
-from networking import models
 from twisted.enterprise import adbapi
 from twisted.internet.defer import Deferred
 
@@ -71,8 +70,8 @@ class Database:
             END;
         """)
 
-    def update_player_pos(self, player: models.Player, y: int, x: int) -> Deferred:
-        print(f"Updating player position ({player.get_username()})...")
+    def update_player_pos(self, username: str, y: int, x: int) -> Deferred:
+        print(f"Updating player position ({username})...")
         return self.dbpool.runOperation(f"""
             UPDATE entities
             SET position = '{y}, {x}'
@@ -80,12 +79,12 @@ class Database:
                 SELECT p.entityid
                 FROM players AS p
                 INNER JOIN users AS u 
-                ON p.userid = u.id and u.username = '{player.get_username()}' 
+                ON p.userid = u.id and u.username = '{username}' 
             )
         """)
 
-    def get_player_pos(self, player: models.Player) -> Deferred:
-        print(f"Getting player position ({player.get_username()})...", end='')
+    def get_player_pos(self, username: str) -> Deferred:
+        print(f"Getting player position ({username})...", end='')
         return self.dbpool.runQuery(f"""
             SELECT position[0], position[1]
             FROM entities
@@ -93,6 +92,38 @@ class Database:
                 SELECT p.entityid
                 FROM players as p 
                 INNER JOIN users AS u 
-                ON p.userid = u.id AND u.username = '{player.get_username()}'
+                ON p.userid = u.id AND u.username = '{username}'
+            )
+        """)
+
+    def set_player_room(self, username: str, roomname: str) -> Deferred:
+        print(f"Updating player room ({username})...")
+        return self.dbpool.runOperation(f"""
+                    UPDATE entities
+                    SET roomid = (
+                        SELECT id
+                        FROM rooms
+                        WHERE name = '{roomname}'
+                    )
+                    WHERE id IN (
+                        SELECT p.entityid
+                        FROM players AS p
+                        INNER JOIN users AS u 
+                        ON p.userid = u.id and u.username = '{username}' 
+                    )
+                """)
+
+    def get_player_roomname(self, username: str) -> Deferred:
+        print(f"Getting player room ({username})...", end='')
+        return self.dbpool.runQuery(f"""
+            SELECT name 
+            FROM rooms
+            WHERE id IN (
+                SELECT roomid
+                FROM entities AS e
+                INNER JOIN players AS p
+                ON e.id = p.entityid
+                INNER JOIN users AS u
+                ON p.userid = u.id AND u.username = '{username}'
             )
         """)

@@ -3,7 +3,7 @@ import curses.ascii
 import socket
 import threading
 import time
-import maps
+from enum import Enum
 from typing import *
 from networking import packet
 from networking import models
@@ -12,21 +12,22 @@ from .controller import Controller
 from ..views.gameview import GameView
 
 
+class Action(Enum):
+    MOVE_ROOMS = 1
+    LOGOUT = 2
+
+
 class Game(Controller):
-    def __init__(self, s: socket.socket):
+    def __init__(self, s: socket.socket, username: str):
         super().__init__()
         self.s: socket.socket = s
+        self.username = username
+        self.action: Optional[Action] = None
 
         # Game data
         self.player: Optional[models.Player] = None
-        self.objects_in_view: Set[Any] = set()
-        self.ground_map: Optional[bytes] = None
-        self.size: Optional[Tuple[int, int]] = None
+        self.visible_users: Dict[str, Tuple[int, int]] = {}
         self.tick_rate: Optional[int] = None
-
-        self.ground_map_data: Dict[Tuple[int, int], chr] = {}
-        self.solid_map_data: Dict[Tuple[int, int], chr] = {}
-        self.roof_map_data: Dict[Tuple[int, int], chr] = {}
 
         self.logger: Log = Log()
 
@@ -54,64 +55,52 @@ class Game(Controller):
                 p: packet.Packet = packet.receive(self.s)
                 if isinstance(p, packet.ServerPlayerPacket):
                     self.player = p.payloads[0].value
-                elif isinstance(p, packet.ServerGroundMapFilePacket):
-                    self.construct_map_data(p.payloads[0].value, mattype='ground')
-                elif isinstance(p, packet.ServerSolidMapFilePacket):
-                    self.construct_map_data(p.payloads[0].value, mattype='solid')
+                    self.player.get_room().unpack()
+                elif isinstance(p, packet.ServerUserPositionPacket):
+                    self.user_exchange(p.payloads[0].value, p.payloads[1].value)
                 elif isinstance(p, packet.ServerTickRatePacket):
                     self.tick_rate = p.payloads[0].value
+
+                ready = self.ready()
 
             # Get volatile data such as player positions, etc.
             p: packet.Packet = packet.receive(self.s)
 
-            if isinstance(p, packet.ServerPlayerPacket):
-                player: models.Player = p.payloads[0].value
-                pid: int = player.get_id()
-
-                # If the received player is ourselves, update our player
-                if pid == self.player.get_id():
-                    self.player = player
-                
-                # If the received player is somebody else, either update the other player or add a new one in
-                else:
-                    # If the received player is already in view, update them
-                    for o in self.objects_in_view:
-                        if isinstance(o, models.Player) and o.get_id() == pid:
-                            self.objects_in_view.remove(o)
-                            self.objects_in_view.add(player)
-                    # Otherwise, add them
-                    self.objects_in_view.add(player)
+            if isinstance(p, packet.ServerUserPositionPacket):
+                self.user_exchange(p.payloads[0].value, tuple(p.payloads[1].value))  # Can't receive tuples as JSON
 
             elif isinstance(p, packet.ServerLogPacket):
                 self.logger.log(p.payloads[0].value)
 
-            # Another player has logged out or disconnected so we remove them from the game.
-            elif isinstance(p, packet.LogoutPacket) or isinstance(p, packet.DisconnectPacket):
+            # Another player has logged out, left the room, or disconnected so we remove them from the game.
+            elif isinstance(p, packet.LogoutPacket) or isinstance(p, packet.GoodbyePacket):
                 username: str = p.payloads[0].value
-                for obj in self.objects_in_view:
-                    if isinstance(obj, models.Player) and obj.get_username() == username and obj in self.objects_in_view:
-                        self.objects_in_view.remove(obj)
-                        break
+                if username in self.visible_users:
+                    self.visible_users.pop(username)
 
-            # Server sent back a goodbye packet indicating it's OK for us to exit the game.
-            elif isinstance(p, packet.GoodbyePacket):
-                self.stop()
-                break
+            elif isinstance(p, packet.OkPacket):
+                if self.action == Action.MOVE_ROOMS:
+                    self.action = None
+                    self.reinitialize()
+                elif self.action == Action.LOGOUT:
+                    self.action = None
+                    self.stop()
+                    break
 
-    def construct_map_data(self, map_file: List[str], mattype: str):
-        """Load the coordinates of each type of ground material into a dictionary
-           Should be accessed like self.ground_map_data[maps.STONE] which will return all coordinates where
-           stone is found."""
-        asciilist = maps.ml2asciilist(map_file)
-        self.size = len(asciilist), len(asciilist[0])
-        for y, row in enumerate(asciilist):
-            for x, c in enumerate(row):
-                if mattype == 'ground':
-                    self.ground_map_data[(y, x)] = c
-                elif mattype == 'solid':
-                    self.solid_map_data[(y, x)] = c
-                else:
-                    raise NotImplementedError("I need to rethink the construction of different types of map data")
+            elif isinstance(p, packet.DenyPacket):
+                pass
+                # Define custom followup behaviours here, e.g.
+                # if self.action == Action.DO_THIS:
+                #   self.action = None
+                #   self.action = do_that()
+
+    def user_exchange(self, username: str, position: Tuple[int, int]):
+        # If the received username is ourselves, update ourself
+        if username == self.username:
+            self.player.set_position(list(position))
+
+        # If the received player is somebody else, either update the other user position or add a new one in
+        self.visible_users[username] = position
 
     def handle_input(self) -> int:
         key = super().handle_input()
@@ -148,6 +137,16 @@ class Game(Controller):
         elif key == ord('j'):
             self.view.win2_focus = GameView.Window2Focus.JOURNAL
 
+        # TODO: Remove this
+        # Moving rooms (just a test)
+        elif key == ord('f'):
+            self.action = Action.MOVE_ROOMS
+            packet.send(packet.MoveRoomsPacket('forest'), self.s)
+        elif key == ord('t'):
+            self.action = Action.MOVE_ROOMS
+            packet.send(packet.MoveRoomsPacket('tavern'), self.s)
+
+
         # Chat
         elif key in (curses.KEY_ENTER, curses.ascii.LF, curses.ascii.CR):
             self.view.chatbox.modal()
@@ -156,6 +155,7 @@ class Game(Controller):
         # Quit on Windows. TODO: Figure out how to make CTRL+C or ESC work.
         elif key == ord('q'):
             packet.send(packet.LogoutPacket(self.player.get_username()), self.s)
+            self.action = Action.LOGOUT
 
         return key
 
@@ -163,7 +163,12 @@ class Game(Controller):
         packet.send(packet.ChatPacket(message), self.s)
 
     def ready(self) -> bool:
-        return False not in [bool(data) for data in (self.player, self.size, self.ground_map_data, self.tick_rate)]
+        return False not in [bool(data) for data in (self.player, self.tick_rate)] and self.player.get_room().is_unpacked()
+
+    def reinitialize(self):
+        self.player = None
+        self.visible_users = {}
+        self.tick_rate = None
 
     def stop(self) -> None:
         self._logged_in = False

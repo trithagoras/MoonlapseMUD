@@ -6,7 +6,7 @@ import random
 from typing import *
 from .view import View, Color
 from ..curses_helper import TextBox
-from ..curses_helper import color_addch
+from ..curses_helper import color_addch, color_addstr
 
 
 class GameView(View):
@@ -57,6 +57,11 @@ class GameView(View):
     def draw(self) -> None:
         super().draw()
 
+        if not self.game.ready():
+            msg: str = "Loading, please wait..."
+            color_addstr(self.stdscr, self.height // 2, (self.width - len(msg)) // 2, msg, Color.WHITE)
+            return
+
         # Focus control labels
         self.stdscr.hline(0, 0, curses.ACS_HLINE, self.width)
 
@@ -105,16 +110,17 @@ class GameView(View):
     def draw_map(self):
         view_radius = self.game.player.get_view_radius()
         win1_hwidth, win1_hheight = self.win1_width // 2, self.win1_height // 2
+        player_pos = self.game.player.get_position()
+        room = self.game.player.get_room()
 
         for row in range(-view_radius, view_radius + 1):
             for col in range(-view_radius, view_radius + 1):
-                player_pos = self.game.player.get_position()
                 pos = (player_pos[0] + row, player_pos[1] + col)
                 random.seed(hash(pos))
 
                 if self.coordinate_exists(*pos):
                     cy, cx = win1_hheight + row, win1_hwidth + col * 2
-                    for map_data in (self.game.ground_map_data, self.game.solid_map_data, self.game.roof_map_data):
+                    for map_data in (room.groundmap, room.solidmap):
                         if pos not in map_data:
                             continue
                         c = map_data[pos]
@@ -125,27 +131,28 @@ class GameView(View):
                         elif c == maps.SAND:
                             color_addch(self.win1, cy, cx, '~', Color.YELLOW)
                         elif c == maps.WATER:
-                            color_addch(self.win1, cy, cx, '░', Color.BLUE)
+                            color_addch(self.win1, cy, cx, '#', Color.BLUE)
                         elif c == maps.LEAF:
                             color_addch(self.win1, cy, cx, random.choice(['╭', '╮', '╯', '╰']), Color.GREEN)
                         elif c == maps.COBBLESTONE:
                             color_addch(self.win1, cy, cx, '░', Color.WHITE)
                         elif c == maps.WOOD:
-                            color_addch(self.win1, cy, cx, '◍', Color.YELLOW)
+                            color_addch(self.win1, cy, cx, '·', Color.YELLOW)
 
                     # Overrides: Enter in here if solid must look different from ground, for example
-                    map_data = self.game.solid_map_data
+                    map_data = room.solidmap
                     if pos in map_data:
                         c = map_data[pos]
                         if c == maps.STONE:
                             color_addch(self.win1, cy, cx, '█', Color.WHITE)
+                        elif c == maps.WOOD:
+                            color_addch(self.win1, cy, cx, '◍', Color.YELLOW)
 
                     # Objects
-                    for obj in self.game.objects_in_view:
-                        if pos == obj.get_position():
-                            color_addch(self.win1, cy, cx, '☺', Color.WHITE)
+                    if pos in self.game.visible_users.values():
+                        color_addch(self.win1, cy, cx, '☺', Color.WHITE)
 
-        # Draw player to centre of screen
+        # Draw player in middle of screen
         color_addch(self.win1, win1_hheight, win1_hwidth, '☺', Color.WHITE)
 
     def draw_help_win(self):
@@ -210,7 +217,7 @@ class GameView(View):
         self.stdscr.vline(self.chatwin_y - 1, self.width - 1, curses.ACS_VLINE, 1)
 
     def coordinate_exists(self, y: int, x: int) -> bool:
-        return 0 <= y < self.game.size[0] and 0 <= x < self.game.size[1]
+        return 0 <= y < self.game.player.get_room().height and 0 <= x < self.game.player.get_room().width
 
     @staticmethod
     def progress_bar(value: float, max_value: float) -> str:

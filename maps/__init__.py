@@ -1,4 +1,5 @@
 from typing import *
+import os
 
 _ = ' '
 _ = '!'
@@ -132,6 +133,73 @@ def ml2asciilist(ml_file: List[str]) -> List[str]:
         asciilist.append(thisasciiline)
 
     return asciilist
+
+
+def mappathtodict(mappath) -> List[str]:
+    # Load in the map files and convert them to palatable data types to be sent out to the client.
+    with open(mappath, 'r') as f:
+        lines = [line.strip('\n') for line in f.readlines()]
+
+    return ml2asciilist(lines)
+
+
+class Room:
+    DEFAULT: str = 'forest'
+
+    def __init__(self, name: Optional[str]):
+        pwd: str = os.path.dirname(__file__)
+
+        if not name or name not in os.listdir(pwd):
+            name = self.DEFAULT
+        self.name = name
+
+        path_to_room_dir = os.path.join(pwd, self.name)
+
+        groundmappath = os.path.join(path_to_room_dir, 'ground.data')
+        solidmappath = os.path.join(path_to_room_dir, 'solid.data')
+        roofmappath = os.path.join(path_to_room_dir, 'roof.data')
+
+        self.grounddata: List[str] = mappathtodict(groundmappath)
+        self.soliddata: List[str] = mappathtodict(solidmappath)
+        self.roofdata: List[str] = mappathtodict(roofmappath)
+
+        self.height = len(self.grounddata)
+        self.width = len(self.grounddata[0])
+
+        self.groundmap: Dict[Tuple[int, int], chr] = {}
+        self.solidmap: Dict[Tuple[int, int], chr] = {}
+        self.roofmap: Dict[Tuple[int, int], chr] = {}
+
+        self._is_unpacked = False
+
+    def unpack(self):
+        """
+        Calculations to be run client side which unpacks the compressed map data into a more readable format.
+        Don't call this before sending over the network unless you call pack first.
+        """
+        for y, (grow, srow, rrow) in enumerate(zip(self.grounddata, self.soliddata, self.roofdata)):
+            for x, (gc, sc, rc) in enumerate(zip(grow, srow, rrow)):
+                if gc != NOTHING:
+                    self.groundmap[(y, x)] = gc
+                if sc != NOTHING:
+                    self.solidmap[(y, x)] = sc
+                if rc != NOTHING:
+                    self.roofmap[(y, x)] = rc
+
+        self._is_unpacked = True
+
+    def is_unpacked(self):
+        return self._is_unpacked
+
+    def pack(self):
+        self.groundmap = {}
+        self.solidmap = {}
+        self.roofmap = {}
+
+        self._is_unpacked = False
+
+    def __eq__(self, o: object) -> bool:
+        return isinstance(o, Room) and o.name == self.name
 
 
 if __name__ == '__main__':

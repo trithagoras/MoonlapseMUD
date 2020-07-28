@@ -1,51 +1,48 @@
 import random
 from typing import *
-import copy
+from maps import Room
 
 
 class Player:
-    def __init__(self, player_id: int):
-        self._id: int = player_id
-        self._username: Optional[str] = None
-        self._position: Optional[List[int]] = None
-        self._char: Optional[chr] = None
+    def __init__(self, username: str):
+        self._username: str = username
+        self._position: Optional[Tuple[int, int]] = None
+        self._room: Optional[Room] = None
+        self._char: chr = '@'
         self._view_radius: Optional[int] = None
 
     def ready(self) -> bool:
-        return None not in (self._username, self._position, self._id, self._char)
+        return None not in (self._username, self._position, self._char)
 
-    def _assign_id(self, player_id) -> None:
-        self._id = player_id
+    def assign_location(self, position: Tuple[Optional[int], Optional[int]]) -> None:
+        if not self.get_room():
+            raise ValueError("Cannot assign location without a room. Must set the room first.")
 
-        choices: List[chr] = ['#', '@', '&', '+', '%', '$', '£']
-        if self._id > len(choices) - 1:
-            self._char = 65 + self._id - len(choices)
-        else:
-            self._char: chr = choices[self._id]
-
-    def assign_location(self, position: List[int], walls: List[Tuple[int, int]], max_height: int, max_width: int) -> None:
-        if position == [None, None]:
+        room = self.get_room()
+        if position == (None, None):
+            room.unpack()
             while True:
-                self._position = [random.randint(1, max_height), random.randint(1, max_width)]
-                if tuple(self._position) not in walls:
+                self._position = random.randint(1, room.height), random.randint(1, room.width)
+                if self._position not in room.solidmap.values():
+                    room.pack()
                     break
         else:
-            self._position = [position[0], position[1]]
-
-    def assign_username(self, username: str) -> None:
-        self._username = username
+            self._position = (position[0], position[1])
 
     def get_username(self) -> str:
         return self._username
 
-    def get_id(self) -> int:
-        return self._id
-
     def get_position(self) -> Tuple[int, int]:
-        return tuple(self._position)
+        return self._position
 
     def set_position(self, destination: List[int]) -> None:
         self._position = destination
+
+    def get_room(self) -> Room:
+        return self._room
+
+    def set_room(self, room: Room) -> None:
+        self._room = room
 
     def get_char(self) -> chr:
         return self._char
@@ -67,10 +64,10 @@ class Player:
         return pos[0] + r + 1, pos[1] + r + 1
 
     def __hash__(self) -> int:
-        return hash((self.get_position(), self.get_id()))
+        return hash(self.get_username())
 
     def __eq__(self, o: object) -> bool:
         return isinstance(o, Player) and hash(o) == hash(self)
 
     def __repr__(self):
-        return f"Player: [username={self.get_username()}, id={self.get_id()}]"
+        return f"Player {self.get_username()}"

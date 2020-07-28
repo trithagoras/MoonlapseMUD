@@ -1,8 +1,19 @@
 import socket
 import traceback
+import json
 
-from .payload import *
+from . import payload
+from .payload import Payload
 from .models import *
+
+# Required to import from shared modules
+import sys
+from pathlib import Path
+file = Path(__file__).resolve()
+parent, root = file.parent, file.parents[1]
+sys.path.append(str(root))
+
+from maps import Room
 
 
 class Packet:
@@ -89,9 +100,11 @@ class WelcomePacket(Packet):
 
 class GoodbyePacket(Packet):
     """
-    A packet sent from a protocol to a client after a logout request is received.
+    A packet sent from a protocol to a client after a moving rooms. Can also be sent from a protocol to
+    a client to indicate someone else has left the room.
     """
-    pass
+    def __init__(self, username: str):
+        super().__init__(Payload(username))
 
 
 class LoginPacket(Packet):
@@ -163,6 +176,11 @@ class MoveRightPacket(MovePacket):
     pass
 
 
+class MoveRoomsPacket(Packet):
+    def __init__(self, roomname: str):
+        super().__init__(Payload(roomname))
+
+
 class DisconnectPacket(Packet):
     """
     A packet sent to signify the client's connection has been lost. An optional reason
@@ -199,41 +217,21 @@ class ServerPlayerPacket(Packet):
         super().__init__(Payload(player))
 
 
-class HelloPacket(Packet):
+class ServerUserPositionPacket(Packet):
     """
-    A packet sent from a protocol to another protocol when a player first connects. 
-    Each protocol can then update their clients accordingly, i.e. sending their Players 
-    in return and telling their clients to add the new Player to the game.
+    A packet sent from a protocol to a client containing a username and the associated player position.
     """
-    def __init__(self, player: Player):
-        super().__init__(Payload(player))
+    def __init__(self, username: str, position: Tuple[int, int]):
+        super().__init__(Payload(username), Payload(position))
 
 
-class ServerGroundMapFilePacket(Packet):
+class ServerRoomPacket(Packet):
     """
-    A packet sent from a protocol to its client describing the
+    A packet sent from a protocol to its client describing the room. Note: Be sure to call room.pack() before you send
+    a room over the network and the client should call room.unpack() after receiving.
     """
-    def __init__(self, mapfile: List[str]):
-        super().__init__(Payload(mapfile))
-
-
-class ServerSolidMapFilePacket(Packet):
-    """
-    A packet sent from a protocol to its client describing the
-    """
-    def __init__(self, mapfile: List[str]):
-        super().__init__(Payload(mapfile))
-
-
-class ServerMapSizePacket(Packet):
-    """
-    A packet sent from a protocol to its client describing the height and width of the room it's connected 
-    to. Ths should be interpreted by the game client for drawing to the screen, etc.
-    """
-    def __init__(self, height: int, width: int):
-        pheight: Payload = Payload(height)
-        pwidth: Payload = Payload(width)
-        super().__init__(pheight, pwidth)
+    def __init__(self, room: Room):
+        super().__init__(Payload(room))
 
 
 class ServerTickRatePacket(Packet):
@@ -266,7 +264,7 @@ def frombytes(data: bytes) -> Packet:
 
         elif key[0] == 'p':
             index: int = int(key[1:])
-            payloads_values.insert(index, Payload.deserialize(value).value)
+            payloads_values.insert(index, payload.deserialize(value).value)
     
     # Use reflection to construct the specific packet type we're looking for
     specificPacketClassName: str = action

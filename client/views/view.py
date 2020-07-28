@@ -16,6 +16,8 @@ class View:
     def display(self, stdscr):
         self.stdscr = stdscr
 
+        self.stdscr.keypad(True)
+
         # Start colors in curses
         curses.start_color()
 
