@@ -34,7 +34,9 @@ jobs:
         script: |
           tmux kill-session -t gameserver
           cd ${{ secrets.REMOTE_GAME_DIR }}
+          git stash
           git pull origin master
+          git stash pop
           tmux new-session -d -s gameserver \; send-keys "python3 ${{ secrets.REMOTE_GAME_DIR }}/server" Enter
           exit
           
