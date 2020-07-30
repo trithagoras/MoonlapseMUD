@@ -67,7 +67,29 @@ class Moonlapse(NetstringReceiver):
     def connectionMade(self) -> None:
         super().connectionMade()
         servertime: str = time.strftime('%d %B, %Y %R %p', time.gmtime())
-        self.sendPacket(packet.WelcomePacket(f"Welcome to MoonlapseMUD 0.2 - Server time: {servertime}"))
+        self.sendPacket(packet.WelcomePacket(f"""  *    .  *       .             *   *                       
+                         *                        .         
+ *   .        *       .       .      *       .             *
+   .     *                                                  
+█▀▄▀█ ████▄ ████▄    ▄   █    ██   █ ▄▄    ▄▄▄▄▄   ▄███▄ *  
+█ █ █ █   █ █   █     █  █    █ █  █ * █  █     ▀▄ █▀   ▀   
+█ ▄ █ █   █ █   █ ██   █ █    █▄▄█ █▀▀▀ ▄  ▀▀▀▀▄   ██▄▄     
+█   █ ▀████ ▀████ █ █  █ ███▄ █  █ █  *  ▀▄▄▄▄▀    █▄   ▄▀  
+   █              █  █ █   . ▀   █  █.             ▀███▀    
+  ▀    .  *       █   ██        █    ▀ *        *           
+         .       .             ▀             .            * 
+    *     *        █▀▄▀█   ▄   ██▄       .             *    
+*                . █ █ █    █  █  █        .                
+      .     .  *   █ ▄ █ █   █ █   █     *          *       
+                   █   █ █   █ █  █    *       .           .
+       .*             █  █▄ ▄█ ███▀                         
+   *       .     *         ▀        .   *    .*            
+                                                            
+           .     .  *        * .     .  .       *       .   
+       .                .        .                          
+.  *           *                     *       .              
+                             .                *             
+         *          .   *                                   """))
 
     def connectionLost(self, reason: Failure = None) -> None:
         super().connectionLost()

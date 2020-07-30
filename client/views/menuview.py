@@ -15,4 +15,5 @@ class MenuView(View):
             color_addstr(self.stdscr, 6 + i * 3, 5, menuitem, Color.WHITE, curses.A_BOLD if selected else curses.A_DIM)
 
         if self.title:
-            color_addstr(self.stdscr, 2, (self.width - len(self.title)) // 2, self.title, Color.CYAN, curses.A_UNDERLINE)
+            for y, line in enumerate(self.title.splitlines()):
+                color_addstr(self.stdscr, 2 + y, (self.width - len(line)) // 2, line, Color.CYAN)
