@@ -16,7 +16,7 @@ The format is as follows:
 Yeah, it's a long story. Basically something that looks like this:
 ```
 64$
-63$}$}
+63$}
 24G6(34}
 ```
 In this made up context, what this means is
