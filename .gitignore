@@ -1,8 +1,10 @@
 server/connectionstrings.json
 /packetdebug.txt
 *.pyc
-*.xml
 *.iml
 *.log
 .vs/*
 *.pyproj
+venv/*
+/.idea/dictionaries/*
+/.idea/misc.xml

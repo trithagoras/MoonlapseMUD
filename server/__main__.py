@@ -20,12 +20,24 @@ class MoonlapseServer(Factory):
         self.database.connect()
 
         # Insert the server rooms to the database if they don't already exist
-        mapdirs: Tuple[str] = tuple([dirname for dirname in os.listdir('maps') if os.path.isdir(os.path.join('maps', dirname))])
+        layoutssdir = 'maps/layouts'
+        mapdirs: List[str] = [d for d in os.listdir(layoutssdir) if os.path.isdir(os.path.join(layoutssdir, d))]
         for mapdir in mapdirs:
-            self.database.create_room(mapdir, f"maps/{mapdir}")
+            self.database.create_room(mapdir, f"{layoutssdir}/{mapdir}")
             print(f"Added map {mapdir} to the database")
 
-        self.roomnames_users: Dict[Optional[str], [str, protocol.Moonlapse]] = {}
+        # Keep track of room names and a list of users inside, e.g.
+        # {
+        #   'forest': {
+        #     'josh': <protocol.Moonlapse object 1>,
+        #     'jane': <protocol.Moonlapse object 2>
+        #   },
+        #   'tavern': {
+        #     'sue': <protocol.Moonlapse object 3>
+        #   }
+        # }
+        # If the roomname is None, the players inside are in the lobby.
+        self.roomnames_users: Dict[Optional[str], Dict[str, protocol.Moonlapse]] = {}
 
     def buildProtocol(self, addr):
         print("Adding a new client.")

@@ -145,14 +145,10 @@ def mappathtodict(mappath) -> List[str]:
 
 class Room:
     def __init__(self, name: str):
-        pwd: str = os.path.dirname(__file__)
-
-        if not (name in os.listdir(pwd) and os.path.isdir(os.path.join(pwd, name))):
-            raise ValueError("Name of room must exist as a subdirectory of maps")
         self.name = name
-
-        path_to_room_dir = os.path.join(pwd, self.name)
-
+        pwd: str = os.path.dirname(__file__)
+        path_to_room_dir = os.path.join(pwd, 'layouts', self.name)
+        
         groundmappath = os.path.join(path_to_room_dir, 'ground.data')
         solidmappath = os.path.join(path_to_room_dir, 'solid.data')
         roofmappath = os.path.join(path_to_room_dir, 'roof.data')
