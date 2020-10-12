@@ -19,6 +19,12 @@ class MoonlapseServer(Factory):
         self.database: database.Database = database.Database(connectionstringspath)
         self.database.connect()
 
+        # Insert the server rooms to the database if they don't already exist
+        mapdirs: Tuple[str] = tuple([dirname for dirname in os.listdir('maps') if os.path.isdir(os.path.join('maps', dirname))])
+        for mapdir in mapdirs:
+            self.database.create_room(mapdir, f"maps/{mapdir}")
+            print(f"Added map {mapdir} to the database")
+
         self.roomnames_users: Dict[Optional[str], [str, protocol.Moonlapse]] = {}
 
     def buildProtocol(self, addr):

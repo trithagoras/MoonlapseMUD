@@ -144,13 +144,11 @@ def mappathtodict(mappath) -> List[str]:
 
 
 class Room:
-    DEFAULT: str = 'forest'
-
-    def __init__(self, name: Optional[str]):
+    def __init__(self, name: str):
         pwd: str = os.path.dirname(__file__)
 
-        if not name or name not in os.listdir(pwd):
-            name = self.DEFAULT
+        if not (name in os.listdir(pwd) and os.path.isdir(os.path.join(pwd, name))):
+            raise ValueError("Name of room must exist as a subdirectory of maps")
         self.name = name
 
         path_to_room_dir = os.path.join(pwd, self.name)
