@@ -1,5 +1,6 @@
 import json
 import inspect
+from typing import *
 from .models import *
 
 

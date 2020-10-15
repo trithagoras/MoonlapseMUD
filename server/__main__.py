@@ -2,6 +2,7 @@ from twisted.internet.protocol import Factory
 from twisted.internet import reactor
 from typing import *
 import os
+import manage
 
 # Required to import from shared modules
 import sys
@@ -12,6 +13,7 @@ sys.path.append(str(root))
 
 from server import database
 from server import protocol
+from networking import models
 
 
 class MoonlapseServer(Factory):
@@ -23,8 +25,10 @@ class MoonlapseServer(Factory):
         layoutssdir = 'maps/layouts'
         mapdirs: List[str] = [d for d in os.listdir(layoutssdir) if os.path.isdir(os.path.join(layoutssdir, d))]
         for mapdir in mapdirs:
-            self.database.create_room(mapdir, f"{layoutssdir}/{mapdir}")
-            print(f"Added map {mapdir} to the database")
+            room = models.Room(name=mapdir, path=f"{layoutssdir}/{mapdir}")
+            if not models.Room.objects.filter(name=room.name):
+                room.save()
+                print(f"Added map {mapdir} to the database")
 
         # Keep track of room names and a list of users inside, e.g.
         # {

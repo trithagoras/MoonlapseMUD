@@ -1,6 +1,3 @@
-import random
-from typing import *
-import maps
 from django.db import models
 
 
@@ -12,6 +9,7 @@ class User(models.Model):
 class Room(models.Model):
     name = models.TextField(max_length=200)
     path = models.TextField(max_length=500)
+
 
 
 class Entity(models.Model):

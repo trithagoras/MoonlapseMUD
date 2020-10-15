@@ -5,6 +5,7 @@ import json
 from . import payload
 from .payload import Payload
 from .models import *
+from typing import *
 
 # Required to import from shared modules
 import sys
