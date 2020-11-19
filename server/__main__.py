@@ -11,15 +11,20 @@ file = Path(__file__).resolve()
 parent, root = file.parent, file.parents[1]
 sys.path.append(str(root))
 
-from server import database
 from server import protocol
 from networking import models
 
 
 class MoonlapseServer(Factory):
-    def __init__(self, connectionstringspath):
-        self.database: database.Database = database.Database(connectionstringspath)
-        self.database.connect()
+    def __init__(self):
+        # Keep track of room ids and a set of protocols inside, e.g.
+        # {
+        #   1: {<protocol.Moonlapse object 3>},
+        #   3: {<protocol.Moonlapse object 4>, <protocol.Moonlapse object 5>},
+        #   None: {<protocol.Moonlapse object 7>}
+        # }
+        # If the roomname is None, the protocols inside have not logged in to the game yet.
+        self.rooms_protocols: Dict[Optional[int], Set[protocol.Moonlapse]] = {None: set()}
 
         # Insert the server rooms to the database if they don't already exist
         layoutssdir = 'maps/layouts'
@@ -30,40 +35,21 @@ class MoonlapseServer(Factory):
                 room.save()
                 print(f"Added map {mapdir} to the database")
 
-        # Keep track of room names and a list of users inside, e.g.
-        # {
-        #   'forest': {
-        #     'josh': <protocol.Moonlapse object 1>,
-        #     'jane': <protocol.Moonlapse object 2>
-        #   },
-        #   'tavern': {
-        #     'sue': <protocol.Moonlapse object 3>
-        #   }
-        # }
-        # If the roomname is None, the players inside are in the lobby.
-        self.roomnames_users: Dict[Optional[str], Dict[str, protocol.Moonlapse]] = {}
-
     def buildProtocol(self, addr):
         print("Adding a new client.")
-        return protocol.Moonlapse(self, self.database)
+        return protocol.Moonlapse(self)
 
-    def moveProtocols(self, proto, roomname: str):
+    def moveProtocols(self, proto, roomid: int):
         # Remove the player from the old room
-        if proto.roomname and proto.username in self.roomnames_users[proto.roomname]:
-            self.roomnames_users[proto.roomname].pop(proto.username)
+        for protos in self.rooms_protocols.values():
+            protos.discard(proto)
 
         # Add the player to the new room
-        if roomname in self.roomnames_users:
-            self.roomnames_users[roomname][proto.username] = proto
-        else:
-            self.roomnames_users[roomname] = {proto.username: proto}
-
+        if roomid not in self.rooms_protocols:
+            self.rooms_protocols[roomid] = set()
+        self.rooms_protocols[roomid].add(proto)
 
 
 if __name__ == '__main__':
-    pwd: str = os.path.dirname(__file__)
-
-    connectionstringspath: str = os.path.join(pwd, 'connectionstrings.json')
-
-    reactor.listenTCP(42523, MoonlapseServer(connectionstringspath))
+    reactor.listenTCP(42523, MoonlapseServer())
     reactor.run()

@@ -11,7 +11,6 @@ class Room(models.Model):
     path = models.TextField(max_length=500)
 
 
-
 class Entity(models.Model):
     roomid = models.ForeignKey(Room, on_delete=models.RESTRICT)
     y = models.IntegerField(default=0)

@@ -3,22 +3,22 @@ from twisted.internet.defer import Deferred
 from twisted.python.failure import Failure
 
 from server.__main__ import MoonlapseServer
-from database import Database
+import manage
 from networking import packet
-from networking import models
+import models
 from networking.logger import Log
 
 from typing import *
 import time
-from maps import Room
+from django.forms.models import model_to_dict
 
 
-def within_bounds(coords: Tuple[int, int], topleft: Tuple[int, int], botright: Tuple[int, int]) -> bool:
+def within_bounds(y: int, x: int, ymin: int, xmin: int, ymax: int, xmax: int) -> bool:
     """
     Checks if the given coordinates are inside the square defined by the top left and bottom right corners.
     Includes all values in the square, even right/bottom-most parts.
     """
-    return topleft[0] <= coords[0] <= botright[0] and topleft[1] <= coords[1] <= botright[1]
+    return ymin <= y <= ymax and xmin <= x <= xmax
 
 
 class Moonlapse(NetstringReceiver):
@@ -40,20 +40,16 @@ class Moonlapse(NetstringReceiver):
     The self.processPacket method is used to tell another protocol on the server to process a packet which 
     doesn't necessarily have to be sent to any clients.
     """
-    def __init__(self, server: MoonlapseServer, database: Database, roomname: Optional[str] = None):
+    def __init__(self, server: MoonlapseServer, roomid: Optional[int], others: Set['Moonlapse']):
         super().__init__()
         self._server: MoonlapseServer = server
-        self.database: Database = database
-        self.roomname = roomname
-
-        # A volatile dictionary of usernames to protocols passed in by the server.
-        self.users: Dict[str, 'Moonlapse'] = {}
+        self.others: Set['Moonlapse'] = others
 
         # Information specific to the player using this protocol
-        self.username: Optional[str] = None
-        self.password: Optional[str] = None
-        self.player: Optional[models.Player] = None
-        self.players_visible_users: Dict[str, Tuple[int, int]] = {}
+        self.user: Optional[models.User] = None
+        self.entity: Optional[models.Entity] = None
+        self._visible_entities: Set[models.Entity] = set()
+
         self.logged_in: bool = False
 
         # The state of the protocol which gets called as a function to process only the packets 
@@ -67,35 +63,14 @@ class Moonlapse(NetstringReceiver):
     def connectionMade(self) -> None:
         super().connectionMade()
         servertime: str = time.strftime('%d %B, %Y %R %p', time.gmtime())
-        self.sendPacket(packet.WelcomePacket(f"""  *    .  *       .             *   *                       
-                         *                        .         
- *   .        *       .       .      *       .             *
-   .     *                                                  
-█▀▄▀█ ████▄ ████▄    ▄   █    ██   █ ▄▄    ▄▄▄▄▄   ▄███▄ *  
-█ █ █ █   █ █   █     █  █    █ █  █ * █  █     ▀▄ █▀   ▀   
-█ ▄ █ █   █ █   █ ██   █ █    █▄▄█ █▀▀▀ ▄  ▀▀▀▀▄   ██▄▄     
-█   █ ▀████ ▀████ █ █  █ ███▄ █  █ █  *  ▀▄▄▄▄▀    █▄   ▄▀  
-   █              █  █ █   . ▀   █  █.             ▀███▀    
-  ▀    .  *       █   ██        █    ▀ *        *           
-         .       .             ▀             .            * 
-    *     *        █▀▄▀█   ▄   ██▄       .             *    
-*                . █ █ █    █  █  █        .                
-      .     .  *   █ ▄ █ █   █ █   █     *          *       
-                   █   █ █   █ █  █    *       .           .
-       .*             █  █▄ ▄█ ███▀                         
-   *       .     *         ▀        .   *    .*            
-                                                            
-           .     .  *        * .     .  .       *       .   
-       .                .        .                          
-.  *           *                     *       .              
-                             .                *             
-         *          .   *                                   """))
+        self.sendPacket(packet.WelcomePacket(f"Welcome to MoonlapseMUD. Server time is {servertime}"))
 
     def connectionLost(self, reason: Failure = None) -> None:
         super().connectionLost()
         self.state = self._DISCONNECT
         if self.logged_in:
             self.processPacket(packet.DisconnectPacket(self.username, reason=reason.getErrorMessage()))
+            self.logged_in = False
 
     def stringReceived(self, string) -> None:
         """
@@ -131,7 +106,7 @@ class Moonlapse(NetstringReceiver):
         """
         if isinstance(p, packet.MovePacket):
             self.move(p)
-        elif isinstance(p, packet.ServerUserPositionPacket):
+        elif isinstance(p, packet.ServerEntityPositionPacket):
             self.user_exchange(p)
         elif isinstance(p, packet.ChatPacket):
             self.chat(p)
@@ -151,110 +126,54 @@ class Moonlapse(NetstringReceiver):
         stringReceived.
         """
         if isinstance(p, packet.LoginPacket):
-            self._handle_login(p.payloads[0].value, p.payloads[1].value)
+            self._login_user(p.payloads[0].value, p.payloads[1].value)
         elif isinstance(p, packet.RegisterPacket):
-            self._handle_registration(p.payloads[0].value, p.payloads[1].value)
+            self._register_user(p.payloads[0].value, p.payloads[1].value)
 
-    def _handle_login(self, username: str, password: str) -> None:
-        """
-        Handles a login packet by doing the following asynchronously:
-        1. Check if the given username is already connected to the server
-        2. Check if the given username exists in the database
-        3. Check if the given password is correct for the given username
-        4. Initialise the player
-        5. Move the player to the server room the database has them in
-        6. Move the player to the position the database has them in
-        7. Send all of the gathered information to the client
-
-        If an error occurs at any point in the process, it is sent as a Deny Packet back
-        to the client with an appropriate error message.
-        """
-        if self.roomname and username in self.users:
+    def _login_user(self, username: str, password: str) -> None:
+        if username in [proto.user.username for proto in self.others]:
             self.sendPacket(packet.DenyPacket("You are already inhabiting this realm"))
             return
 
-        self.database.user_exists(username
-        ).addCallbacks(
-            callback = self._check_password_correct,
-            callbackArgs = (username, password),
-            errback = lambda e: self.sendPacket(packet.DenyPacket(e.getErrorMessage()))  # Catch user_exists
-        ).addCallbacks(
-            callback = self._initialise_player_and_query_room,
-            callbackArgs = (username,),
-            errback = lambda e: self.sendPacket(packet.DenyPacket(e.getErrorMessage()))  # Catch check_password_correct
-        ).addCallbacks(
-            callback = self.move_rooms,
-            errback = lambda e: self.sendPacket(packet.DenyPacket(e.getErrorMessage()))  # Catch initialise_player_and_query_room
-        )
+        if not models.User.objects.filter(username=username):
+            self.sendPacket(packet.DenyPacket("I don't know anybody by that name"))
+            return
 
-    def _check_password_correct(self, user_exists: List[Tuple[bool]], username: str, password: str) -> Deferred:
-        print(f"\n_check_password_correct(user_exists={user_exists}, username={username}, password={password})\n")
-        if user_exists and not user_exists[0][0]:
-            raise EntryError("I don't know anybody by that name")
+        if not models.User.objects.filter(password=password):
+            self.sendPacket(packet.DenyPacket("Incorrect password"))
+            return
 
-        return self.database.password_correct(username, password)
+        self.user = models.User.objects.filter(username=username, password=password)[0]
 
-    def _initialise_player_and_query_room(self, password_correct: List[Tuple[bool]], username: str) -> Deferred:
-        print(f"\n_initialise_player_and_query_room(password_correct={password_correct}, username={username})\n")
-        if password_correct and not password_correct[0][0]:
-            raise EntryError("Incorrect password")
+        player = models.Player.objects.filter(userid=self.user.id)[0]
+        self.entity = models.Entity.objects.filter(id=player.entityid)[0]
+        self.move_rooms(self.entity.roomid)
 
-        self.username = username
-        self.player = models.Player(self.username)
+    def move_rooms(self, roomid):
+        print(f"\nmove_rooms(roomid={roomid})\n")
+        self._server.moveProtocols(self, roomid)
 
-        return self.database.get_player_roomname(username)
+        self.broadcast(packet.GoodbyePacket(self.user.username), excluding=(self.user,))
+        self.entity.roomid = roomid
+        self.entity.save()
+        self.others = self._server.rooms_protos[roomid]
+        self._establish_player_in_world()
 
-    def move_rooms(self, roomname: List[Tuple[Optional[str]]]):
-        print(f"\nmove_rooms(roomname={roomname})\n")
-        roomname = roomname[0][0]
-
-        self._server.moveProtocols(self, roomname)
-
-        self.broadcast(packet.GoodbyePacket(self.username), excluding=(self.username,))
-        self.players_visible_users = {}
-        self.roomname = roomname
-        self.users = self._server.roomnames_users[roomname]
-
-        # Only do the following if the user isn't going back to the lobby (None)
-        if self.roomname:
-            self.player.set_room(Room(roomname))
-            self.database.set_player_room(self.username, roomname
-            ).addCallbacks(
-                callback=self.query_player_position,
-                errback=lambda e: self.sendPacket(packet.DenyPacket(e.getErrorMessage()))  # Catch move_rooms
-            ).addCallbacks(
-                callback=self._establish_player_in_world,
-                errback=lambda e: self.sendPacket(packet.DenyPacket(e.getErrorMessage()))  # Catch query_player_position
-            )
-
-    def query_player_position(self, _):
-        print(f"\nquery_player_position(_={_})\n")
-        return self.database.get_player_pos(self.username)
-
-    def _establish_player_in_world(self, init_pos: List[Tuple[Optional[float], Optional[float]]]) -> None:
-        print(f"\n_establish_player_in_world(init_pos={init_pos})\n")
+    def _establish_player_in_world(self) -> None:
+        print(f"\n_establish_player_in_world()\n")
         self.sendPacket(packet.OkPacket())
 
-        if init_pos:
-            init_pos: Tuple[Optional[float], Optional[float]] = init_pos[0]
-            print(f"[{self.username}][{self.state.__name__}][{self.roomname}]: Got", init_pos)
-            self.player.set_view_radius(10)
+        # Assign the starting position if not already done
+        if None in (self.entity.y, self.entity.x):
+            self.entity.y = 0
+            self.entity.x = 0
+            self.entity.save()
 
-            if None in init_pos:
-                self.player.assign_location(init_pos)
-                new_pos: Tuple[int, int] = self.player.get_position()
-                self.database.update_player_pos(self.username, new_pos[0], new_pos[1])
-            else:
-                init_pos = (int(init_pos[0]), int(init_pos[1]))
-                self.player.assign_location(init_pos)
-
+        # Send new data to the client
         self.sendPacket(packet.ServerTickRatePacket(100))
-        self.player.get_room().pack()
-        self.sendPacket(packet.ServerPlayerPacket(self.player))
-        self.player.get_room().unpack()
+        self.sendPacket(packet.ServerModelPacket(self.entity))
 
         self.state = self._PLAY
-        self.broadcast(packet.ServerUserPositionPacket(self.username, self.player.get_position()), excluding=(self.username,))
         self.broadcast(packet.ServerLogPacket(f"{self.username} has arrived."))
         self.logged_in = True
 
@@ -268,37 +187,19 @@ class Moonlapse(NetstringReceiver):
             self.state = self._GETENTRY
 
     def depart_other(self, p: packet.GoodbyePacket):
-        other_name: str = p.payloads[0].value
-        if other_name in self.players_visible_users:
-            self.players_visible_users.pop(other_name)
-        self.sendPacket(packet.ServerLogPacket(f"{other_name} has departed."))
+        other_username: str = p.payloads[0].value
+        if other_username in self._visible_entities:
+            self._visible_entities.pop(other_username)
+        self.sendPacket(packet.ServerLogPacket(f"{other_username} has departed."))
         self.sendPacket(p)
 
-    def _handle_registration(self, username: str, password: str) -> None:
-        """
-        Handles a registration packet by doing the following asynchronously:
-        1. Check if the given username does not already exist in the database
-        2. Write the new username and password into the database
-        3. Tell the client the registration was successful
+    def _register_user(self, username: str, password: str) -> None:
+        if models.User.objects.filter(username=username):
+            self.sendPacket(packet.DenyPacket("Somebody else already goes by that name"))
+            return
 
-        If an error occurs at any point in the process, it is sent as a Deny Packet back
-        to the client with an appropriate error message.
-        """
-        self.database.user_exists(username
-        ).addCallbacks(
-            callback=self._register_user,
-            callbackArgs=(username, password),
-            errback=lambda e: self.sendPacket(packet.DenyPacket(e.getErrorMessage()))  # Catch user_exists
-        ).addCallbacks(
-            callback=lambda _: self.sendPacket(packet.OkPacket()),
-            errback=lambda e: self.sendPacket(packet.DenyPacket(e.getErrorMessage()))  # Catch register_user
-        )
-
-    def _register_user(self, user_exists: List[Tuple[bool]], username: str, password: str) -> Deferred:
-        if user_exists[0][0]:
-            raise EntryError(f"Somebody else already goes by that name")
-
-        return self.database.register_user(username, password)
+        user = models.User(username=username, password=password)
+        user.save()
 
     def _DISCONNECT(self, p: packet.DisconnectPacket):
         """
@@ -361,51 +262,50 @@ class Moonlapse(NetstringReceiver):
               information than is required. A client will know all the information 
               about every player connected to the server even if they are not in view.
         """
-        pos: Tuple[int, int] = self.player.get_position()
 
         # Calculate the desired destination
-        dest: List[int] = list(pos)
         if isinstance(p, packet.MoveUpPacket):
-            dest[0] -= 1
+            self.entity.y -= 1
         elif isinstance(p, packet.MoveRightPacket):
-            dest[1] += 1
+            self.entity.x += 1
         elif isinstance(p, packet.MoveDownPacket):
-            dest[0] += 1
+            self.entity.y += 1
         elif isinstance(p, packet.MoveLeftPacket):
-            dest[1] -= 1
+            self.entity.x -= 1
 
         room = self.player.get_room()
-        if within_bounds(tuple(dest), (0, 0), (room.height - 1, room.width - 1)) and tuple(dest) not in room.solidmap:
-            self.player.set_position(dest)
-            self.database.update_player_pos(self.username, dest[0], dest[1])
-
+        if within_bounds(self.entity.y, self.entity.x, 0, 0, room.height - 1, room.width - 1) and (self.entity.y, self.entity.x) not in room.solidmap:
+            self.entity.save()
             current_usernames_in_view: Tuple[str] = self.get_usernames_in_view()
 
             # For players who were previously in our view but aren't any more, tell them to remove us from their view
             # Also remove them from our view
-            for old_username_in_view in list(self.players_visible_users.keys()):    # We might change the dict's size during iteration so better convert it to a list
+            for old_username_in_view in list(self._visible_entities.keys()):    # We might change the dict's size during iteration so better convert it to a list
                 if old_username_in_view not in current_usernames_in_view:
-                    self.broadcast(packet.ServerUserPositionPacket(self.username, (-1, -1)), including=(old_username_in_view,))
-                    self.players_visible_users.pop(old_username_in_view)
+                    self.broadcast(packet.ServerEntityPositionPacket(self.username, (-1, -1)), including=(old_username_in_view,))
+                    self._visible_entities.pop(old_username_in_view)
 
             # Tell everyone in view our position has updated or we have entered their view
-            self.broadcast(packet.ServerUserPositionPacket(self.username, self.player.get_position()), including=current_usernames_in_view)
+            self.broadcast(packet.ServerEntityPositionPacket(self.username, self.player.get_position()), including=current_usernames_in_view)
 
         else:
-            self.sendPacket(packet.DenyPacket("can't move there"))
+            self.sendPacket(packet.DenyPacket("Can't move there"))
 
-    def user_exchange(self, p: packet.ServerUserPositionPacket):
+    def user_exchange(self, p: packet.ServerEntityPositionPacket):
+        entity: models.Entity = p.payloads[0].value
+
         # We can't send or receive tuples as JSON so convert it when expecting
-        p = packet.ServerUserPositionPacket(p.payloads[0].value, tuple(p.payloads[1].value))
+        position: Tuple[int, int] = tuple(p.payloads[1].value)
+
+        p = packet.ServerEntityPositionPacket(entity, position)
 
         self.sendPacket(p)
 
-        other_username: str = p.payloads[0].value
-        if other_username not in self.players_visible_users:
-            self.players_visible_users[other_username] = p.payloads[1].value
+        if entity not in self._visible_entities:
+            self._visible_entities[other_username] = p.payloads[1].value
 
             if other_username != self.username:
-                self.broadcast(packet.ServerUserPositionPacket(self.username, self.player.get_position()), including=(other_username,))
+                self.broadcast(packet.ServerEntityPositionPacket(self.username, self.player.get_position()), including=(other_username,))
 
     def get_usernames_in_view(self) -> Tuple[str]:
         return tuple([username for username in self.users if within_bounds(

@@ -56,7 +56,7 @@ class Game(Controller):
                 if isinstance(p, packet.ServerPlayerPacket):
                     self.player = p.payloads[0].value
                     self.player.get_room().unpack()
-                elif isinstance(p, packet.ServerUserPositionPacket):
+                elif isinstance(p, packet.ServerEntityPositionPacket):
                     self.user_exchange(p.payloads[0].value, p.payloads[1].value)
                 elif isinstance(p, packet.ServerTickRatePacket):
                     self.tick_rate = p.payloads[0].value
@@ -66,7 +66,7 @@ class Game(Controller):
             # Get volatile data such as player positions, etc.
             p: packet.Packet = packet.receive(self.s)
 
-            if isinstance(p, packet.ServerUserPositionPacket):
+            if isinstance(p, packet.ServerEntityPositionPacket):
                 self.user_exchange(p.payloads[0].value, tuple(p.payloads[1].value))  # Can't receive tuples as JSON
 
             elif isinstance(p, packet.ServerLogPacket):

@@ -218,7 +218,7 @@ class ServerPlayerPacket(Packet):
         super().__init__(Payload(player))
 
 
-class ServerUserPositionPacket(Packet):
+class ServerEntityPositionPacket(Packet):
     """
     A packet sent from a protocol to a client containing a username and the associated player position.
     """
