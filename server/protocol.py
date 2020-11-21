@@ -67,7 +67,9 @@ class Moonlapse(NetstringReceiver):
         self.logger: Log = Log()
 
     def _debug(self, message: str):
-        print(f"[{self._user.username}][{self.state.__name__}][{self._entity.roomid}]: {message}")
+        print(f"[{self._user.username if self._user else None }]"
+              f"[{self.state.__name__}]"
+              f"[{self._entity.roomid if self._entity else None}]: {message}")
 
     def connectionMade(self) -> None:
         super().connectionMade()
@@ -207,12 +209,13 @@ class Moonlapse(NetstringReceiver):
         self.sendPacket(p)
 
     def _register_user(self, username: str, password: str) -> None:
-        if models.User.objects.get(username=username):
+        if models.User.objects.filter(username=username):
             self.sendPacket(packet.DenyPacket("Somebody else already goes by that name"))
             return
 
         user = models.User(username=username, password=password)
         user.save()
+        self.sendPacket(packet.OkPacket())
 
     def _DISCONNECT(self, p: packet.DisconnectPacket):
         """

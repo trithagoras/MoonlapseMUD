@@ -3,10 +3,10 @@ import curses.ascii
 import socket
 import threading
 import time
+import models
 from enum import Enum
 from typing import *
 from networking import packet
-from networking import models
 from networking.logger import Log
 from .controller import Controller
 from ..views.gameview import GameView
