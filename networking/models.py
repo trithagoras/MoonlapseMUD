@@ -16,6 +16,7 @@ class Entity(models.Model):
     y = models.IntegerField(default=0)
     x = models.IntegerField(default=0)
     char = models.CharField(max_length=1, default='@')
+    name = models.CharField(max_length=50)
 
 
 class Player(models.Model):
