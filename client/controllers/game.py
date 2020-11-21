@@ -25,8 +25,12 @@ class Game(Controller):
         self.action: Optional[Action] = None
 
         # Game data
+        self.user: Optional[models.User] = None
+        self.room: Optional[models.Room] = None
+        self.entity: Optional[models.Entity] = None
         self.player: Optional[models.Player] = None
-        self.visible_users: Dict[str, Tuple[int, int]] = {}
+
+        self.visible_entities: Dict[models.Entity, Tuple[int, int]] = {}
         self.tick_rate: Optional[int] = None
 
         self.logger: Log = Log()
@@ -53,9 +57,8 @@ class Game(Controller):
             # Get initial room data if not already done
             while not self.ready() and self._logged_in:
                 p: packet.Packet = packet.receive(self.s)
-                if isinstance(p, packet.ServerPlayerPacket):
-                    self.player = p.payloads[0].value
-                    self.player.get_room().unpack()
+                if isinstance(p, packet.ServerModelPacket):
+                    self.receive_model_data(p.payloads[0].value, p.payloads[1].value)
                 elif isinstance(p, packet.ServerEntityPositionPacket):
                     self.user_exchange(p.payloads[0].value, p.payloads[1].value)
                 elif isinstance(p, packet.ServerTickRatePacket):
@@ -93,6 +96,22 @@ class Game(Controller):
                 # if self.action == Action.DO_THIS:
                 #   self.action = None
                 #   self.action = do_that()
+
+    def receive_model_data(self, type: str, model: dict):
+        if type == 'User':
+            self.user = models.User(username=model['username'])
+
+        elif type == 'Room':
+            room_name: str = model['name']
+            room_path: str = model['path']
+            self.room = models.Room(name=room_name, path=room_path)
+
+        elif type == 'Entity':
+            self.entity = models.Entity(room=self.room, y=model['y'], x=model['x'], char=model['char'])
+            self.player.get_room().unpack()
+
+        elif type == 'Player':
+            self.player = models.Player(user=self.user, entity=self.entity, view_radius=model['view_radius'])
 
     def user_exchange(self, username: str, position: Tuple[int, int]):
         # If the received username is ourselves, update ourself

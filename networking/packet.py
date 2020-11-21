@@ -144,9 +144,10 @@ class ServerModelPacket(Packet):
         "char": "@"
     }
     """
-    def __init__(self, modeldict: dict):
+    def __init__(self, type: str, modeldict: dict):
+        ptype: Payload = Payload(type)
         pmodel: Payload = Payload(modeldict)
-        super().__init__(pmodel)
+        super().__init__(ptype, pmodel)
 
 
 class ChatPacket(Packet):

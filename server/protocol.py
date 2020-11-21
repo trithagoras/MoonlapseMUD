@@ -185,7 +185,18 @@ class Moonlapse(NetstringReceiver):
 
         # Send new data to the client
         self.sendPacket(packet.ServerTickRatePacket(100))
-        self.sendPacket(packet.ServerModelPacket(model_to_dict(self._entity)))
+
+        userdict: dict = model_to_dict(self._user)
+        self.sendpacket(packet.ServerModelPacket('User', userdict))
+
+        roomdict: dict = model_to_dict(self._room)
+        self.sendPacket(packet.ServerModelPacket('Room', roomdict))
+
+        entitydict: dict = model_to_dict(self._entity)
+        self.sendPacket(packet.ServerModelPacket('Entity', entitydict))
+
+        playerdict: dict = model_to_dict(self._player)
+        self.sendPacket(packet.ServerModelPacket('Player', playerdict))
 
         self.state = self._PLAY
         self.broadcast(packet.ServerLogPacket(f"{self._user.username} has arrived."))
@@ -250,7 +261,7 @@ class Moonlapse(NetstringReceiver):
         reason: Optional[Failure] = p.payloads[1].value
 
         if self._logged_in:
-            self.processPacket(packet.DisconnectPacket(disconnecting_username, reason=reason.getErrorMessage()))
+            self.processPacket(packet.DisconnectPacket(disconnecting_username, reason=reason))
             self._logged_in = False
 
         # Release this protocol from the server
