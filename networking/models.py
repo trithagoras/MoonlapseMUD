@@ -12,14 +12,14 @@ class Room(models.Model):
 
 
 class Entity(models.Model):
-    roomid = models.ForeignKey(Room, on_delete=models.RESTRICT)
-    y = models.IntegerField(default=0)
-    x = models.IntegerField(default=0)
+    room = models.ForeignKey(Room, on_delete=models.RESTRICT)
+    y = models.IntegerField(null=True, default=None)
+    x = models.IntegerField(null=True, default=None)
     char = models.CharField(max_length=1, default='@')
     name = models.CharField(max_length=50)
 
 
 class Player(models.Model):
-    userid = models.ForeignKey(User, on_delete=models.RESTRICT)
-    entityid = models.ForeignKey(Entity, on_delete=models.RESTRICT)
+    user = models.ForeignKey(User, on_delete=models.RESTRICT)
+    entity = models.ForeignKey(Entity, on_delete=models.RESTRICT)
     view_radius = models.IntegerField(default=10)

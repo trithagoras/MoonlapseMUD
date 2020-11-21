@@ -69,7 +69,7 @@ class Moonlapse(NetstringReceiver):
     def _debug(self, message: str):
         print(f"[{self._user.username if self._user else None }]"
               f"[{self.state.__name__}]"
-              f"[{self._entity.roomid if self._entity else None}]: {message}")
+              f"[{self._entity.room.id if self._entity else None}]: {message}")
 
     def connectionMade(self) -> None:
         super().connectionMade()
@@ -140,6 +140,7 @@ class Moonlapse(NetstringReceiver):
     def _login_user(self, username: str, password: str) -> None:
         if username in [proto.user.username for proto in self._others]:
             self.sendPacket(packet.DenyPacket("You are already inhabiting this realm"))
+            self.sendPacket(packet.DenyPacket("You are already inhabiting this realm"))
             return
 
         if not models.User.objects.filter(username=username):
@@ -151,11 +152,11 @@ class Moonlapse(NetstringReceiver):
             return
 
         # The user exists in the database so retrieve the player and entity objects
-        self._user = models.User.objects.filter(username=username, password=password)[0]
-        self._player = models.Player.objects.filter(userid=self._user.id)[0]
-        self._entity = models.Entity.objects.filter(id=self._player.entityid)[0]
+        self._user = models.User.objects.get(username=username)
+        self._player = models.Player.objects.get(user=self._user.id)
+        self._entity = models.Entity.objects.get(id=self._player.entity.id)
 
-        self.processPacket(packet.MoveRoomsPacket(self._entity.roomid))
+        self.move_rooms(self._entity.room.id)
 
     def move_rooms(self, dest_roomid: Optional[int]):
         print(f"\nmove_rooms(dest_roomid={dest_roomid})\n")
@@ -164,12 +165,12 @@ class Moonlapse(NetstringReceiver):
 
         self.broadcast(packet.GoodbyePacket(self._entity.id), excluding=(self._user.username,))
 
-        self._entity.roomid = dest_roomid
+        self._entity.room.id = dest_roomid
         self._entity.save()
 
         self._room = maps.Room(models.Room.objects.get(id=dest_roomid).name)
 
-        self._others = self._server.rooms_protos[dest_roomid]
+        self._others = self._server.rooms_protocols[dest_roomid]
         self._establish_player_in_world()
 
     def _establish_player_in_world(self) -> None:
@@ -213,8 +214,18 @@ class Moonlapse(NetstringReceiver):
             self.sendPacket(packet.DenyPacket("Somebody else already goes by that name"))
             return
 
+        # Save the new user
         user = models.User(username=username, password=password)
         user.save()
+
+        # Create and save a new entity
+        entity = models.Entity(room=models.Room.objects.get(id=1), name=username)
+        entity.save()
+
+        # Create and save a new player
+        player = models.Player(user=user, entity=entity)
+        player.save()
+
         self.sendPacket(packet.OkPacket())
 
     def _DISCONNECT(self, p: packet.DisconnectPacket):
@@ -229,9 +240,12 @@ class Moonlapse(NetstringReceiver):
         disconnecting_username: str = p.payloads[0].value
 
         # TODO: This is yuck, stop it.
-        disconnecting_proto: 'Moonlapse' = [
-            proto for proto in self._others if proto._user.username == disconnecting_username
-        ][0]
+        try:
+            disconnecting_proto: 'Moonlapse' = [
+                proto for proto in self._others if proto._user.username == disconnecting_username
+            ][0]
+        except IndexError:
+            return
 
         reason: Optional[Failure] = p.payloads[1].value
 
