@@ -127,7 +127,7 @@ class Moonlapse(NetstringReceiver):
         elif isinstance(p, packet.MoveRoomsPacket):
             self.move_rooms(p.payloads[0].value)
         elif isinstance(p, packet.ServerModelPacket):
-            self.sendPacket(p)
+            self.process_new_model(p)
 
     def _GETENTRY(self, p: Union[packet.LoginPacket, packet.RegisterPacket]) -> None:
         """
@@ -209,6 +209,10 @@ class Moonlapse(NetstringReceiver):
         self.broadcast(packet.ServerLogPacket(f"{self._user.username} has arrived."))
         self._logged_in = True
 
+        # Tell entities in view that we have arrived
+        # TODO: This is a bit dodgy but good enough for now. Fix later.
+        self.processPacket(packet.MovePacket())
+
     def logout(self, p: packet.LogoutPacket):
         username: str = p.payloads[0].value
         if username == self._user.username:
@@ -246,6 +250,14 @@ class Moonlapse(NetstringReceiver):
         player.save()
 
         self.sendPacket(packet.OkPacket())
+
+    def process_new_model(self, p: packet.ServerModelPacket):
+        type: str = p.payloads[0].value
+        model: dict = p.payloads[1].value
+
+        # TODO: Make it so that we tell new entities about us if we're in their view
+        if type == 'Entity':
+            self.sendPacket(p)
 
     def _DISCONNECT(self, p: packet.DisconnectPacket):
         """

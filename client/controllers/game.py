@@ -70,9 +70,19 @@ class Game(Controller):
                 model: dict = p.payloads[1].value
 
                 if type == 'Entity':
-                    if model['id'] == self.entity.id:
-                        self.entity = models.Entity(model)
+                    # If the incoming entity is our player, update it
+                    entity = models.Entity(model)
+                    if entity.id == self.entity.id:
+                        self.entity = entity
 
+                    # If the incoming entity is already visible to us, update it
+                    for e in self.visible_entities:
+                        if e.id == entity.id:
+                            self.visible_entities.remove(e)
+                            self.visible_entities.add(entity)
+
+                    # Else, add it to the visible list (it is only ever sent to us if it's in view)
+                    self.visible_entities.add(entity)
 
             elif isinstance(p, packet.ServerLogPacket):
                 self.logger.log(p.payloads[0].value)
@@ -80,8 +90,11 @@ class Game(Controller):
             # Another player has logged out, left the room, or disconnected so we remove them from the game.
             elif isinstance(p, packet.GoodbyePacket):
                 entityid: int = p.payloads[0].value
-                if entityid in self.visible_entities:
-                    self.visible_entities.remove(entityid)
+                # Convert self.visible_entities to a tuple to avoid "RuntimeError: Set changed size during iteration"
+                # TODO: Think of a better way to handle this
+                for entity in tuple(self.visible_entities):
+                    if entity.id == entityid:
+                        self.visible_entities.remove(entity)
 
             elif isinstance(p, packet.OkPacket):
                 if self.action == Action.MOVE_ROOMS:
