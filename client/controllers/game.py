@@ -30,7 +30,7 @@ class Game(Controller):
         self.entity: Optional[models.Entity] = None
         self.player: Optional[models.Player] = None
 
-        self.visible_entities: Dict[models.Entity, Tuple[int, int]] = {}
+        self.visible_entities: Set[models.Entity] = set()
         self.tick_rate: Optional[int] = None
 
         self.logger: Log = Log()
@@ -58,28 +58,29 @@ class Game(Controller):
             while not self.ready() and self._logged_in:
                 p: packet.Packet = packet.receive(self.s)
                 if isinstance(p, packet.ServerModelPacket):
-                    self.receive_model_data(p.payloads[0].value, p.payloads[1].value)
-                elif isinstance(p, packet.ServerEntityPositionPacket):
-                    self.user_exchange(p.payloads[0].value, p.payloads[1].value)
+                    self.initialise_models(p.payloads[0].value, p.payloads[1].value)
                 elif isinstance(p, packet.ServerTickRatePacket):
                     self.tick_rate = p.payloads[0].value
-
-                ready = self.ready()
 
             # Get volatile data such as player positions, etc.
             p: packet.Packet = packet.receive(self.s)
 
-            if isinstance(p, packet.ServerEntityPositionPacket):
-                self.user_exchange(p.payloads[0].value, tuple(p.payloads[1].value))  # Can't receive tuples as JSON
+            if isinstance(p, packet.ServerModelPacket):
+                type: str = p.payloads[0].value
+                model: dict = p.payloads[1].value
+
+                # if type == 'Entity':
+                #     if model['id'] == self.entity.id:
+
 
             elif isinstance(p, packet.ServerLogPacket):
                 self.logger.log(p.payloads[0].value)
 
             # Another player has logged out, left the room, or disconnected so we remove them from the game.
-            elif isinstance(p, packet.LogoutPacket) or isinstance(p, packet.GoodbyePacket):
-                username: str = p.payloads[0].value
-                if username in self.visible_users:
-                    self.visible_users.pop(username)
+            elif isinstance(p, packet.GoodbyePacket):
+                entityid: int = p.payloads[0].value
+                if entityid in self.visible_entities:
+                    self.visible_entities.remove(entityid)
 
             elif isinstance(p, packet.OkPacket):
                 if self.action == Action.MOVE_ROOMS:
@@ -97,29 +98,18 @@ class Game(Controller):
                 #   self.action = None
                 #   self.action = do_that()
 
-    def receive_model_data(self, type: str, model: dict):
+    def initialise_models(self, type: str, data: dict):
         if type == 'User':
-            self.user = models.User(username=model['username'])
+            self.user = models.User(data)
 
         elif type == 'Room':
-            room_name: str = model['name']
-            room_path: str = model['path']
-            self.room = models.Room(name=room_name, path=room_path)
+            self.room = models.Room(data)
 
         elif type == 'Entity':
-            self.entity = models.Entity(room=self.room, y=model['y'], x=model['x'], char=model['char'])
-            self.player.get_room().unpack()
+            self.entity = models.Entity(data)
 
         elif type == 'Player':
-            self.player = models.Player(user=self.user, entity=self.entity, view_radius=model['view_radius'])
-
-    def user_exchange(self, username: str, position: Tuple[int, int]):
-        # If the received username is ourselves, update ourself
-        if username == self.username:
-            self.player.set_position(list(position))
-
-        # If the received player is somebody else, either update the other user position or add a new one in
-        self.visible_users[username] = position
+            self.player = models.Player(data)
 
     def handle_input(self) -> int:
         key = super().handle_input()
@@ -182,11 +172,11 @@ class Game(Controller):
         packet.send(packet.ChatPacket(message), self.s)
 
     def ready(self) -> bool:
-        return False not in [bool(data) for data in (self.player, self.tick_rate)] and self.player.get_room().is_unpacked()
+        return False not in [bool(data) for data in (self.user, self.entity, self.player, self.room, self.tick_rate)]
 
     def reinitialize(self):
-        self.player = None
-        self.visible_users = {}
+        self.entity = None
+        self.visible_entities = set()
         self.tick_rate = None
 
     def stop(self) -> None:

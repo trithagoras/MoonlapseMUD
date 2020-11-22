@@ -53,7 +53,7 @@ class Moonlapse(NetstringReceiver):
         self._user: Optional[models.User] = None
         self._entity: Optional[models.Entity] = None
         self._player: Optional[models.Player] = None
-        self._room: Optional[maps.Room] = None
+        self._room: Optional[models.Room] = None
         self._visible_entities: Set[models.Entity] = set()
 
         self._logged_in: bool = False
@@ -161,9 +161,11 @@ class Moonlapse(NetstringReceiver):
     def move_rooms(self, dest_roomid: Optional[int]):
         print(f"\nmove_rooms(dest_roomid={dest_roomid})\n")
 
-        self._server.moveProtocols(self, dest_roomid)
-
+        # Tell people in the current (old) room we are leaving
         self.broadcast(packet.GoodbyePacket(self._entity.id), excluding=(self._user.username,))
+
+        # Move to the new room
+        self._server.moveProtocols(self, dest_roomid)
 
         self._entity.room.id = dest_roomid
         self._entity.save()
@@ -187,7 +189,7 @@ class Moonlapse(NetstringReceiver):
         self.sendPacket(packet.ServerTickRatePacket(100))
 
         userdict: dict = model_to_dict(self._user)
-        self.sendpacket(packet.ServerModelPacket('User', userdict))
+        self.sendPacket(packet.ServerModelPacket('User', userdict))
 
         roomdict: dict = model_to_dict(self._room)
         self.sendPacket(packet.ServerModelPacket('Room', roomdict))

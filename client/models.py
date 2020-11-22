@@ -1,24 +1,24 @@
-class User:
-    def __init__(self, username: str):
-        self.username: str = username
+class Model:
+    def __init__(self, attr: dict):
+        for k, v in attr.items():
+            setattr(self, k, v)
 
 
-class Room:
-    def __init__(self, name: str, path: str):
-        self.name: str = name
-        self.path: str = path
+class User(Model):
+    def __init__(self, attr: dict):
+        super().__init__()
 
 
-class Entity:
-    def __init__(self, room: Room, y: int, x: int, char: chr = '@'):
-        self.room: Room = room
-        self.y: int = y
-        self.x: int = x
-        self.char: chr = char
+class Room(Model):
+    def __init__(self, attr: dict):
+        super().__init__()
 
 
-class Player:
-    def __init__(self, user: User, entity: Entity, view_radius: int = 10):
-        self.user: User = user
-        self.entity: Entity = entity
-        self.view_radius: int = view_radius
+class Entity(Model):
+    def __init__(self, attr: dict):
+        super().__init__()
+
+
+class Player(Model):
+    def __init__(self, attr: dict):
+        super().__init__()

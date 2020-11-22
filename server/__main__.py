@@ -13,7 +13,7 @@ sys.path.append(str(root))
 
 from server import protocol
 from networking import models
-
+import maps
 
 class MoonlapseServer(Factory):
     def __init__(self):
@@ -30,10 +30,14 @@ class MoonlapseServer(Factory):
         layoutssdir = 'maps/layouts'
         mapdirs: List[str] = [d for d in os.listdir(layoutssdir) if os.path.isdir(os.path.join(layoutssdir, d))]
         for mapdir in mapdirs:
-            room = models.Room(name=mapdir, path=f"{layoutssdir}/{mapdir}")
+            room_data = maps.Room(mapdir)
+            room = models.Room(name=mapdir, ground_data=room_data.grounddata, solid_data=room_data.soliddata, roof_data=room_data.roofdata, height=room_data.height, width=room_data.width)
+
+            room.save()
             if not models.Room.objects.filter(name=room.name):
-                room.save()
                 print(f"Added map {mapdir} to the database")
+            else:
+                print(f"Updated map {mapdir} if there were any changes")
 
     def buildProtocol(self, addr):
         print("Adding a new client.")

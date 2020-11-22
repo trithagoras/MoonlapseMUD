@@ -1,4 +1,5 @@
 from django.db import models
+from django.contrib.postgres.fields import ArrayField
 
 
 class User(models.Model):
@@ -7,8 +8,12 @@ class User(models.Model):
 
 
 class Room(models.Model):
-    name = models.TextField(max_length=200)
-    path = models.TextField(max_length=500)
+    name = models.CharField(max_length=200)
+    ground_data = ArrayField(models.TextField(max_length=None))
+    solid_data = ArrayField(models.TextField(max_length=None))
+    roof_data = ArrayField(models.TextField(max_length=None))
+    height = models.IntegerField()
+    width = models.IntegerField()
 
 
 class Entity(models.Model):
