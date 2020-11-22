@@ -33,7 +33,7 @@ class Payload:
 def deserialize(serialized: str) -> 'Payload':
     attrs = json.loads(serialized)
 
-    if isinstance(attrs, dict):
+    if isinstance(attrs, dict) and 'classkey' in attrs.keys():
         # Use reflection to construct the specific payload type we're looking for
         classkey: str = attrs.pop('classkey')
         constructor: Type = globals()[classkey]

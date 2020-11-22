@@ -6,19 +6,19 @@ class Model:
 
 class User(Model):
     def __init__(self, attr: dict):
-        super().__init__()
+        super().__init__(attr)
 
 
 class Room(Model):
     def __init__(self, attr: dict):
-        super().__init__()
+        super().__init__(attr)
 
 
 class Entity(Model):
     def __init__(self, attr: dict):
-        super().__init__()
+        super().__init__(attr)
 
 
 class Player(Model):
     def __init__(self, attr: dict):
-        super().__init__()
+        super().__init__(attr)

@@ -4,6 +4,7 @@ import socket
 import threading
 import time
 import models
+import maps
 from enum import Enum
 from typing import *
 from networking import packet
@@ -21,7 +22,6 @@ class Game(Controller):
     def __init__(self, s: socket.socket, username: str):
         super().__init__()
         self.s: socket.socket = s
-        self.username = username
         self.action: Optional[Action] = None
 
         # Game data
@@ -103,7 +103,7 @@ class Game(Controller):
             self.user = models.User(data)
 
         elif type == 'Room':
-            self.room = models.Room(data)
+            self.room = maps.Room(data['name'])
 
         elif type == 'Entity':
             self.entity = models.Entity(data)
@@ -163,7 +163,7 @@ class Game(Controller):
 
         # Quit on Windows. TODO: Figure out how to make CTRL+C or ESC work.
         elif key == ord('q'):
-            packet.send(packet.LogoutPacket(self.player.get_username()), self.s)
+            packet.send(packet.LogoutPacket(self.user.username), self.s)
             self.action = Action.LOGOUT
 
         return key
