@@ -54,6 +54,7 @@ class Moonlapse(NetstringReceiver):
         self._entity: Optional[models.Entity] = None
         self._player: Optional[models.Player] = None
         self._room: Optional[models.Room] = None
+        self._roommap: Optional[maps.Room] = None
         self._visible_entities: Set[models.Entity] = set()
 
         self._logged_in: bool = False
@@ -170,7 +171,10 @@ class Moonlapse(NetstringReceiver):
         self._entity.room.id = dest_roomid
         self._entity.save()
 
-        self._room = maps.Room(models.Room.objects.get(id=dest_roomid).name)
+        self._room = models.Room.objects.get(id=dest_roomid)
+        self._roommap = maps.Room(self._room.name)
+        if not self._roommap.is_unpacked():
+            self._roommap.unpack()
 
         self._others = self._server.rooms_protocols[dest_roomid]
         self._establish_player_in_world()
@@ -232,10 +236,11 @@ class Moonlapse(NetstringReceiver):
         user.save()
 
         # Create and save a new entity
-        entity = models.Entity(room=models.Room.objects.get(id=1), name=username)
+        entity = models.Entity(room=models.Room.objects.first(), name=username)
         entity.save()
 
         # Create and save a new player
+        # TODO: Get default room
         player = models.Player(user=user, entity=entity)
         player.save()
 
@@ -328,7 +333,7 @@ class Moonlapse(NetstringReceiver):
         elif isinstance(p, packet.MoveLeftPacket):
             desired_x -= 1
 
-        if (desired_y, desired_x) in self._room.solidmap or not within_bounds(desired_y, desired_x, 0, 0, self._room.height - 1, self._room.width - 1):
+        if (desired_y, desired_x) in self._roommap.solidmap or not within_bounds(desired_y, desired_x, 0, 0, self._room.height - 1, self._room.width - 1):
             self.sendPacket(packet.DenyPacket("Can't move there"))
             return
 

@@ -15,6 +15,7 @@ from server import protocol
 from networking import models
 import maps
 
+
 class MoonlapseServer(Factory):
     def __init__(self):
         # Keep track of room ids and a set of protocols inside, e.g.
