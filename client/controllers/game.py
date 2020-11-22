@@ -69,8 +69,9 @@ class Game(Controller):
                 type: str = p.payloads[0].value
                 model: dict = p.payloads[1].value
 
-                # if type == 'Entity':
-                #     if model['id'] == self.entity.id:
+                if type == 'Entity':
+                    if model['id'] == self.entity.id:
+                        self.entity = models.Entity(model)
 
 
             elif isinstance(p, packet.ServerLogPacket):
@@ -104,6 +105,8 @@ class Game(Controller):
 
         elif type == 'Room':
             self.room = maps.Room(data['name'])
+            if not self.room.is_unpacked():
+                self.room.unpack()
 
         elif type == 'Entity':
             self.entity = models.Entity(data)
