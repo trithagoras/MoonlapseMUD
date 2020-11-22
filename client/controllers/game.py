@@ -90,11 +90,11 @@ class Game(Controller):
             # Another player has logged out, left the room, or disconnected so we remove them from the game.
             elif isinstance(p, packet.GoodbyePacket):
                 entityid: int = p.payloads[0].value
-                # Convert self.visible_entities to a tuple to avoid "RuntimeError: Set changed size during iteration"
-                # TODO: Think of a better way to handle this
-                for entity in tuple(self.visible_entities):
-                    if entity.id == entityid:
-                        self.visible_entities.remove(entity)
+                departed: models.Entity = next((e for e in self.visible_entities if e.id == entityid), None)
+                if not departed:
+                    return
+
+                self.visible_entities.remove(departed)
 
             elif isinstance(p, packet.OkPacket):
                 if self.action == Action.MOVE_ROOMS:

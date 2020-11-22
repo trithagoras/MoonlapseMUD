@@ -147,12 +147,15 @@ class GameView(View):
                         elif c == maps.WOOD:
                             color_addch(self.win1, cy, cx, '◍', Color.YELLOW)
 
-                    # Objects
-                    if pos in {(e.y, e.x) for e in self.game.visible_entities}:
-                        color_addch(self.win1, cy, cx, '☺', Color.WHITE)
+        # Draw entities
+        for e in self.game.visible_entities:
+            y: int = win1_hheight + (e.y - self.game.entity.y)
+            x: int = win1_hwidth + + (e.x - self.game.entity.x)
+            c: chr = e.char
+            color_addch(self.win1, y, x, c, Color.WHITE)
 
         # Draw player in middle of screen
-        color_addch(self.win1, win1_hheight, win1_hwidth, '☺', Color.WHITE)
+        color_addch(self.win1, win1_hheight, win1_hwidth, self.game.entity.char, Color.WHITE)
 
     def draw_help_win(self):
         with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'assets', 'help.txt'), 'r') as helpfile:

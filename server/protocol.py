@@ -70,7 +70,7 @@ class Moonlapse(NetstringReceiver):
     def _debug(self, message: str):
         print(f"[{self._user.username if self._user else None }]"
               f"[{self.state.__name__}]"
-              f"[{self._entity.room_id if self._entity else None}]: {message}")
+              f"[{self._entity.room.name if self._entity else None}]: {message}")
 
     def connectionMade(self) -> None:
         super().connectionMade()
@@ -255,9 +255,18 @@ class Moonlapse(NetstringReceiver):
         type: str = p.payloads[0].value
         model: dict = p.payloads[1].value
 
-        # TODO: Make it so that we tell new entities about us if we're in their view
+        # Send the new model to the client if it's still within our view - otherwise remove it from our list of visible
+        # entities
         if type == 'Entity':
-            self.sendPacket(p)
+            if self.coord_in_view(model['y'], model['x']):
+                self.sendPacket(p)
+            else:
+                departed: models.Entity = next((e for e in self._visible_entities if e.id == model['id']), None)
+                if not departed:
+                    return
+
+                self.sendPacket(packet.GoodbyePacket(departed.id))
+                self._visible_entities.remove(departed)
 
     def _DISCONNECT(self, p: packet.DisconnectPacket):
         """
@@ -296,7 +305,11 @@ class Moonlapse(NetstringReceiver):
         """
         self._debug(f"Broadcasting {packets} to {including if including else 'everyone'} except {excluding}")
 
-        sendto: Set['Moonlapse'] = {p for p in self._others if p._user.username not in excluding}
+        sendto: Set['Moonlapse'] = self._others
+        if including:
+            sendto = {proto for proto in self._others if proto._user.username in including}
+
+        sendto = {proto for proto in sendto if proto._user.username not in excluding}
 
         for proto in sendto:
             for p in packets:
@@ -344,30 +357,22 @@ class Moonlapse(NetstringReceiver):
         self._entity.save()
         current_entities_in_view: Set[models.Entity] = self.get_entities_in_view()
         current_usernames_in_view = {p._user.username for p in self._others if p._entity in current_entities_in_view}
-        new_model_packet = packet.ServerModelPacket('Entity', model_to_dict(self._entity))
 
         # Tell everyone in view our position has updated or we have entered their view
         self.broadcast(packet.ServerModelPacket('Entity', model_to_dict(self._entity)), including=current_usernames_in_view)
 
-        # For players which were previously in our view but aren't any more, tell them to remove us from their view
-        # Also remove them from our view
+        # For players which were previously in our view but aren't any more remove them from our view
         for old_entity_in_view in self._visible_entities:
             if old_entity_in_view not in current_entities_in_view:
-                # TODO: This is horrible, think of a better way
-                new_model_packet.payloads[1].value['y'] = -1
-                new_model_packet.payloads[1].value['x'] = -1
-                self.broadcast(new_model_packet, including=current_usernames_in_view)
                 self._visible_entities.remove(old_entity_in_view)
 
     def get_entities_in_view(self) -> Set[models.Entity]:
+        return {proto._entity for proto in self._others if self.coord_in_view(proto._entity.y, proto._entity.x)}
+
+    def coord_in_view(self, y: int, x: int) -> bool:
         topleft_y, topleft_x = self._entity.y - self._player.view_radius, self._entity.x - self._player.view_radius
         botright_y, botright_x = self._entity.y + self._player.view_radius, self._entity.x + self._player.view_radius
-        return {
-            proto._entity for proto in self._others if within_bounds(
-                proto._entity.y, proto._entity.x, topleft_y, topleft_x, botright_y, botright_x
-            )
-        }
-
+        return within_bounds(y, x, topleft_y, topleft_x, botright_y, botright_x)
 
 class EntryError(Exception):
     """
