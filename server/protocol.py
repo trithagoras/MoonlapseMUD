@@ -145,7 +145,7 @@ class Moonlapse(NetstringReceiver):
             self.sendPacket(packet.DenyPacket("I don't know anybody by that name"))
             return
 
-        if not models.User.objects.filter(password=password):
+        if not models.User.objects.filter(username=username, password=password):
             self.sendPacket(packet.DenyPacket("Incorrect password"))
             return
 
@@ -373,9 +373,3 @@ class Moonlapse(NetstringReceiver):
         topleft_y, topleft_x = self._entity.y - self._player.view_radius, self._entity.x - self._player.view_radius
         botright_y, botright_x = self._entity.y + self._player.view_radius, self._entity.x + self._player.view_radius
         return within_bounds(y, x, topleft_y, topleft_x, botright_y, botright_x)
-
-class EntryError(Exception):
-    """
-    Raised if there was an error during the login or registration process.
-    """
-    pass
