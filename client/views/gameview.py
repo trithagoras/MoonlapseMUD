@@ -150,7 +150,7 @@ class GameView(View):
         # Draw entities
         for e in self.game.visible_entities:
             y: int = win1_hheight + (e.y - self.game.entity.y)
-            x: int = win1_hwidth + + (e.x - self.game.entity.x)
+            x: int = win1_hwidth + (e.x - self.game.entity.x)
             c: chr = e.char
             color_addch(self.win1, y, x, c, Color.WHITE)
 

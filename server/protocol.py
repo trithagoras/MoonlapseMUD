@@ -127,7 +127,9 @@ class Moonlapse(NetstringReceiver):
         elif isinstance(p, packet.MoveRoomsPacket):
             self.move_rooms(p.payloads[0].value)
         elif isinstance(p, packet.ServerModelPacket):
-            self.process_new_model(p)
+            self.process_model(p)
+        elif isinstance(p, packet.HelloPacket):
+            self.greet(p)
 
     def _GETENTRY(self, p: Union[packet.LoginPacket, packet.RegisterPacket]) -> None:
         """
@@ -210,8 +212,7 @@ class Moonlapse(NetstringReceiver):
         self._logged_in = True
 
         # Tell entities in view that we have arrived
-        # TODO: This is a bit dodgy but good enough for now. Fix later.
-        self.processPacket(packet.MovePacket())
+        self.broadcast(packet.HelloPacket(model_to_dict(self._entity)), excluding=(self._user.username,))
 
     def logout(self, p: packet.LogoutPacket):
         username: str = p.payloads[0].value
@@ -251,7 +252,29 @@ class Moonlapse(NetstringReceiver):
 
         self.sendPacket(packet.OkPacket())
 
-    def process_new_model(self, p: packet.ServerModelPacket):
+    # Interaction plan
+    # Cases:
+    # 1. * Player A already in room
+    #    * Player B joins room and broadcasts its entity model to every protocol in the room
+    #    * Player A's protocol checks if Player B's entity is within view; if so:
+    #          * Player A tells its client about Player B
+    #    * Player A broadcasts its entity model to Player B's protocol
+    #    * Player B's protocol checks if Player A's entity is within view; if so:
+    #          * Player B tells its client about Player A
+    def greet(self, p: packet.HelloPacket):
+        model: dict = p.payloads[0].value
+        if self.coord_in_view(model['y'], model['x']):
+            self.sendPacket(packet.ServerModelPacket('Entity', model))
+
+        # Find the protocol which owns the sent entity (if any)
+        proto: Optional['Moonlapse'] = next((p for p in self._others if p._entity.id == model['id']), None)
+        if proto is None:
+            return
+
+        # The greeting came from another protocol so tell it about us
+        proto.processPacket(packet.ServerModelPacket('Entity', model_to_dict(self._entity)))
+
+    def process_model(self, p: packet.ServerModelPacket):
         type: str = p.payloads[0].value
         model: dict = p.payloads[1].value
 
@@ -259,10 +282,13 @@ class Moonlapse(NetstringReceiver):
         # entities
         if type == 'Entity':
             if self.coord_in_view(model['y'], model['x']):
+                # If it's in our view, tell our client about it
                 self.sendPacket(p)
             else:
+                # Else, it's not in our view but check if it WAS so we can say goodbye to it
                 departed: models.Entity = next((e for e in self._visible_entities if e.id == model['id']), None)
                 if not departed:
+                    # It wasn't in our view to begin with so do nothing
                     return
 
                 self.sendPacket(packet.GoodbyePacket(departed.id))
@@ -277,7 +303,9 @@ class Moonlapse(NetstringReceiver):
         This should never be called directly. Instead it should be handled by
         self.connectionLost.
         """
-        reason: Optional[Failure] = p.payloads[1].value
+        reason: Optional[Failure] = None
+        if len(p.payloads) > 1:
+            reason = p.payloads[1].value
 
         if self._logged_in:
             self.sendPacket(packet.DisconnectPacket(self._user.username, reason=reason))
@@ -356,12 +384,11 @@ class Moonlapse(NetstringReceiver):
         self._entity.x = desired_x
         self._entity.save()
         current_entities_in_view: Set[models.Entity] = self.get_entities_in_view()
-        current_usernames_in_view = {p._user.username for p in self._others if p._entity in current_entities_in_view}
 
-        # Tell everyone in view our position has updated or we have entered their view
-        self.broadcast(packet.ServerModelPacket('Entity', model_to_dict(self._entity)), including=current_usernames_in_view)
+        # Broadcast our new position to other protocols in the room
+        self.broadcast(packet.ServerModelPacket('Entity', model_to_dict(self._entity)))
 
-        # For players which were previously in our view but aren't any more remove them from our view
+        # For players which were previously in our view but aren't any more, remove them from our view
         for old_entity_in_view in self._visible_entities:
             if old_entity_in_view not in current_entities_in_view:
                 self._visible_entities.remove(old_entity_in_view)

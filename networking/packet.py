@@ -150,6 +150,16 @@ class ServerModelPacket(Packet):
         super().__init__(ptype, pmodel)
 
 
+class HelloPacket(Packet):
+    """
+    A packet representing an entity model from the server in the form of a dictionary.
+    Use only to broadcast yourself when first connecting to a new room.
+    """
+    def __init__(self, modeldict: dict):
+        pmodel: Payload = Payload(modeldict)
+        super().__init__(pmodel)
+
+
 class ChatPacket(Packet):
     """
     A packet sent from a client or a protocol to communicate a player's chat message to other players.
