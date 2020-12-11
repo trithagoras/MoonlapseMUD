@@ -263,16 +263,22 @@ class Moonlapse(NetstringReceiver):
     #          * Player B tells its client about Player A
     def greet(self, p: packet.HelloPacket):
         model: dict = p.payloads[0].value
+        # Player A's protocol checks if Player B's entity is within view; if so:
         if self.coord_in_view(model['y'], model['x']):
+            # Player A tells its client about Player B
             self.sendPacket(packet.ServerModelPacket('Entity', model))
+        else:
+            self._debug(f"{model['name']} not in my view so I won't tell my client about it")
 
-        # Find the protocol which owns the sent entity (if any)
+        # Obtain Player B's protocol
         proto: Optional['Moonlapse'] = next((p for p in self._others if p._entity.id == model['id']), None)
         if proto is None:
             return
 
-        # The greeting came from another protocol so tell it about us
+        # Player A broadcasts its entity model to Player B's protocol
         proto.processPacket(packet.ServerModelPacket('Entity', model_to_dict(self._entity)))
+
+        # Now the rest of the logic is passed to proto.process_model
 
     def process_model(self, p: packet.ServerModelPacket):
         type: str = p.payloads[0].value
@@ -308,7 +314,7 @@ class Moonlapse(NetstringReceiver):
             reason = p.payloads[1].value
 
         if self._logged_in:
-            self.sendPacket(packet.DisconnectPacket(self._user.username, reason=reason))
+            self.sendPacket(packet.DisconnectPacket(self._user.username, reason=reason.getErrorMessage()))
             self._logged_in = False
 
         # Release this protocol from the server
@@ -387,6 +393,8 @@ class Moonlapse(NetstringReceiver):
 
         # Broadcast our new position to other protocols in the room
         self.broadcast(packet.ServerModelPacket('Entity', model_to_dict(self._entity)))
+        # Send greetings to keep the views up to date
+        self.broadcast(packet.HelloPacket(model_to_dict(self._entity)))
 
         # For players which were previously in our view but aren't any more, remove them from our view
         for old_entity_in_view in self._visible_entities:
