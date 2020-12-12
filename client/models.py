@@ -22,3 +22,8 @@ class Entity(Model):
 class Player(Model):
     def __init__(self, attr: dict):
         super().__init__(attr)
+
+
+class Portal(Model):
+    def __init__(self, attr: dict):
+        super().__init__(attr)

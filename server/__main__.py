@@ -1,3 +1,5 @@
+import twisted
+import django
 from twisted.internet.protocol import Factory
 from twisted.internet import reactor
 from typing import *
@@ -57,6 +59,7 @@ class MoonlapseServer(Factory):
 
 
 if __name__ == '__main__':
+    print(f"Starting MoonlapseMUD server")
     PORT: int = 42523
     reactor.listenTCP(PORT, MoonlapseServer())
     print(f"Server listening on port {42523}")

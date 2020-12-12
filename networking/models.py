@@ -28,3 +28,10 @@ class Player(models.Model):
     user = models.ForeignKey(User, on_delete=models.RESTRICT)
     entity = models.ForeignKey(Entity, on_delete=models.RESTRICT)
     view_radius = models.IntegerField(default=10)
+
+
+class Portal(models.Model):
+    entity = models.ForeignKey(Entity, on_delete=models.RESTRICT)
+    linkedy = models.IntegerField(null=True, default=None)
+    linkedx = models.IntegerField(null=True, default=None)
+    linkedroom = models.ForeignKey(Room, on_delete=models.RESTRICT)
