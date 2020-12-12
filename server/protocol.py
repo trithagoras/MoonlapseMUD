@@ -140,7 +140,7 @@ class Moonlapse(NetstringReceiver):
         if isinstance(p, packet.LoginPacket):
             self._login_user(p.payloads[0].value, p.payloads[1].value)
         elif isinstance(p, packet.RegisterPacket):
-            self._register_user(p.payloads[0].value, p.payloads[1].value)
+            self._register_user(p)
 
     def _login_user(self, username: str, password: str) -> None:
         if not models.User.objects.filter(username=username):
@@ -232,7 +232,11 @@ class Moonlapse(NetstringReceiver):
         self.sendPacket(packet.ServerLogPacket(f"{other_entity.name} has departed."))
         self.sendPacket(p)
 
-    def _register_user(self, username: str, password: str) -> None:
+    def _register_user(self, p: packet.RegisterPacket) -> None:
+        username: str = p.payloads[0].value
+        password: str = p.payloads[1].value
+        char: chr = p.payloads[2].value
+
         if models.User.objects.filter(username=username):
             self.sendPacket(packet.DenyPacket("Somebody else already goes by that name"))
             return
@@ -242,7 +246,7 @@ class Moonlapse(NetstringReceiver):
         user.save()
 
         # Create and save a new entity
-        entity = models.Entity(room=models.Room.objects.first(), name=username)
+        entity = models.Entity(room=models.Room.objects.first(), name=username, char=char)
         entity.save()
 
         # Create and save a new player

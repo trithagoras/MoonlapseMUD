@@ -126,10 +126,11 @@ class RegisterPacket(Packet):
     technically to the LoginPacket but it's important to have a separate name to distinguish the 
     different use cases when handling these packets on the protocol's end.
     """
-    def __init__(self, username, password: str):
+    def __init__(self, username, password: str, char: chr):
         pusername = Payload(username)
         ppassword = Payload(password)
-        super().__init__(pusername, ppassword)
+        pchar = Payload(char)
+        super().__init__(pusername, ppassword, pchar)
 
 
 class ServerModelPacket(Packet):
