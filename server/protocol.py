@@ -267,42 +267,41 @@ class Moonlapse(NetstringReceiver):
     #          * Player B tells its client about Player A
     def greet(self, p: packet.HelloPacket):
         model: dict = p.payloads[0].value
+        # Obtain Player B's protocol
+        other_proto: Optional['Moonlapse'] = next((p for p in self._others if p._entity.id == model['id']), None)
+        if other_proto is None:
+            return
+
         # Player A's protocol checks if Player B's entity is within view; if so:
-        if self.coord_in_view(model['y'], model['x']):
+        if self.coord_in_view(other_proto._entity.y, other_proto._entity.x):
+            self._visible_entities.add(other_proto._entity)
             # Player A tells its client about Player B
             self.sendPacket(packet.ServerModelPacket('Entity', model))
         else:
-            self._debug(f"{model['name']} not in my view so I won't tell my client about it")
-
-        # Obtain Player B's protocol
-        proto: Optional['Moonlapse'] = next((p for p in self._others if p._entity.id == model['id']), None)
-        if proto is None:
-            return
+            self._debug(f"{other_proto._entity.name} not in my view so I won't tell my client about it")
 
         # Player A broadcasts its entity model to Player B's protocol
-        proto.processPacket(packet.ServerModelPacket('Entity', model_to_dict(self._entity)))
+        other_proto.processPacket(packet.ServerModelPacket('Entity', model_to_dict(self._entity)))
 
         # Now the rest of the logic is passed to proto.process_model
 
     def process_model(self, p: packet.ServerModelPacket):
         type: str = p.payloads[0].value
         model: dict = p.payloads[1].value
+        other_proto: Optional['Moonlapse'] = next((p for p in self._others if p._entity.id == model['id']), None)
 
         # Send the new model to the client if it's still within our view - otherwise remove it from our list of visible
         # entities
         if type == 'Entity':
-            if self.coord_in_view(model['y'], model['x']):
+            if self.coord_in_view(other_proto._entity.y, other_proto._entity.x):
                 # If it's in our view, tell our client about it
                 self.sendPacket(p)
+                self._visible_entities.add(other_proto._entity)
             else:
                 # Else, it's not in our view but check if it WAS so we can say goodbye to it
-                departed: models.Entity = next((e for e in self._visible_entities if e.id == model['id']), None)
-                if not departed:
-                    # It wasn't in our view to begin with so do nothing
-                    return
-
-                self.sendPacket(packet.GoodbyePacket(departed.id))
-                self._visible_entities.remove(departed)
+                if other_proto._entity in self._visible_entities:
+                    self.sendPacket(packet.GoodbyePacket(other_proto._entity.id))
+                    self._visible_entities.remove(other_proto._entity)
 
     def _DISCONNECT(self, p: packet.DisconnectPacket):
         """
