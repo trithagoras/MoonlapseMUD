@@ -21,7 +21,8 @@ class Entity(models.Model):
     y = models.IntegerField(null=True, default=None)
     x = models.IntegerField(null=True, default=None)
     char = models.CharField(max_length=1, default='@')
-    name = models.CharField(max_length=50)
+    typename = models.CharField(null=False, max_length=50)
+    name = models.CharField(max_length=50, default=typename)
 
 
 class Player(models.Model):

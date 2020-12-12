@@ -261,7 +261,7 @@ class Moonlapse(NetstringReceiver):
         user.save()
 
         # Create and save a new entity
-        entity = models.Entity(room=models.Room.objects.first(), name=username, char=char)
+        entity = models.Entity(room=models.Room.objects.first(), typename='Player', name=username, char=char)
         entity.save()
 
         # Create and save a new player
@@ -311,7 +311,7 @@ class Moonlapse(NetstringReceiver):
                 # If it's in our view, tell our client about it
                 self.sendPacket(p)
                 model_room = models.Room.objects.get(id=model['room'])
-                entity = models.Entity(id=model['id'], room=model_room, y=model['y'], x=model['x'], char=model['char'], name=model['name'])
+                entity = models.Entity(id=model['id'], room=model_room, y=model['y'], x=model['x'], char=model['char'], typename=model['typename'], name=model['name'])
                 self._debug(f"Entity {entity.name} in view, adding to visible entities")
                 self._visible_entities.add(entity)
             else:
@@ -397,6 +397,7 @@ class Moonlapse(NetstringReceiver):
         # Calculate the desired destination
         desired_y: int = self._entity.y
         desired_x: int = self._entity.x
+
         if isinstance(p, packet.MoveUpPacket):
             desired_y -= 1
         elif isinstance(p, packet.MoveRightPacket):
@@ -405,6 +406,11 @@ class Moonlapse(NetstringReceiver):
             desired_y += 1
         elif isinstance(p, packet.MoveLeftPacket):
             desired_x -= 1
+
+        # Check if we're going to land on a portal
+        for e in self._visible_entities:
+            if e.typename == "Portal" and e.y == desired_y and e.x == desired_x:
+                print("We stood on a portal")
 
         if (desired_y, desired_x) in self._roommap.solidmap or not within_bounds(desired_y, desired_x, 0, 0, self._room.height - 1, self._room.width - 1):
             self.sendPacket(packet.DenyPacket("Can't move there"))
