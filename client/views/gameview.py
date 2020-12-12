@@ -38,6 +38,10 @@ class GameView(View):
         self.focus: int = 1
         self.win2_focus = GameView.Window2Focus.SKILLS
 
+        # Spinner to tell the game view hasn't frozen
+        self.spinners: str = "⠁⠂⠄⡀⢀⠠⠐⠈"
+        self.spinner_it: Iterable = iter(self.spinners)
+
     def display(self, stdscr):
         self.stdscr = stdscr
         stdscr.timeout(round(1000 / self.game.tick_rate))
@@ -164,7 +168,13 @@ class GameView(View):
                 self.win2.addstr(y, 2, line)
 
     def draw_status_win(self):
-        self.win2.addstr(1, 2, f"{self.game.entity.name}, Guardian of Forgotten Moor")
+        try:
+            spinner = next(self.spinner_it)
+        except StopIteration:
+            self.spinner_it = iter(self.spinners)
+            spinner = next(self.spinner_it)
+
+        self.win2.addstr(1, 2, f"{spinner}{self.game.entity.name}, Guardian of Forgotten Moor")
         self.win2.addstr(3, 2, f"Level 15 {self.progress_bar(7, 10)} (7/10 skill levels to 16)")
 
         self.win2.addstr(5, 2, f"Vitality      31/31 {self.progress_bar(3, 10)} (3,000/10,000)")
