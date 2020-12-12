@@ -54,63 +54,67 @@ class Game(Controller):
 
     def receive_data(self) -> None:
         while self._logged_in:
-            # Get initial room data if not already done
-            while not self.ready() and self._logged_in:
+            try:
+                # Get initial room data if not already done
+                while not self.ready() and self._logged_in:
+                    p: packet.Packet = packet.receive(self.s)
+                    if isinstance(p, packet.ServerModelPacket):
+                        self.initialise_models(p.payloads[0].value, p.payloads[1].value)
+                    elif isinstance(p, packet.ServerTickRatePacket):
+                        self.tick_rate = p.payloads[0].value
+
+                # Get volatile data such as player positions, etc.
                 p: packet.Packet = packet.receive(self.s)
+
                 if isinstance(p, packet.ServerModelPacket):
-                    self.initialise_models(p.payloads[0].value, p.payloads[1].value)
-                elif isinstance(p, packet.ServerTickRatePacket):
-                    self.tick_rate = p.payloads[0].value
+                    type: str = p.payloads[0].value
+                    model: dict = p.payloads[1].value
 
-            # Get volatile data such as player positions, etc.
-            p: packet.Packet = packet.receive(self.s)
+                    if type == 'Entity':
+                        # If the incoming entity is our player, update it
+                        entity = models.Entity(model)
+                        if entity.id == self.entity.id:
+                            self.entity = entity
 
-            if isinstance(p, packet.ServerModelPacket):
-                type: str = p.payloads[0].value
-                model: dict = p.payloads[1].value
+                        # If the incoming entity is already visible to us, update it
+                        for e in self.visible_entities:
+                            if e.id == entity.id:
+                                self.visible_entities.remove(e)
+                                self.visible_entities.add(entity)
 
-                if type == 'Entity':
-                    # If the incoming entity is our player, update it
-                    entity = models.Entity(model)
-                    if entity.id == self.entity.id:
-                        self.entity = entity
+                        # Else, add it to the visible list (it is only ever sent to us if it's in view)
+                        self.visible_entities.add(entity)
 
-                    # If the incoming entity is already visible to us, update it
-                    for e in self.visible_entities:
-                        if e.id == entity.id:
-                            self.visible_entities.remove(e)
-                            self.visible_entities.add(entity)
+                elif isinstance(p, packet.ServerLogPacket):
+                    self.logger.log(p.payloads[0].value)
 
-                    # Else, add it to the visible list (it is only ever sent to us if it's in view)
-                    self.visible_entities.add(entity)
+                # Another player has logged out, left the room, or disconnected so we remove them from the game.
+                elif isinstance(p, packet.GoodbyePacket):
+                    entityid: int = p.payloads[0].value
+                    departed: models.Entity = next((e for e in self.visible_entities if e.id == entityid), None)
+                    if departed:
+                        self.visible_entities.remove(departed)
 
-            elif isinstance(p, packet.ServerLogPacket):
-                self.logger.log(p.payloads[0].value)
+                elif isinstance(p, packet.OkPacket):
+                    if self.action == Action.MOVE_ROOMS:
+                        self.action = None
+                        self.reinitialize()
+                    elif self.action == Action.LOGOUT:
+                        self.action = None
+                        self.stop()
+                        break
 
-            # Another player has logged out, left the room, or disconnected so we remove them from the game.
-            elif isinstance(p, packet.GoodbyePacket):
-                entityid: int = p.payloads[0].value
-                departed: models.Entity = next((e for e in self.visible_entities if e.id == entityid), None)
-                if not departed:
-                    return
+                elif isinstance(p, packet.DenyPacket):
+                    pass
+                    # Define custom followup behaviours here, e.g.
+                    # if self.action == Action.DO_THIS:
+                    #   self.action = None
+                    #   self.action = do_that()
+            except Exception as e:
+                self.logger.log(str(e))
 
-                self.visible_entities.remove(departed)
-
-            elif isinstance(p, packet.OkPacket):
-                if self.action == Action.MOVE_ROOMS:
-                    self.action = None
-                    self.reinitialize()
-                elif self.action == Action.LOGOUT:
-                    self.action = None
-                    self.stop()
-                    break
-
-            elif isinstance(p, packet.DenyPacket):
-                pass
-                # Define custom followup behaviours here, e.g.
-                # if self.action == Action.DO_THIS:
-                #   self.action = None
-                #   self.action = do_that()
+        # The loop ended?
+        self.logger.log("Seems you've stopped listening friend...")
 
     def initialise_models(self, type: str, data: dict):
         if type == 'User':

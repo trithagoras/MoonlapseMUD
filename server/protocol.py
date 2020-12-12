@@ -219,6 +219,7 @@ class Moonlapse(NetstringReceiver):
         if username == self._user.username:
             # Tell our client it's OK to log out
             self.sendPacket(packet.OkPacket())
+            self.broadcast(packet.GoodbyePacket(self._entity.id), excluding=(self._user.username,))
             self.move_rooms(None)
             self._logged_in = False
             self.state = self._GETENTRY
