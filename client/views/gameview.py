@@ -38,6 +38,10 @@ class GameView(View):
         self.focus: int = 1
         self.win2_focus = GameView.Window2Focus.SKILLS
 
+        # Spinner to tell the game view hasn't frozen
+        self.spinners: str = "⠁⠂⠄⡀⢀⠠⠐⠈"
+        self.spinner_it: Iterable = iter(self.spinners)
+
     def display(self, stdscr):
         self.stdscr = stdscr
         stdscr.timeout(round(1000 / self.game.tick_rate))
@@ -108,14 +112,13 @@ class GameView(View):
         self.draw_log()
 
     def draw_map(self):
-        view_radius = self.game.player.get_view_radius()
+        view_radius = self.game.player.view_radius
         win1_hwidth, win1_hheight = self.win1_width // 2, self.win1_height // 2
-        player_pos = self.game.player.get_position()
-        room = self.game.player.get_room()
+        room = self.game.room
 
         for row in range(-view_radius, view_radius + 1):
             for col in range(-view_radius, view_radius + 1):
-                pos = (player_pos[0] + row, player_pos[1] + col)
+                pos = (self.game.entity.y + row, self.game.entity.x + col)
                 random.seed(hash(pos))
 
                 if self.coordinate_exists(*pos):
@@ -148,12 +151,15 @@ class GameView(View):
                         elif c == maps.WOOD:
                             color_addch(self.win1, cy, cx, '◍', Color.YELLOW)
 
-                    # Objects
-                    if pos in self.game.visible_users.values():
-                        color_addch(self.win1, cy, cx, '☺', Color.WHITE)
+        # Draw entities
+        for e in self.game.visible_entities:
+            if e.id != self.game.entity.id:
+                y: int = win1_hheight + (e.y - self.game.entity.y)
+                x: int = win1_hwidth + (e.x - self.game.entity.x) * 2
+                color_addch(self.win1, y, x, e.char, Color.WHITE)
 
         # Draw player in middle of screen
-        color_addch(self.win1, win1_hheight, win1_hwidth, '☺', Color.WHITE)
+        color_addch(self.win1, win1_hheight, win1_hwidth, self.game.entity.char, Color.WHITE)
 
     def draw_help_win(self):
         with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'assets', 'help.txt'), 'r') as helpfile:
@@ -162,7 +168,13 @@ class GameView(View):
                 self.win2.addstr(y, 2, line)
 
     def draw_status_win(self):
-        self.win2.addstr(1, 2, f"{self.game.player.get_username()}, Guardian of Forgotten Moor")
+        try:
+            spinner = next(self.spinner_it)
+        except StopIteration:
+            self.spinner_it = iter(self.spinners)
+            spinner = next(self.spinner_it)
+
+        self.win2.addstr(1, 2, f"{spinner}{self.game.entity.name}, Guardian of Forgotten Moor @ ({self.game.entity.y},{self.game.entity.x})")
         self.win2.addstr(3, 2, f"Level 15 {self.progress_bar(7, 10)} (7/10 skill levels to 16)")
 
         self.win2.addstr(5, 2, f"Vitality      31/31 {self.progress_bar(3, 10)} (3,000/10,000)")
@@ -217,7 +229,7 @@ class GameView(View):
         self.stdscr.vline(self.chatwin_y - 1, self.width - 1, curses.ACS_VLINE, 1)
 
     def coordinate_exists(self, y: int, x: int) -> bool:
-        return 0 <= y < self.game.player.get_room().height and 0 <= x < self.game.player.get_room().width
+        return 0 <= y < self.game.room.height and 0 <= x < self.game.room.width
 
     @staticmethod
     def progress_bar(value: float, max_value: float) -> str:

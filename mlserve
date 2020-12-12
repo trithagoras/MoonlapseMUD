@@ -1,0 +1,3 @@
+python server/manage.py makemigrations networking
+python server/manage.py migrate
+python server
