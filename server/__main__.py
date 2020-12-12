@@ -34,27 +34,50 @@ class MoonlapseServer(Factory):
         mapdirs: List[str] = [d for d in os.listdir(layoutssdir) if os.path.isdir(os.path.join(layoutssdir, d))]
         for mapdir in mapdirs:
             room_data = maps.Room(mapdir)
-            room = models.Room(name=mapdir, ground_data=room_data.grounddata, solid_data=room_data.soliddata, roof_data=room_data.roofdata, height=room_data.height, width=room_data.width)
-
-            room.save()
-            if not models.Room.objects.filter(name=room.name):
+            if not models.Room.objects.filter(name=room_data.name):
+                room = models.Room(name=mapdir, ground_data=room_data.grounddata, solid_data=room_data.soliddata, roof_data=room_data.roofdata, height=room_data.height, width=room_data.width)
+                room.save()
                 print(f"Added map {mapdir} to the database")
             else:
+                room = models.Room.objects.get(name=room_data.name)
+                room.ground_data = room_data.grounddata
+                room.solid_data = room_data.soliddata
+                room.roof_data = room_data.roofdata
+                room.height = room_data.height
+                room.width = room_data.width
+                room.save()
                 print(f"Updated map {mapdir} if there were any changes")
 
-            if not models.Entity.objects.filter(name='Forest portal 1'):
-                forest_room = models.Room.objects.filter(name="forest")[0]
-                forest_portal1_entity = models.Entity(room=forest_room, y=12, x=42, char='O', typename='Portal', name='Forest portal 1')
-                forest_portal1 = models.Portal(entity=forest_portal1_entity, linkedy=12, linkedx=25, linkedroom=forest_room)
-                forest_portal1_entity.save()
-                forest_portal1.save()
 
-            if not models.Entity.objects.filter(name='Forest portal 2'):
-                forest_room = models.Room.objects.filter(name="forest")[0]
-                forest_portal2_entity = models.Entity(room=forest_room, y=12, x=25, char='O', typename='Portal', name='Forest portal 2')
-                forest_portal2 = models.Portal(entity=forest_portal2_entity, linkedy=12, linkedx=42, linkedroom=forest_room)
-                forest_portal2_entity.save()
-                forest_portal2.save()
+        tavern_room = models.Room.objects.filter(name="tavern")[0]
+        forest_room = models.Room.objects.filter(name="forest")[0]
+
+        if not models.Entity.objects.filter(name='Forest portal 1'):
+            forest_portal1_entity = models.Entity(room=forest_room, y=12, x=42, char='O', typename='Portal', name='Forest portal 1')
+            forest_portal1 = models.Portal(entity=forest_portal1_entity, linkedy=12, linkedx=25, linkedroom=forest_room)
+            forest_portal1_entity.save()
+            forest_portal1.save()
+
+        if not models.Entity.objects.filter(name='Forest portal 2'):
+            forest_room = models.Room.objects.filter(name="forest")[0]
+            forest_portal2_entity = models.Entity(room=forest_room, y=12, x=25, char='O', typename='Portal', name='Forest portal 2')
+            forest_portal2 = models.Portal(entity=forest_portal2_entity, linkedy=12, linkedx=42, linkedroom=forest_room)
+            forest_portal2_entity.save()
+            forest_portal2.save()
+
+        if not models.Entity.objects.filter(name='Forest portal 3'):
+            forest_room = models.Room.objects.filter(name="forest")[0]
+            forest_portal3_entity = models.Entity(room=forest_room, y=9, x=28, char='O', typename='Portal', name='Forest portal 3')
+            forest_portal3 = models.Portal(entity=forest_portal3_entity, linkedy=0, linkedx=15, linkedroom=tavern_room)
+            forest_portal3_entity.save()
+            forest_portal3.save()
+
+        if not models.Entity.objects.filter(name='Tavern portal'):
+            tavern_room = models.Room.objects.filter(name="tavern")[0]
+            tavern_portal_entity = models.Entity(room=tavern_room, y=0, x=15, char='O', typename='Portal', name='Tavern portal')
+            tavern_portal = models.Portal(entity=tavern_portal_entity, linkedy=9, linkedx=28, linkedroom=forest_room)
+            tavern_portal_entity.save()
+            tavern_portal.save()
 
     def buildProtocol(self, addr):
         print("Adding a new client.")

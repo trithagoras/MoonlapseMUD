@@ -413,6 +413,8 @@ class Moonlapse(NetstringReceiver):
                 portal: models.Portal = models.Portal.objects.get(entity=e)
                 desired_y = portal.linkedy
                 desired_x = portal.linkedx
+                if self._room != portal.linkedroom:
+                    self.move_rooms(portal.linkedroom.id)
 
         if (desired_y, desired_x) in self._roommap.solidmap or not within_bounds(desired_y, desired_x, 0, 0, self._room.height - 1, self._room.width - 1):
             self.sendPacket(packet.DenyPacket("Can't move there"))
