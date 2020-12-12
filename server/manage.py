@@ -5,6 +5,8 @@ import json
 from pathlib import Path
 from django.conf import settings
 
+print(f"Using Django {django.get_version()}")
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 with open(os.path.join(BASE_DIR, "connectionstrings.json"), 'r') as f:

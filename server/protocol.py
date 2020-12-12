@@ -163,9 +163,15 @@ class Moonlapse(NetstringReceiver):
         # Tell people in the current (old) room we are leaving
         self.broadcast(packet.GoodbyePacket(self._entity.id), excluding=(self._user.username,))
 
+        # Reset visible entities (so things don't "follow" us between rooms)
+        self._visible_entities = set()
+
         # If the destination room is None (i.e. we are going to the lobby), skip the rest
         if dest_roomid is None:
             return
+
+        # Tell our client we're ready to switch rooms
+        self.sendPacket(packet.MoveRoomsPacket(dest_roomid))
 
         # Move to the new room
         self._server.moveProtocols(self, dest_roomid)
@@ -210,11 +216,20 @@ class Moonlapse(NetstringReceiver):
         self.broadcast(packet.ServerLogPacket(f"{self._user.username} has arrived."))
         self._logged_in = True
 
-        # Reset visible entities (so things don't "follow" us between rooms)
-        self._visible_entities = set()
-
         # Tell entities in view that we have arrived
         self.broadcast(packet.HelloPacket(model_to_dict(self._entity)), excluding=(self._user.username,))
+
+        # Tell our client about all the entities around
+        self._process_entities()
+
+    def _process_entities(self):
+        for entity in models.Entity.objects.filter(room=self._room):
+            # TODO: Don't loop through all players
+            if entity.id in (p.entity.id for p in models.Player.objects.all()):
+                # Don't send players as that's done separately
+                continue
+            model_packet = packet.ServerModelPacket('Entity', model_to_dict(entity))
+            self.process_model(model_packet)
 
     def logout(self, p: packet.LogoutPacket):
         username: str = p.payloads[0].value
@@ -249,7 +264,7 @@ class Moonlapse(NetstringReceiver):
         user.save()
 
         # Create and save a new entity
-        entity = models.Entity(room=models.Room.objects.first(), name=username, char=char)
+        entity = models.Entity(room=models.Room.objects.first(), typename='Player', name=username, char=char)
         entity.save()
 
         # Create and save a new player
@@ -291,22 +306,25 @@ class Moonlapse(NetstringReceiver):
     def process_model(self, p: packet.ServerModelPacket):
         type: str = p.payloads[0].value
         model: dict = p.payloads[1].value
-        other_proto: Optional['Moonlapse'] = next((p for p in self._others if p._entity.id == model['id']), None)
-        if other_proto is None:
-            return
 
         # Send the new model to the client if it's still within our view - otherwise remove it from our list of visible
         # entities
         if type == 'Entity':
-            if self.coord_in_view(other_proto._entity.y, other_proto._entity.x):
+            if self.coord_in_view(model['y'], model['x']):
                 # If it's in our view, tell our client about it
                 self.sendPacket(p)
-                self._visible_entities.add(other_proto._entity)
+                model_room = models.Room.objects.get(id=model['room'])
+                entity = models.Entity(id=model['id'], room=model_room, y=model['y'], x=model['x'], char=model['char'], typename=model['typename'], name=model['name'])
+                self._debug(f"Entity {entity.name} in view, adding to visible entities")
+                self._visible_entities.add(entity)
             else:
                 # Else, it's not in our view but check if it WAS so we can say goodbye to it
-                if other_proto._entity in self._visible_entities:
-                    self.sendPacket(packet.GoodbyePacket(other_proto._entity.id))
-                    self._visible_entities.remove(other_proto._entity)
+                entityid: int = model['id']
+                self.sendPacket(packet.GoodbyePacket(entityid))
+                self._remove_visible_entity(entityid)
+
+    def _remove_visible_entity(self, entityid: int):
+        self._visible_entities = {e for e in self._visible_entities if e.id != entityid}
 
     def _DISCONNECT(self, p: packet.DisconnectPacket):
         """
@@ -382,6 +400,7 @@ class Moonlapse(NetstringReceiver):
         # Calculate the desired destination
         desired_y: int = self._entity.y
         desired_x: int = self._entity.x
+
         if isinstance(p, packet.MoveUpPacket):
             desired_y -= 1
         elif isinstance(p, packet.MoveRightPacket):
@@ -390,6 +409,15 @@ class Moonlapse(NetstringReceiver):
             desired_y += 1
         elif isinstance(p, packet.MoveLeftPacket):
             desired_x -= 1
+
+        # Check if we're going to land on a portal
+        for e in self._visible_entities:
+            if e.typename == "Portal" and e.y == desired_y and e.x == desired_x:
+                portal: models.Portal = models.Portal.objects.get(entity=e)
+                desired_y = portal.linkedy
+                desired_x = portal.linkedx
+                if self._room != portal.linkedroom:
+                    self.move_rooms(portal.linkedroom.id)
 
         if (desired_y, desired_x) in self._roommap.solidmap or not within_bounds(desired_y, desired_x, 0, 0, self._room.height - 1, self._room.width - 1):
             self.sendPacket(packet.DenyPacket("Can't move there"))
@@ -403,6 +431,8 @@ class Moonlapse(NetstringReceiver):
         self.broadcast(packet.ServerModelPacket('Entity', model_to_dict(self._entity)))
         # Send greetings to keep the views up to date
         self.broadcast(packet.HelloPacket(model_to_dict(self._entity)))
+        # Process the entities around us
+        self._process_entities()
 
         # For players which were previously in our view but aren't any more, remove them from our view
         for old_entity_in_view in tuple(self._visible_entities):    # Iterate over tuple to void "Set changed size during iteration" errors
