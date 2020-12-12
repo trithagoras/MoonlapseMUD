@@ -410,7 +410,9 @@ class Moonlapse(NetstringReceiver):
         # Check if we're going to land on a portal
         for e in self._visible_entities:
             if e.typename == "Portal" and e.y == desired_y and e.x == desired_x:
-                print("We stood on a portal")
+                portal: models.Portal = models.Portal.objects.get(entity=e)
+                desired_y = portal.linkedy
+                desired_x = portal.linkedx
 
         if (desired_y, desired_x) in self._roommap.solidmap or not within_bounds(desired_y, desired_x, 0, 0, self._room.height - 1, self._room.width - 1):
             self.sendPacket(packet.DenyPacket("Can't move there"))

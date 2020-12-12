@@ -42,12 +42,19 @@ class MoonlapseServer(Factory):
             else:
                 print(f"Updated map {mapdir} if there were any changes")
 
-            if not models.Entity.objects.filter(name='Forest portal'):
+            if not models.Entity.objects.filter(name='Forest portal 1'):
                 forest_room = models.Room.objects.filter(name="forest")[0]
-                forest_portal_entity = models.Entity(room=forest_room, y=12, x=42, char='O', typename='Portal', name='Forest portal')
-                forest_portal = models.Portal(entity=forest_portal_entity, linkedy=12, linkedx=25, linkedroom=forest_room)
-                forest_portal_entity.save()
-                forest_portal.save()
+                forest_portal1_entity = models.Entity(room=forest_room, y=12, x=42, char='O', typename='Portal', name='Forest portal 1')
+                forest_portal1 = models.Portal(entity=forest_portal1_entity, linkedy=12, linkedx=25, linkedroom=forest_room)
+                forest_portal1_entity.save()
+                forest_portal1.save()
+
+            if not models.Entity.objects.filter(name='Forest portal 2'):
+                forest_room = models.Room.objects.filter(name="forest")[0]
+                forest_portal2_entity = models.Entity(room=forest_room, y=12, x=25, char='O', typename='Portal', name='Forest portal 2')
+                forest_portal2 = models.Portal(entity=forest_portal2_entity, linkedy=12, linkedx=42, linkedroom=forest_room)
+                forest_portal2_entity.save()
+                forest_portal2.save()
 
     def buildProtocol(self, addr):
         print("Adding a new client.")
