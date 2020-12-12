@@ -4,7 +4,7 @@ import json
 
 from . import payload
 from .payload import Payload
-from .models import *
+from typing import *
 
 # Required to import from shared modules
 import sys
@@ -12,8 +12,6 @@ from pathlib import Path
 file = Path(__file__).resolve()
 parent, root = file.parent, file.parents[1]
 sys.path.append(str(root))
-
-from maps import Room
 
 
 class Packet:
@@ -103,8 +101,8 @@ class GoodbyePacket(Packet):
     A packet sent from a protocol to a client after a moving rooms. Can also be sent from a protocol to
     a client to indicate someone else has left the room.
     """
-    def __init__(self, username: str):
-        super().__init__(Payload(username))
+    def __init__(self, entityid: int):
+        super().__init__(Payload(entityid))
 
 
 class LoginPacket(Packet):
@@ -116,9 +114,11 @@ class LoginPacket(Packet):
         ppassword = Payload(password)
         super().__init__(pusername, ppassword)
 
+
 class LogoutPacket(Packet):
     def __init__(self, username: str):
         super().__init__(Payload(username))
+
 
 class RegisterPacket(Packet):
     """
@@ -126,10 +126,40 @@ class RegisterPacket(Packet):
     technically to the LoginPacket but it's important to have a separate name to distinguish the 
     different use cases when handling these packets on the protocol's end.
     """
-    def __init__(self, username, password: str):
+    def __init__(self, username, password: str, char: chr):
         pusername = Payload(username)
         ppassword = Payload(password)
-        super().__init__(pusername, ppassword)
+        pchar = Payload(char)
+        super().__init__(pusername, ppassword, pchar)
+
+
+class ServerModelPacket(Packet):
+    """
+    A packet representing a model from the server in the form of a dictionary.
+    Example of an Entity model from the server in this form:
+    {
+        "id": 12,
+        "roomid": 3,
+        "y": 24,
+        "x": 1,
+        "char": "@"
+    }
+    """
+    def __init__(self, type: str, modeldict: dict):
+        ptype: Payload = Payload(type)
+        pmodel: Payload = Payload(modeldict)
+        super().__init__(ptype, pmodel)
+
+
+class HelloPacket(Packet):
+    """
+    A packet representing an entity model from the server in the form of a dictionary.
+    Use only to broadcast yourself when first connecting to a new room.
+    """
+    def __init__(self, modeldict: dict):
+        pmodel: Payload = Payload(modeldict)
+        super().__init__(pmodel)
+
 
 class ChatPacket(Packet):
     """
@@ -177,8 +207,8 @@ class MoveRightPacket(MovePacket):
 
 
 class MoveRoomsPacket(Packet):
-    def __init__(self, roomname: str):
-        super().__init__(Payload(roomname))
+    def __init__(self, roomid: Optional[int]):
+        super().__init__(Payload(roomid))
 
 
 class DisconnectPacket(Packet):
@@ -207,31 +237,6 @@ class ServerRoomFullPacket(Packet):
     """
     def __init__(self):
         super().__init__()
-
-
-class ServerPlayerPacket(Packet):
-    """
-    A packet sent from a protocol to a client containing an entire models.Player object.
-    """
-    def __init__(self, player: Player):
-        super().__init__(Payload(player))
-
-
-class ServerUserPositionPacket(Packet):
-    """
-    A packet sent from a protocol to a client containing a username and the associated player position.
-    """
-    def __init__(self, username: str, position: Tuple[int, int]):
-        super().__init__(Payload(username), Payload(position))
-
-
-class ServerRoomPacket(Packet):
-    """
-    A packet sent from a protocol to its client describing the room. Note: Be sure to call room.pack() before you send
-    a room over the network and the client should call room.unpack() after receiving.
-    """
-    def __init__(self, room: Room):
-        super().__init__(Payload(room))
 
 
 class ServerTickRatePacket(Packet):

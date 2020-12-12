@@ -3,10 +3,11 @@ import curses.ascii
 import socket
 import threading
 import time
+import models
+import maps
 from enum import Enum
 from typing import *
 from networking import packet
-from networking import models
 from networking.logger import Log
 from .controller import Controller
 from ..views.gameview import GameView
@@ -21,12 +22,15 @@ class Game(Controller):
     def __init__(self, s: socket.socket, username: str):
         super().__init__()
         self.s: socket.socket = s
-        self.username = username
         self.action: Optional[Action] = None
 
         # Game data
+        self.user: Optional[models.User] = None
+        self.room: Optional[models.Room] = None
+        self.entity: Optional[models.Entity] = None
         self.player: Optional[models.Player] = None
-        self.visible_users: Dict[str, Tuple[int, int]] = {}
+
+        self.visible_entities: Set[models.Entity] = set()
         self.tick_rate: Optional[int] = None
 
         self.logger: Log = Log()
@@ -50,57 +54,82 @@ class Game(Controller):
 
     def receive_data(self) -> None:
         while self._logged_in:
-            # Get initial room data if not already done
-            while not self.ready() and self._logged_in:
+            try:
+                # Get initial room data if not already done
+                while not self.ready() and self._logged_in:
+                    p: packet.Packet = packet.receive(self.s)
+                    if isinstance(p, packet.ServerModelPacket):
+                        self.initialise_models(p.payloads[0].value, p.payloads[1].value)
+                    elif isinstance(p, packet.ServerTickRatePacket):
+                        self.tick_rate = p.payloads[0].value
+
+                # Get volatile data such as player positions, etc.
                 p: packet.Packet = packet.receive(self.s)
-                if isinstance(p, packet.ServerPlayerPacket):
-                    self.player = p.payloads[0].value
-                    self.player.get_room().unpack()
-                elif isinstance(p, packet.ServerUserPositionPacket):
-                    self.user_exchange(p.payloads[0].value, p.payloads[1].value)
-                elif isinstance(p, packet.ServerTickRatePacket):
-                    self.tick_rate = p.payloads[0].value
 
-                ready = self.ready()
+                if isinstance(p, packet.ServerModelPacket):
+                    type: str = p.payloads[0].value
+                    model: dict = p.payloads[1].value
 
-            # Get volatile data such as player positions, etc.
-            p: packet.Packet = packet.receive(self.s)
+                    if type == 'Entity':
+                        # If the incoming entity is our player, update it
+                        entity = models.Entity(model)
+                        if entity.id == self.entity.id:
+                            self.entity = entity
 
-            if isinstance(p, packet.ServerUserPositionPacket):
-                self.user_exchange(p.payloads[0].value, tuple(p.payloads[1].value))  # Can't receive tuples as JSON
+                        # If the incoming entity is already visible to us, update it
+                        for e in self.visible_entities:
+                            if e.id == entity.id:
+                                self.visible_entities.remove(e)
+                                self.visible_entities.add(entity)
 
-            elif isinstance(p, packet.ServerLogPacket):
-                self.logger.log(p.payloads[0].value)
+                        # Else, add it to the visible list (it is only ever sent to us if it's in view)
+                        self.visible_entities.add(entity)
 
-            # Another player has logged out, left the room, or disconnected so we remove them from the game.
-            elif isinstance(p, packet.LogoutPacket) or isinstance(p, packet.GoodbyePacket):
-                username: str = p.payloads[0].value
-                if username in self.visible_users:
-                    self.visible_users.pop(username)
+                elif isinstance(p, packet.ServerLogPacket):
+                    self.logger.log(p.payloads[0].value)
 
-            elif isinstance(p, packet.OkPacket):
-                if self.action == Action.MOVE_ROOMS:
-                    self.action = None
-                    self.reinitialize()
-                elif self.action == Action.LOGOUT:
-                    self.action = None
-                    self.stop()
-                    break
+                # Another player has logged out, left the room, or disconnected so we remove them from the game.
+                elif isinstance(p, packet.GoodbyePacket):
+                    entityid: int = p.payloads[0].value
+                    departed: models.Entity = next((e for e in self.visible_entities if e.id == entityid), None)
+                    if departed:
+                        self.visible_entities.remove(departed)
 
-            elif isinstance(p, packet.DenyPacket):
-                pass
-                # Define custom followup behaviours here, e.g.
-                # if self.action == Action.DO_THIS:
-                #   self.action = None
-                #   self.action = do_that()
+                elif isinstance(p, packet.OkPacket):
+                    if self.action == Action.MOVE_ROOMS:
+                        self.action = None
+                        self.reinitialize()
+                    elif self.action == Action.LOGOUT:
+                        self.action = None
+                        self.stop()
+                        break
 
-    def user_exchange(self, username: str, position: Tuple[int, int]):
-        # If the received username is ourselves, update ourself
-        if username == self.username:
-            self.player.set_position(list(position))
+                elif isinstance(p, packet.DenyPacket):
+                    pass
+                    # Define custom followup behaviours here, e.g.
+                    # if self.action == Action.DO_THIS:
+                    #   self.action = None
+                    #   self.action = do_that()
+            except Exception as e:
+                self.logger.log(str(e))
 
-        # If the received player is somebody else, either update the other user position or add a new one in
-        self.visible_users[username] = position
+        # The loop ended?
+        self.logger.log("Seems you've stopped listening friend...")
+
+    def initialise_models(self, type: str, data: dict):
+        if type == 'User':
+            self.user = models.User(data)
+
+        elif type == 'Room':
+            self.room = maps.Room(data['name'])
+            if not self.room.is_unpacked():
+                self.room.unpack()
+
+        elif type == 'Entity':
+            self.entity = models.Entity(data)
+
+        elif type == 'Player':
+            self.player = models.Player(data)
 
     def handle_input(self) -> int:
         key = super().handle_input()
@@ -141,10 +170,10 @@ class Game(Controller):
         # Moving rooms (just a test)
         elif key == ord('f'):
             self.action = Action.MOVE_ROOMS
-            packet.send(packet.MoveRoomsPacket('forest'), self.s)
+            packet.send(packet.MoveRoomsPacket(1), self.s)
         elif key == ord('t'):
             self.action = Action.MOVE_ROOMS
-            packet.send(packet.MoveRoomsPacket('tavern'), self.s)
+            packet.send(packet.MoveRoomsPacket(2), self.s)
 
 
         # Chat
@@ -154,7 +183,7 @@ class Game(Controller):
 
         # Quit on Windows. TODO: Figure out how to make CTRL+C or ESC work.
         elif key == ord('q'):
-            packet.send(packet.LogoutPacket(self.player.get_username()), self.s)
+            packet.send(packet.LogoutPacket(self.user.username), self.s)
             self.action = Action.LOGOUT
 
         return key
@@ -163,11 +192,11 @@ class Game(Controller):
         packet.send(packet.ChatPacket(message), self.s)
 
     def ready(self) -> bool:
-        return False not in [bool(data) for data in (self.player, self.tick_rate)] and self.player.get_room().is_unpacked()
+        return False not in [bool(data) for data in (self.user, self.entity, self.player, self.room, self.tick_rate)]
 
     def reinitialize(self):
-        self.player = None
-        self.visible_users = {}
+        self.entity = None
+        self.visible_entities = set()
         self.tick_rate = None
 
     def stop(self) -> None:

@@ -2,6 +2,7 @@ from twisted.internet.protocol import Factory
 from twisted.internet import reactor
 from typing import *
 import os
+import manage
 
 # Required to import from shared modules
 import sys
@@ -10,56 +11,53 @@ file = Path(__file__).resolve()
 parent, root = file.parent, file.parents[1]
 sys.path.append(str(root))
 
-from server import database
 from server import protocol
+from networking import models
+import maps
 
 
 class MoonlapseServer(Factory):
-    def __init__(self, connectionstringspath):
-        self.database: database.Database = database.Database(connectionstringspath)
-        self.database.connect()
+    def __init__(self):
+        # Keep track of room ids and a set of protocols inside, e.g.
+        # {
+        #   1: {<protocol.Moonlapse object 3>},
+        #   3: {<protocol.Moonlapse object 4>, <protocol.Moonlapse object 5>},
+        #   None: {<protocol.Moonlapse object 7>}
+        # }
+        # If the roomname is None, the protocols inside have not logged in to the game yet.
+        self.rooms_protocols: Dict[Optional[int], Set[protocol.Moonlapse]] = {None: set()}
 
         # Insert the server rooms to the database if they don't already exist
         layoutssdir = 'maps/layouts'
         mapdirs: List[str] = [d for d in os.listdir(layoutssdir) if os.path.isdir(os.path.join(layoutssdir, d))]
         for mapdir in mapdirs:
-            self.database.create_room(mapdir, f"{layoutssdir}/{mapdir}")
-            print(f"Added map {mapdir} to the database")
+            room_data = maps.Room(mapdir)
+            room = models.Room(name=mapdir, ground_data=room_data.grounddata, solid_data=room_data.soliddata, roof_data=room_data.roofdata, height=room_data.height, width=room_data.width)
 
-        # Keep track of room names and a list of users inside, e.g.
-        # {
-        #   'forest': {
-        #     'josh': <protocol.Moonlapse object 1>,
-        #     'jane': <protocol.Moonlapse object 2>
-        #   },
-        #   'tavern': {
-        #     'sue': <protocol.Moonlapse object 3>
-        #   }
-        # }
-        # If the roomname is None, the players inside are in the lobby.
-        self.roomnames_users: Dict[Optional[str], Dict[str, protocol.Moonlapse]] = {}
+            room.save()
+            if not models.Room.objects.filter(name=room.name):
+                print(f"Added map {mapdir} to the database")
+            else:
+                print(f"Updated map {mapdir} if there were any changes")
 
     def buildProtocol(self, addr):
         print("Adding a new client.")
-        return protocol.Moonlapse(self, self.database)
+        # Give the new client their protocol in the "lobby"
+        return protocol.Moonlapse(self, None, self.rooms_protocols[None])
 
-    def moveProtocols(self, proto, roomname: str):
+    def moveProtocols(self, proto, dest_roomid: int):
         # Remove the player from the old room
-        if proto.roomname and proto.username in self.roomnames_users[proto.roomname]:
-            self.roomnames_users[proto.roomname].pop(proto.username)
+        curr_roomid = None if proto._room is None else proto._room.id
+        self.rooms_protocols[curr_roomid].discard(proto)
 
         # Add the player to the new room
-        if roomname in self.roomnames_users:
-            self.roomnames_users[roomname][proto.username] = proto
-        else:
-            self.roomnames_users[roomname] = {proto.username: proto}
-
+        if dest_roomid not in self.rooms_protocols:
+            self.rooms_protocols[dest_roomid] = set()
+        self.rooms_protocols[dest_roomid].add(proto)
 
 
 if __name__ == '__main__':
-    pwd: str = os.path.dirname(__file__)
-
-    connectionstringspath: str = os.path.join(pwd, 'connectionstrings.json')
-
-    reactor.listenTCP(42523, MoonlapseServer(connectionstringspath))
+    PORT: int = 42523
+    reactor.listenTCP(PORT, MoonlapseServer())
+    print(f"Server listening on port {42523}")
     reactor.run()
