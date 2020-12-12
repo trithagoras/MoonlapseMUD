@@ -153,10 +153,10 @@ class GameView(View):
 
         # Draw entities
         for e in self.game.visible_entities:
-            y: int = win1_hheight + (e.y - self.game.entity.y)
-            x: int = win1_hwidth + (e.x - self.game.entity.x)
-            c: chr = e.char
-            color_addch(self.win1, y, x, c, Color.WHITE)
+            if e.id != self.game.entity.id:
+                y: int = win1_hheight + (e.y - self.game.entity.y)
+                x: int = win1_hwidth + (e.x - self.game.entity.x) * 2
+                color_addch(self.win1, y, x, e.char, Color.WHITE)
 
         # Draw player in middle of screen
         color_addch(self.win1, win1_hheight, win1_hwidth, self.game.entity.char, Color.WHITE)
@@ -174,7 +174,7 @@ class GameView(View):
             self.spinner_it = iter(self.spinners)
             spinner = next(self.spinner_it)
 
-        self.win2.addstr(1, 2, f"{spinner}{self.game.entity.name}, Guardian of Forgotten Moor")
+        self.win2.addstr(1, 2, f"{spinner}{self.game.entity.name}, Guardian of Forgotten Moor @ ({self.game.entity.y},{self.game.entity.x})")
         self.win2.addstr(3, 2, f"Level 15 {self.progress_bar(7, 10)} (7/10 skill levels to 16)")
 
         self.win2.addstr(5, 2, f"Vitality      31/31 {self.progress_bar(3, 10)} (3,000/10,000)")
