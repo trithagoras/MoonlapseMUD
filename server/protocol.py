@@ -163,9 +163,15 @@ class Moonlapse(NetstringReceiver):
         # Tell people in the current (old) room we are leaving
         self.broadcast(packet.GoodbyePacket(self._entity.id), excluding=(self._user.username,))
 
+        # Reset visible entities (so things don't "follow" us between rooms)
+        self._visible_entities = set()
+
         # If the destination room is None (i.e. we are going to the lobby), skip the rest
         if dest_roomid is None:
             return
+
+        # Tell our client we're ready to switch rooms
+        self.sendPacket(packet.MoveRoomsPacket(dest_roomid))
 
         # Move to the new room
         self._server.moveProtocols(self, dest_roomid)
@@ -209,9 +215,6 @@ class Moonlapse(NetstringReceiver):
         self.state = self._PLAY
         self.broadcast(packet.ServerLogPacket(f"{self._user.username} has arrived."))
         self._logged_in = True
-
-        # Reset visible entities (so things don't "follow" us between rooms)
-        self._visible_entities = set()
 
         # Tell entities in view that we have arrived
         self.broadcast(packet.HelloPacket(model_to_dict(self._entity)), excluding=(self._user.username,))

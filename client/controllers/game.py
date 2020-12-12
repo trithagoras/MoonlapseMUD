@@ -95,6 +95,9 @@ class Game(Controller):
                     if departed:
                         self.visible_entities.remove(departed)
 
+                if isinstance(p, packet.MoveRoomsPacket):
+                    self.action = Action.MOVE_ROOMS
+
                 elif isinstance(p, packet.OkPacket):
                     if self.action == Action.MOVE_ROOMS:
                         self.action = None
@@ -110,6 +113,7 @@ class Game(Controller):
                     # if self.action == Action.DO_THIS:
                     #   self.action = None
                     #   self.action = do_that()
+
             except Exception as e:
                 self.logger.log(str(e))
 
@@ -165,16 +169,6 @@ class Game(Controller):
             self.view.win2_focus = GameView.Window2Focus.GUILD
         elif key == ord('j'):
             self.view.win2_focus = GameView.Window2Focus.JOURNAL
-
-        # TODO: Remove this
-        # Moving rooms (just a test)
-        elif key == ord('f'):
-            self.action = Action.MOVE_ROOMS
-            packet.send(packet.MoveRoomsPacket(2), self.s)
-        elif key == ord('t'):
-            self.action = Action.MOVE_ROOMS
-            packet.send(packet.MoveRoomsPacket(3), self.s)
-
 
         # Chat
         elif key in (curses.KEY_ENTER, curses.ascii.LF, curses.ascii.CR):
