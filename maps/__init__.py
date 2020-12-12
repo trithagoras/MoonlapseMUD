@@ -144,17 +144,11 @@ def mappathtodict(mappath) -> List[str]:
 
 
 class Room:
-    DEFAULT: str = 'forest'
-
-    def __init__(self, name: Optional[str]):
-        pwd: str = os.path.dirname(__file__)
-
-        if not name or name not in os.listdir(pwd):
-            name = self.DEFAULT
+    def __init__(self, name: str):
         self.name = name
-
-        path_to_room_dir = os.path.join(pwd, self.name)
-
+        pwd: str = os.path.dirname(__file__)
+        path_to_room_dir = os.path.join(pwd, 'layouts', self.name)
+        
         groundmappath = os.path.join(path_to_room_dir, 'ground.data')
         solidmappath = os.path.join(path_to_room_dir, 'solid.data')
         roofmappath = os.path.join(path_to_room_dir, 'roof.data')

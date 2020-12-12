@@ -28,12 +28,14 @@ class Database:
     def register_user(self, username: str, password: str) -> Deferred:
         print(f"Attempting to register player to database: {username}:{password}...")
         now: str = str(datetime.datetime.utcnow())
+        # TODO: Find a better way of setting the default room
         return self.dbpool.runOperation(f"""
             INSERT INTO users (username, password)
             VALUES ('{username}', '{password}');
 
-            INSERT INTO entities (type, lastupdated)
-            VALUES ('Player', '{now}');
+            INSERT INTO entities (type, lastupdated, roomid)
+            SELECT 'Player', '{now}', MIN(id)
+            FROM rooms;
 
             INSERT INTO players (entityid, userid, name, character)
             SELECT e.id, u.id, '{username}', '@'
@@ -84,7 +86,7 @@ class Database:
         """)
 
     def get_player_pos(self, username: str) -> Deferred:
-        print(f"Getting player position ({username})...", end='')
+        print(f"Getting player position ({username})...")
         return self.dbpool.runQuery(f"""
             SELECT position[0], position[1]
             FROM entities
@@ -114,7 +116,7 @@ class Database:
                 """)
 
     def get_player_roomname(self, username: str) -> Deferred:
-        print(f"Getting player room ({username})...", end='')
+        print(f"Getting player room ({username})...")
         return self.dbpool.runQuery(f"""
             SELECT name 
             FROM rooms
@@ -126,4 +128,26 @@ class Database:
                 INNER JOIN users AS u
                 ON p.userid = u.id AND u.username = '{username}'
             )
+        """)
+
+    def create_room(self, name: str, path: str) -> Deferred:
+        print(f"Creating room ({name})...")
+        return self.dbpool.runOperation(f"""
+            DO
+            $do$
+            BEGIN
+                IF EXISTS (
+                    SELECT NULL
+                    FROM rooms
+                    WHERE path = '{path}'
+                ) THEN
+                    UPDATE rooms
+                    SET name = '{name}'
+                    WHERE path = '{path}';
+                ELSE
+                    INSERT INTO rooms (name, path)
+                    VALUES ('{name}', '{path}');
+                END IF;
+            END;
+            $do$;
         """)
