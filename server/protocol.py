@@ -46,7 +46,6 @@ class Moonlapse(NetstringReceiver):
 
         # Information specific to this protocol
         self._server: MoonlapseServer = server
-        self._roomid: Optional[int] = roomid
         self._others: Set['Moonlapse'] = others
 
         # Information specific to the player using this protocol
@@ -211,6 +210,9 @@ class Moonlapse(NetstringReceiver):
         self.broadcast(packet.ServerLogPacket(f"{self._user.username} has arrived."))
         self._logged_in = True
 
+        # Reset visible entities (so things don't "follow" us between rooms)
+        self._visible_entities = set()
+
         # Tell entities in view that we have arrived
         self.broadcast(packet.HelloPacket(model_to_dict(self._entity)), excluding=(self._user.username,))
 
@@ -290,6 +292,8 @@ class Moonlapse(NetstringReceiver):
         type: str = p.payloads[0].value
         model: dict = p.payloads[1].value
         other_proto: Optional['Moonlapse'] = next((p for p in self._others if p._entity.id == model['id']), None)
+        if other_proto is None:
+            return
 
         # Send the new model to the client if it's still within our view - otherwise remove it from our list of visible
         # entities
@@ -322,8 +326,9 @@ class Moonlapse(NetstringReceiver):
             self._logged_in = False
 
         # Release this protocol from the server
-        self._others.remove(self)
-        self._debug(f"Deleted self from others list")
+        if self in self._others:
+            self._others.remove(self)
+            self._debug(f"Deleted self from others list")
 
         # Tell all still connected protocols about this disconnection
         for proto in self._others:
@@ -393,7 +398,6 @@ class Moonlapse(NetstringReceiver):
         self._entity.y = desired_y
         self._entity.x = desired_x
         self._entity.save()
-        current_entities_in_view: Set[models.Entity] = self.get_entities_in_view()
 
         # Broadcast our new position to other protocols in the room
         self.broadcast(packet.ServerModelPacket('Entity', model_to_dict(self._entity)))
@@ -401,12 +405,9 @@ class Moonlapse(NetstringReceiver):
         self.broadcast(packet.HelloPacket(model_to_dict(self._entity)))
 
         # For players which were previously in our view but aren't any more, remove them from our view
-        for old_entity_in_view in self._visible_entities:
-            if old_entity_in_view not in current_entities_in_view:
+        for old_entity_in_view in tuple(self._visible_entities):    # Iterate over tuple to void "Set changed size during iteration" errors
+            if not self.coord_in_view(old_entity_in_view.y, old_entity_in_view.x):
                 self._visible_entities.remove(old_entity_in_view)
-
-    def get_entities_in_view(self) -> Set[models.Entity]:
-        return {proto._entity for proto in self._others if self.coord_in_view(proto._entity.y, proto._entity.x)}
 
     def coord_in_view(self, y: int, x: int) -> bool:
         topleft_y, topleft_x = self._entity.y - self._player.view_radius, self._entity.x - self._player.view_radius

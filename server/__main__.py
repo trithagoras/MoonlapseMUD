@@ -47,7 +47,8 @@ class MoonlapseServer(Factory):
 
     def moveProtocols(self, proto, dest_roomid: int):
         # Remove the player from the old room
-        self.rooms_protocols[proto._roomid].discard(proto)
+        curr_roomid = None if proto._room is None else proto._room.id
+        self.rooms_protocols[curr_roomid].discard(proto)
 
         # Add the player to the new room
         if dest_roomid not in self.rooms_protocols:

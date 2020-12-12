@@ -170,10 +170,10 @@ class Game(Controller):
         # Moving rooms (just a test)
         elif key == ord('f'):
             self.action = Action.MOVE_ROOMS
-            packet.send(packet.MoveRoomsPacket('forest'), self.s)
+            packet.send(packet.MoveRoomsPacket(1), self.s)
         elif key == ord('t'):
             self.action = Action.MOVE_ROOMS
-            packet.send(packet.MoveRoomsPacket('tavern'), self.s)
+            packet.send(packet.MoveRoomsPacket(2), self.s)
 
 
         # Chat
