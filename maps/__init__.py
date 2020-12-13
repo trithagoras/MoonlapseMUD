@@ -140,7 +140,7 @@ def mappathtodict(mappath) -> List[str]:
     with open(mappath, 'r') as f:
         lines = [line.strip('\n') for line in f.readlines()]
 
-    return ml2asciilist(lines)
+    return lines
 
 
 class Room:
@@ -171,7 +171,10 @@ class Room:
         Calculations to be run client side which unpacks the compressed map data into a more readable format.
         Don't call this before sending over the network unless you call pack first.
         """
-        for y, (grow, srow, rrow) in enumerate(zip(self.grounddata, self.soliddata, self.roofdata)):
+        inflated_gd: List[str] = ml2asciilist(self.grounddata)
+        inflated_sd: List[str] = ml2asciilist(self.soliddata)
+        inflated_rd: List[str] = ml2asciilist(self.roofdata)
+        for y, (grow, srow, rrow) in enumerate(zip(inflated_gd, inflated_sd, inflated_rd)):
             for x, (gc, sc, rc) in enumerate(zip(grow, srow, rrow)):
                 if gc != NOTHING:
                     self.groundmap[(y, x)] = gc
@@ -208,3 +211,7 @@ if __name__ == '__main__':
     ])
     for line in asciilist:
         print(line)
+
+    f = Room("forest")
+    f.unpack()
+    print(f.groundmap)
