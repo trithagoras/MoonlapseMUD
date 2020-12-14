@@ -168,6 +168,7 @@ class Moonlapse(NetstringReceiver):
 
         # If the destination room is None (i.e. we are going to the lobby), skip the rest
         if dest_roomid is None:
+            self._room = None
             return
 
         # Tell our client we're ready to switch rooms so it can reinitialise itself and wait for data again.
