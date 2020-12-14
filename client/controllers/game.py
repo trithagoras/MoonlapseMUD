@@ -1,5 +1,6 @@
 import curses
 import curses.ascii
+import os
 import socket
 import threading
 import time
@@ -125,6 +126,9 @@ class Game(Controller):
             self.user = models.User(data)
 
         elif type == 'Room':
+            if not self._client_has_map_layout(data):
+                self._add_map_layout(data)
+
             self.room = maps.Room(data['name'])
             if not self.room.is_unpacked():
                 self.room.unpack()
@@ -134,6 +138,36 @@ class Game(Controller):
 
         elif type == 'Player':
             self.player = models.Player(data)
+
+    def _client_has_map_layout(self, data: dict) -> bool:
+        for expected_attr in 'name', 'ground_data', 'solid_data', 'roof_data', 'height', 'width':
+            if expected_attr not in data:
+                raise KeyError("Model dict invalid for room")
+
+        roomname = data['name']
+        roompath = os.path.join("maps", "layouts", roomname)
+
+        if not os.path.exists(roompath) or not os.path.isdir(roompath):
+            return False
+
+        for dtype in "ground", "solid", "roof":
+            dpath = os.path.join(roompath, f"{dtype}.data")
+            if not os.path.exists(dpath) or not os.path.isfile(dpath):
+                return False
+
+        return True
+
+    def _add_map_layout(self, data: dict):
+        roomname: str = data['name']
+        layoutpath: str = os.path.join("maps", "layouts", roomname)
+        try:
+            os.makedirs(layoutpath)
+        except FileExistsError:
+            pass
+
+        for dtype in "ground", "solid", "roof":
+            with open(os.path.join(layoutpath, f"{dtype}.data"), 'w') as f:
+                f.writelines('\n'.join(data[f"{dtype}_data"]))
 
     def handle_input(self) -> int:
         key = super().handle_input()
