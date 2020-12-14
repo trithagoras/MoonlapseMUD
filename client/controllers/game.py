@@ -166,8 +166,8 @@ class Game(Controller):
             pass
 
         for dtype in "ground", "solid", "roof":
-            with open(os.path.join(layoutpath, dtype), 'w') as f:
-                f.writelines(data[f"{dtype}_data"])
+            with open(os.path.join(layoutpath, f"{dtype}.data"), 'w') as f:
+                f.writelines('\n'.join(data[f"{dtype}_data"]))
 
     def handle_input(self) -> int:
         key = super().handle_input()
