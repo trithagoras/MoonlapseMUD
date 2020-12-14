@@ -170,8 +170,9 @@ class Moonlapse(NetstringReceiver):
         if dest_roomid is None:
             return
 
-        # Tell our client we're ready to switch rooms
-        self.sendPacket(packet.MoveRoomsPacket(dest_roomid))
+        # Tell our client we're ready to switch rooms so it can reinitialise itself and wait for data again.
+        if self._room is not None:
+            self.sendPacket(packet.MoveRoomsPacket(dest_roomid))
 
         # Move to the new room
         self._server.moveProtocols(self, dest_roomid)
