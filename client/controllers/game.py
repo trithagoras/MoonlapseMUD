@@ -145,7 +145,7 @@ class Game(Controller):
                 raise KeyError("Model dict invalid for room")
 
         roomname = data['name']
-        roompath = os.path.join("maps", "layouts", roomname)
+        roompath = os.path.join(os.path.dirname(os.path.realpath(maps.__file__)), "layouts", roomname)
 
         if not os.path.exists(roompath) or not os.path.isdir(roompath):
             return False
@@ -159,14 +159,14 @@ class Game(Controller):
 
     def _add_map_layout(self, data: dict):
         roomname: str = data['name']
-        layoutpath: str = os.path.join("maps", "layouts", roomname)
+        roompath = os.path.join(os.path.dirname(os.path.realpath(maps.__file__)), "layouts", roomname)
         try:
-            os.makedirs(layoutpath)
+            os.makedirs(roompath)
         except FileExistsError:
             pass
 
         for dtype in "ground", "solid", "roof":
-            with open(os.path.join(layoutpath, f"{dtype}.data"), 'w') as f:
+            with open(os.path.join(roompath, f"{dtype}.data"), 'w') as f:
                 f.writelines('\n'.join(data[f"{dtype}_data"]))
 
     def handle_input(self) -> int:
