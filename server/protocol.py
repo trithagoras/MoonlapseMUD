@@ -215,7 +215,7 @@ class Moonlapse(NetstringReceiver):
         self.sendPacket(packet.ServerModelPacket('Player', playerdict))
 
         self.state = self._PLAY
-        self.broadcast(packet.ServerLogPacket(f"{self._user.username} has arrived."))
+        self.broadcast(packet.ServerLogPacket(f"{self._user.username} has arrived."), excluding=(self._user.username))
         self._logged_in = True
 
         # Tell entities in view that we have arrived
