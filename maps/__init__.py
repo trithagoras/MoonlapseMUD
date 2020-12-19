@@ -135,12 +135,12 @@ def ml2asciilist(ml_file: List[str]) -> List[str]:
     return asciilist
 
 
-def mappathtodict(mappath) -> List[str]:
+def map_path_to_list(mappath) -> List[str]:
     # Load in the map files and convert them to palatable data types to be sent out to the client.
     with open(mappath, 'r') as f:
         lines = [line.strip('\n') for line in f.readlines()]
 
-    return ml2asciilist(lines)
+    return lines
 
 
 class Room:
@@ -153,12 +153,12 @@ class Room:
         solidmappath = os.path.join(path_to_room_dir, 'solid.data')
         roofmappath = os.path.join(path_to_room_dir, 'roof.data')
 
-        self.grounddata: List[str] = mappathtodict(groundmappath)
-        self.soliddata: List[str] = mappathtodict(solidmappath)
-        self.roofdata: List[str] = mappathtodict(roofmappath)
+        self.grounddata: List[str] = map_path_to_list(groundmappath)
+        self.soliddata: List[str] = map_path_to_list(solidmappath)
+        self.roofdata: List[str] = map_path_to_list(roofmappath)
 
         self.height = len(self.grounddata)
-        self.width = len(self.grounddata[0])
+        self.width = len(ml2asciilist([self.grounddata[0]])[0])  # TODO: Think of a less hacky way (works for now)
 
         self.groundmap: Dict[Tuple[int, int], chr] = {}
         self.solidmap: Dict[Tuple[int, int], chr] = {}
@@ -171,7 +171,10 @@ class Room:
         Calculations to be run client side which unpacks the compressed map data into a more readable format.
         Don't call this before sending over the network unless you call pack first.
         """
-        for y, (grow, srow, rrow) in enumerate(zip(self.grounddata, self.soliddata, self.roofdata)):
+        inflated_gd: List[str] = ml2asciilist(self.grounddata)
+        inflated_sd: List[str] = ml2asciilist(self.soliddata)
+        inflated_rd: List[str] = ml2asciilist(self.roofdata)
+        for y, (grow, srow, rrow) in enumerate(zip(inflated_gd, inflated_sd, inflated_rd)):
             for x, (gc, sc, rc) in enumerate(zip(grow, srow, rrow)):
                 if gc != NOTHING:
                     self.groundmap[(y, x)] = gc
@@ -208,3 +211,7 @@ if __name__ == '__main__':
     ])
     for line in asciilist:
         print(line)
+
+    f = Room("forest")
+    f.unpack()
+    print(f.groundmap)

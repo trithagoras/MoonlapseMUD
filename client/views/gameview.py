@@ -95,7 +95,7 @@ class GameView(View):
         self.draw_chatwin_border()
 
         # Rendering window titles
-        self.title(self.win1, "[1] Forgotten Moor", self.focus == 1)
+        self.title(self.win1, f"[1] {self.game.room.name.title()}", self.focus == 1)
         self.title(self.win2, f"[2] {self.win2_focus[0]}", self.focus == 2)
         self.title(self.win3, "[3] Log", self.focus == 3)
 

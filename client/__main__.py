@@ -26,19 +26,19 @@ def handle_arguments() -> Tuple[str, int]:
 
     :return: The hostname and/or port specified in the command line arguments, otherwise ('moonlapse.net', 8081).
     """
-    hostname: str = 'moonlapse.net'
+    hostname: str = 'play.moonlapse.net'
     port: int = 42523
 
     # sys.argv will return something like ['client', 'localhost', 8123]
     n_args: int = len(sys.argv)
 
     if n_args not in (1, 2, 3):
-        print("Usage: client [hostname=moonlapse.net] [port=8123]", file=sys.stderr)
+        print("Usage: client [hostname=moonlapse.net] [port=42523]", file=sys.stderr)
         sys.exit(2)
     elif n_args >= 2:
         hostname = sys.argv[1]
-    elif n_args == 3:
-        port = int(sys.argv[2])
+        if n_args == 3:
+            port = int(sys.argv[2])
 
     return hostname, port
 
