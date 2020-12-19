@@ -30,7 +30,7 @@ class MoonlapseServer(Factory):
         self.rooms_protocols: Dict[Optional[int], Set[protocol.Moonlapse]] = {None: set()}
 
         # Insert the server rooms to the database if they don't already exist
-        layoutssdir = 'maps/layouts'
+        layoutssdir = os.path.join(os.path.dirname(os.path.realpath(maps.__file__)), "layouts")
         mapdirs: List[str] = [d for d in os.listdir(layoutssdir) if os.path.isdir(os.path.join(layoutssdir, d))]
         for mapdir in mapdirs:
             room_data = maps.Room(mapdir)
