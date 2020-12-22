@@ -1,6 +1,8 @@
 import curses
 import curses.ascii
 import socket
+import string
+
 from networking import packet
 from typing import *
 from .menu import Menu
@@ -53,8 +55,8 @@ class RegisterMenu(Menu):
             self.view.title = "Passwords do not match!"
             return
 
-        if len(self.char) != 1:
-            self.view.title = "Character length must be 1"
+        if len(self.char) != 1 or self.char not in (string.ascii_letters + string.digits + string.punctuation):
+            self.view.title = "Char must be an ASCII single length character."
             return
 
         packet.send(packet.RegisterPacket(self.username, self.password, self.char), self.s)

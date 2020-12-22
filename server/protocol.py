@@ -10,6 +10,7 @@ from networking.logger import Log
 from typing import *
 import time
 from django.forms.models import model_to_dict
+import string
 
 import maps
 
@@ -256,6 +257,10 @@ class Moonlapse(NetstringReceiver):
         username: str = p.payloads[0].value
         password: str = p.payloads[1].value
         char: chr = p.payloads[2].value
+
+        if len(char) != 1 or char not in (string.ascii_letters + string.digits + string.punctuation):
+            self.sendPacket(packet.DenyPacket("Char must be an ASCII single length character."))
+            return
 
         if models.User.objects.filter(username=username):
             self.sendPacket(packet.DenyPacket("Somebody else already goes by that name"))
