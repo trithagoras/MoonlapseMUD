@@ -220,6 +220,7 @@ class Game(Controller):
 
     def chat(self, message: str) -> None:
         packet.send(packet.ChatPacket(message), self.s, public_key=self.public_key)
+        self.view.chatbox.value = ''
 
     def ready(self) -> bool:
         return False not in [bool(data) for data in (self.user, self.entity, self.player, self.room, self.tick_rate)]
