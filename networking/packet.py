@@ -1,6 +1,10 @@
+import random
 import socket
+import string
 import traceback
 import json
+import rsa
+from Crypto.Cipher import AES
 
 from . import payload
 from .payload import Payload
@@ -62,9 +66,7 @@ class Packet:
         for i in range(len(self.payloads)):
             serialize_dict[f'p{i}'] = self.payloads[i].serialize()
         data = json.dumps(serialize_dict, separators=(',', ':')).encode('utf-8')
-
-        length = len(data)
-        return str(length).encode('ascii') + b':' + data + b','
+        return data
 
     def __repr__(self) -> str:
         return f"{self.action}: {self.payloads}"
@@ -248,6 +250,14 @@ class ServerTickRatePacket(Packet):
         super().__init__(Payload(tickrate))
 
 
+class ClientKeyPacket(Packet):
+    """
+    A packet sent from a protocol to its client with the client's public key used in encrypting traffic.
+    """
+    def __init__(self, n: int, e: int):
+        super().__init__(Payload(n), Payload(e))
+
+
 def frombytes(data: bytes) -> Packet:
     """
     Constructs a proper packet type from bytes encoding a netstring. See 
@@ -284,14 +294,38 @@ def frombytes(data: bytes) -> Packet:
         print(f"TypeError: {specificPacketClassName} can't handle arguments {tuple(payloads_values)}.")
 
 
-def send(p: Packet, s: socket.socket) -> bytes:
+def _encrypt_message(b: bytes, public_key):
+    IV = b'1111111111111111'
+    key = bytes(''.join(random.choice(string.ascii_letters + string.digits + string.punctuation) for i in range(16)), 'utf-8')
+    aes = AES.new(key, AES.MODE_CFB, IV=IV)
+
+    msg: bytearray = aes.encrypt(b)
+
+    key = rsa.encrypt(key, public_key)
+    # key length = 512/8=64 bytes (chars)
+
+    return key + msg
+
+
+def _to_netstring(data: bytes) -> bytes:
+    length = len(data)
+    return str(length).encode('ascii') + b':' + data + b','
+
+
+def send(p: Packet, s: socket.socket, public_key=None) -> bytes:
     """
     Converts a Packet to bytes and sends it over a socket. Ensures all the data is sent and no more.
     """
-    failure = s.sendall(p.tobytes())
+    b = p.tobytes()
+    if public_key:
+        b = _encrypt_message(b, public_key)
+
+    b = _to_netstring(b)
+
+    failure = s.sendall(b)
     if failure is not None:
         send(p, s)
-    return p.tobytes()
+    return b
     
 
 def receive(s: socket.socket) -> Packet:

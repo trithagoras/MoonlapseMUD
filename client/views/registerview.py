@@ -20,8 +20,8 @@ class RegisterView(MenuView):
     def display(self, stdscr):
         self.stdscr = stdscr
         self.usernamebox = TextBox(stdscr, 6, 30, 20)
-        self.passwordbox = TextBox(stdscr, 9, 30, 20)
-        self.confirmpasswordbox = TextBox(stdscr, 12, 30, 20)
+        self.passwordbox = TextBox(stdscr, 9, 30, 20, censored=True)
+        self.confirmpasswordbox = TextBox(stdscr, 12, 30, 20, censored=True)
         self.charbox = TextBox(stdscr, 15, 30, 20)
 
         super().display(stdscr)
@@ -29,9 +29,9 @@ class RegisterView(MenuView):
     def draw(self):
         super().draw()
 
-        self.stdscr.addstr(6, 30, self.controller.username)
-        self.stdscr.addstr(9, 30, self.controller.password)
-        self.stdscr.addstr(12, 30, self.controller.confirmpassword)
-        self.stdscr.addstr(15, 30, self.controller.char)
+        self.stdscr.addstr(6, 30, self.usernamebox.display_value())
+        self.stdscr.addstr(9, 30, self.passwordbox.display_value())
+        self.stdscr.addstr(12, 30, self.confirmpasswordbox.display_value())
+        self.stdscr.addstr(15, 30, self.charbox.display_value())
 
         self.stdscr.move(6 + self.controller.cursor * 3, 30)

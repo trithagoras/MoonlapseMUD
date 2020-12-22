@@ -9,10 +9,11 @@ from ..views.loginview import LoginView
 
 
 class LoginMenu(Menu):
-    def __init__(self, s: socket.socket):
+    def __init__(self, s: socket.socket, public_key):
         self.s: socket.socket = s
         self.username: str = ''
         self.password: str = ''
+        self.public_key = public_key
 
         super().__init__({
             "Username": self.login,
@@ -37,8 +38,10 @@ class LoginMenu(Menu):
             self.view.title = "Username or password must not be blank"
             return
 
+        # encrypted_pword = pbkdf2.hash_password(self.password)
+
         self.view.title = "Please wait..."
-        packet.send(packet.LoginPacket(self.username, self.password), self.s)
+        packet.send(packet.LoginPacket(self.username, self.password), self.s, public_key=self.public_key)
         self.view.title = "Sent login request..."
         try:
             response: Union[packet.OkPacket, packet.DenyPacket] = packet.receive(self.s)
@@ -48,7 +51,7 @@ class LoginMenu(Menu):
             self.view.title = "Got response..."
             if isinstance(response, packet.OkPacket):
                 self.view.title = "Entering game..."
-                Game(self.s, self.username).start()
+                Game(self.s, self.username, self.public_key).start()
                 self.start()       
             elif isinstance(response, packet.DenyPacket):
                 self.view.title = response.payloads[0].value

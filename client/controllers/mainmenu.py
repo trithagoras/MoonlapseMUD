@@ -4,6 +4,7 @@ from .loginmenu import LoginMenu
 from .menu import Menu
 from .registermenu import RegisterMenu
 from ..views.menuview import MenuView
+import rsa
 
 
 class MainMenu(Menu):
@@ -19,13 +20,15 @@ class MainMenu(Menu):
 
         # Receive the message of the day
         p: packet.Packet = packet.receive(self.s)
-        if isinstance(p, packet.WelcomePacket):
-            self.view.title = p.payloads[0].value
+        # if isinstance(p, packet.WelcomePacket):
+        #     self.view.title = p.payloads[0].value
+        if isinstance(p, packet.ClientKeyPacket):
+            self.public_key = rsa.PublicKey(p.payloads[0].value, p.payloads[1].value)
 
     def login(self):
-        LoginMenu(self.s).start()
+        LoginMenu(self.s, self.public_key).start()
         self.start()
 
     def register(self):
-        RegisterMenu(self.s).start()
+        RegisterMenu(self.s, self.public_key).start()
         self.start()

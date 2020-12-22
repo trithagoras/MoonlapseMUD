@@ -20,9 +20,11 @@ class Action(Enum):
 
 
 class Game(Controller):
-    def __init__(self, s: socket.socket, username: str):
+    def __init__(self, s: socket.socket, username: str, public_key):
         super().__init__()
         self.s: socket.socket = s
+        self.public_key = public_key
+
         self.action: Optional[Action] = None
 
         # Game data
@@ -184,7 +186,7 @@ class Game(Controller):
             directionpacket = packet.MoveLeftPacket()
 
         if directionpacket:
-            packet.send(directionpacket, self.s)
+            packet.send(directionpacket, self.s, public_key=self.public_key)
 
         # Changing window focus
         elif key in (ord('1'), ord('2'), ord('3')):
@@ -211,13 +213,13 @@ class Game(Controller):
 
         # Quit on Windows. TODO: Figure out how to make CTRL+C or ESC work.
         elif key == ord('q'):
-            packet.send(packet.LogoutPacket(self.user.username), self.s)
+            packet.send(packet.LogoutPacket(self.user.username), self.s, public_key=self.public_key)
             self.action = Action.LOGOUT
 
         return key
 
     def chat(self, message: str) -> None:
-        packet.send(packet.ChatPacket(message), self.s)
+        packet.send(packet.ChatPacket(message), self.s, public_key=self.public_key)
 
     def ready(self) -> bool:
         return False not in [bool(data) for data in (self.user, self.entity, self.player, self.room, self.tick_rate)]

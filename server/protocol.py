@@ -1,15 +1,20 @@
 from twisted.protocols.basic import NetstringReceiver
 from twisted.python.failure import Failure
 
+from Crypto.Cipher import AES
+
 from server.__main__ import MoonlapseServer
-import manage
 from networking import packet
 from networking import models
 from networking.logger import Log
+import pbkdf2
 
 from typing import *
 import time
 from django.forms.models import model_to_dict
+
+import rsa
+import json
 
 import maps
 
@@ -41,6 +46,7 @@ class Moonlapse(NetstringReceiver):
     The self.processPacket method is used to tell another protocol on the server to process a packet which 
     doesn't necessarily have to be sent to any clients.
     """
+
     def __init__(self, server: MoonlapseServer, roomid: Optional[int], others: Set['Moonlapse']):
         super().__init__()
 
@@ -66,20 +72,39 @@ class Moonlapse(NetstringReceiver):
 
         self.logger: Log = Log()
 
+        with open("server/rsa_keys.json", 'r') as f:
+            d = json.load(f)
+            self.public_key = rsa.key.PublicKey(d['PublicKey']['n'], d['PublicKey']['e'])
+            self.private_key = rsa.key.PrivateKey(d['PrivateKey']['n'], d['PrivateKey']['e'], d['PrivateKey']['d'],
+                                                  d['PrivateKey']['p'], d['PrivateKey']['q'])
+
     def _debug(self, message: str):
-        print(f"[{self._user.username if self._user else None }]"
+        print(f"[{self._user.username if self._user else None}]"
               f"[{self.state.__name__}]"
               f"[{self._entity.room.name if self._entity else None}]: {message}")
 
     def connectionMade(self) -> None:
         super().connectionMade()
         servertime: str = time.strftime('%d %B, %Y %R %p', time.gmtime())
-        self.sendPacket(packet.WelcomePacket(f"Welcome to MoonlapseMUD. Server time is {servertime}"))
+        # self.sendPacket(packet.WelcomePacket(f"Welcome to MoonlapseMUD. Server time is {servertime}"))
+        self.sendPacket(packet.ClientKeyPacket(self.public_key.n, self.public_key.e))
 
     def connectionLost(self, reason: Failure = None) -> None:
         super().connectionLost()
         self.state = self._DISCONNECT
         self.processPacket(packet.DisconnectPacket(self._user.username, reason))
+
+    def _decrypt_string(self, string: bytes):
+        # first 64 bytes is the RSA encrypted AES key; remainder is AES encrypted message
+        encrypted_key = string[:64]
+        encrypted_message = string[64:]
+
+        IV = b'1111111111111111'
+
+        key = rsa.decrypt(encrypted_key, self.private_key)
+        cipher = AES.new(key, AES.MODE_CFB, IV=IV)
+        message = cipher.decrypt(encrypted_message)
+        return message
 
     def stringReceived(self, string: bytes) -> None:
         """
@@ -87,6 +112,11 @@ class Moonlapse(NetstringReceiver):
         This should never be called directly. It's handled by NetStringReceiver 
         on dataReceived.
         """
+        self._debug(f"Received encrypted data from my client {string}")
+
+        # attempt to decrypt packet
+        string = self._decrypt_string(string)
+
         p: packet.Packet = packet.frombytes(string)
         self._debug(f"Received packet from my client {p}")
         self.state(p)
@@ -96,7 +126,8 @@ class Moonlapse(NetstringReceiver):
         Sends a packet to this protocol's client.
         Call this to communicate information back to the game client application.
         """
-        self.transport.write(p.tobytes())
+        self.sendString(p.tobytes())
+        # self.transport.write(p.tobytes())
         self._debug(f"Sent data to my client: {p.tobytes()}")
 
     def processPacket(self, p: packet.Packet) -> None:
@@ -146,12 +177,16 @@ class Moonlapse(NetstringReceiver):
             self.sendPacket(packet.DenyPacket("I don't know anybody by that name"))
             return
 
-        if not models.User.objects.filter(username=username, password=password):
+        user = models.User.objects.get(username=username)
+        if not pbkdf2.verify_password(user.password, password):
             self.sendPacket(packet.DenyPacket("Incorrect password"))
             return
 
+        # if not models.User.objects.filter(username=username, password=password):
+        #     return
+
         # The user exists in the database so retrieve the player and entity objects
-        self._user = models.User.objects.get(username=username)
+        self._user = user
         self._player = models.Player.objects.get(user=self._user.id)
         self._entity = models.Entity.objects.get(id=self._player.entity.id)
 
@@ -261,6 +296,8 @@ class Moonlapse(NetstringReceiver):
             self.sendPacket(packet.DenyPacket("Somebody else already goes by that name"))
             return
 
+        password = pbkdf2.hash_password(password)
+
         # Save the new user
         user = models.User(username=username, password=password)
         user.save()
@@ -316,7 +353,8 @@ class Moonlapse(NetstringReceiver):
                 # If it's in our view, tell our client about it
                 self.sendPacket(p)
                 model_room = models.Room.objects.get(id=model['room'])
-                entity = models.Entity(id=model['id'], room=model_room, y=model['y'], x=model['x'], char=model['char'], typename=model['typename'], name=model['name'])
+                entity = models.Entity(id=model['id'], room=model_room, y=model['y'], x=model['x'], char=model['char'],
+                                       typename=model['typename'], name=model['name'])
                 self._debug(f"Entity {entity.name} in view, adding to visible entities")
                 self._visible_entities.add(entity)
             else:
@@ -354,7 +392,8 @@ class Moonlapse(NetstringReceiver):
         for proto in self._others:
             proto.processPacket(packet.GoodbyePacket(self._entity.id))
 
-    def broadcast(self, *packets: packet.Packet, including: Iterable[str] = tuple(), excluding: Iterable[str] = tuple()) -> None:
+    def broadcast(self, *packets: packet.Packet, including: Iterable[str] = tuple(),
+                  excluding: Iterable[str] = tuple()) -> None:
         """
         Sends packets to all protocols specified in "including" except for the ones for the usernames specified in
         "excluding", if any.
@@ -421,7 +460,9 @@ class Moonlapse(NetstringReceiver):
                 if self._room != portal.linkedroom:
                     self.move_rooms(portal.linkedroom.id)
 
-        if (desired_y, desired_x) in self._roommap.solidmap or not within_bounds(desired_y, desired_x, 0, 0, self._room.height - 1, self._room.width - 1):
+        if (desired_y, desired_x) in self._roommap.solidmap or not within_bounds(desired_y, desired_x, 0, 0,
+                                                                                 self._room.height - 1,
+                                                                                 self._room.width - 1):
             self.sendPacket(packet.DenyPacket("Can't move there"))
             return
 
@@ -437,7 +478,8 @@ class Moonlapse(NetstringReceiver):
         self._process_entities()
 
         # For players which were previously in our view but aren't any more, remove them from our view
-        for old_entity_in_view in tuple(self._visible_entities):    # Iterate over tuple to void "Set changed size during iteration" errors
+        for old_entity_in_view in tuple(
+                self._visible_entities):  # Iterate over tuple to void "Set changed size during iteration" errors
             if not self.coord_in_view(old_entity_in_view.y, old_entity_in_view.x):
                 self._visible_entities.remove(old_entity_in_view)
 
