@@ -1,4 +1,5 @@
 server/connectionstrings.json
+server/rsa_keys.json
 /packetdebug.txt
 *.pyc
 *.iml

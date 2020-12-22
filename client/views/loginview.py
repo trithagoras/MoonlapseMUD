@@ -16,14 +16,14 @@ class LoginView(MenuView):
     def display(self, stdscr):
         self.stdscr = stdscr
         self.usernamebox = TextBox(stdscr, 6, 20, 20)
-        self.passwordbox = TextBox(stdscr, 9, 20, 20)
+        self.passwordbox = TextBox(stdscr, 9, 20, 20, censored=True)
 
         super().display(stdscr)
 
     def draw(self):
         super().draw()
 
-        self.stdscr.addstr(6, 20, self.controller.username)
-        self.stdscr.addstr(9, 20, self.controller.password)
+        self.stdscr.addstr(6, 20, self.usernamebox.display_value())
+        self.stdscr.addstr(9, 20, self.passwordbox.display_value())
 
         self.stdscr.move(6 + self.controller.cursor * 3, 20)

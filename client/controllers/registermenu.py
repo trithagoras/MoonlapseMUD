@@ -10,8 +10,10 @@ from ..views.registerview import RegisterView
 
 
 class RegisterMenu(Menu):
-    def __init__(self, s: socket.socket):
+    def __init__(self, s: socket.socket, public_key):
         self.s: socket.socket = s
+        self.public_key = public_key
+
         self.username: str = ''
         self.password: str = ''
         self.confirmpassword: str = ''
@@ -59,7 +61,7 @@ class RegisterMenu(Menu):
             self.view.title = "Char must be an ASCII single length character."
             return
 
-        packet.send(packet.RegisterPacket(self.username, self.password, self.char), self.s)
+        packet.send(packet.RegisterPacket(self.username, self.password, self.char), self.s, public_key=self.public_key)
 
         response: Union[packet.OkPacket, packet.DenyPacket] = packet.receive(self.s)
 

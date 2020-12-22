@@ -52,7 +52,7 @@ class TextBox:
     pretty cross platform in terms of input.
     """
 
-    def __init__(self, parent_window, y: int, x: int, width: int, parentview=None, wins_to_update: Iterable = None):
+    def __init__(self, parent_window, y: int, x: int, width: int, censored=False, parentview=None, wins_to_update: Iterable = None):
         """
         Initialises the TextBox.
 
@@ -70,11 +70,13 @@ class TextBox:
         # the origin of the parent rather than the entire screen)
         self.win = parent_window.derwin(1, width, y, x)
 
+        self.censored = censored
+
         # Enable escape sequences to be handled by curses rather than interpreted by this TextBox
         self.win.keypad(1)
 
         # Define the underlying Textbox and enable spaces to be stripped from the result
-        self.box: ExtendedTextBox = ExtendedTextBox(self.win)
+        self.box: ExtendedTextBox = ExtendedTextBox(self.win, self.censored)
 
         self.value: str = ''
 
@@ -100,7 +102,11 @@ class TextBox:
         if first_key is not None:
             if curses.ascii.isprint(first_key):
                 # Add first letter and move cursor right
-                self.win.addch(0, curs_x, chr(first_key))
+                if self.censored:
+                    self.win.addch(0, curs_x, '*')
+                else:
+                    self.win.addch(0, curs_x, chr(first_key))
+                self.value = chr(first_key)
                 curs_x += 1
             elif first_key == curses.KEY_DC and len(self.value) > 0:
                 # Delete first letter and move cursor at beginning
@@ -112,6 +118,7 @@ class TextBox:
 
             self.win.move(self.win.getyx()[0], curs_x)
 
+        self.box.value = self.value
         self.value = self.box.edit(validator, parentview=self.parentview, wins_to_update=self.wins_to_update)
         # I'm not sure why, but sometimes the value has a trailing space
         if len(self.value) > 0 and self.value[-1] == ' ':
@@ -119,10 +126,118 @@ class TextBox:
 
         curses.curs_set(0)
 
+    def display_value(self):
+        if self.censored:
+            return '*' * len(self.value)
+        else:
+            return self.value
+
 
 class ExtendedTextBox(curses.textpad.Textbox):
+    def __init__(self, win, censored):
+        super().__init__(win)
+        self.censored = censored
+        self.value = ''
+
+    def _insert_printable_char(self, ch):
+        self._update_max_yx()
+        (y, x) = self.win.getyx()
+        backyx = None
+        while y < self.maxy or x < self.maxx:
+            if self.insert_mode:
+                oldch = self.win.inch()
+            # The try-catch ignores the error we trigger from some curses
+            # versions by trying to write into the lowest-rightmost spot
+            # in the window.
+            try:
+                if self.censored:
+                    self.win.addch('*')
+                else:
+                    self.win.addch(ch)
+            except curses.error:
+                pass
+            if not self.insert_mode or not curses.ascii.isprint(oldch):
+                break
+            ch = oldch
+            (y, x) = self.win.getyx()
+            # Remember where to put the cursor back since we are in insert_mode
+            if backyx is None:
+                backyx = y, x
+
+        if backyx is not None:
+            self.win.move(*backyx)
+
+    def do_command(self, ch):
+        "Process a single editing command."
+        self._update_max_yx()
+        (y, x) = self.win.getyx()
+        self.lastcmd = ch
+        if curses.ascii.isprint(ch):
+            if y < self.maxy or x < self.maxx:
+                self._insert_printable_char(ch)
+                self.value += chr(ch)
+        elif ch == curses.ascii.SOH:                           # ^a
+            self.win.move(y, 0)
+        elif ch in (curses.ascii.STX,curses.KEY_LEFT, curses.ascii.BS,curses.KEY_BACKSPACE):
+            if x > 0:
+                self.win.move(y, x-1)
+            elif y == 0:
+                pass
+            elif self.stripspaces:
+                self.win.move(y-1, self._end_of_line(y-1))
+            else:
+                self.win.move(y-1, self.maxx)
+            if ch in (curses.ascii.BS, curses.KEY_BACKSPACE):
+                self.value = self.value[:-1]
+                self.win.delch()
+        elif ch == curses.ascii.EOT:                           # ^d
+            self.value = self.value[:-1]
+            self.win.delch()
+        elif ch == curses.ascii.ENQ:                           # ^e
+            if self.stripspaces:
+                self.win.move(y, self._end_of_line(y))
+            else:
+                self.win.move(y, self.maxx)
+        elif ch in (curses.ascii.ACK, curses.KEY_RIGHT):       # ^f
+            if x < self.maxx:
+                self.win.move(y, x+1)
+            elif y == self.maxy:
+                pass
+            else:
+                self.win.move(y+1, 0)
+        elif ch == curses.ascii.BEL:                           # ^g
+            return 0
+        elif ch == curses.ascii.NL:                            # ^j
+            if self.maxy == 0:
+                return 0
+            elif y < self.maxy:
+                self.win.move(y+1, 0)
+        elif ch == curses.ascii.VT:                            # ^k
+            if x == 0 and self._end_of_line(y) == 0:
+                self.value = ''
+                self.win.deleteln()
+            else:
+                # first undo the effect of self._end_of_line
+                self.win.move(y, x)
+                self.win.clrtoeol()
+        elif ch == curses.ascii.FF:                            # ^l
+            self.win.refresh()
+        elif ch in (curses.ascii.SO, curses.KEY_DOWN):         # ^n
+            if y < self.maxy:
+                self.win.move(y+1, x)
+                if x > self._end_of_line(y+1):
+                    self.win.move(y+1, self._end_of_line(y+1))
+        elif ch == curses.ascii.SI:                            # ^o
+            self.win.insertln()
+        elif ch in (curses.ascii.DLE, curses.KEY_UP):          # ^p
+            if y > 0:
+                self.win.move(y-1, x)
+                if x > self._end_of_line(y-1):
+                    self.win.move(y-1, self._end_of_line(y-1))
+        return 1
+
     def edit(self, validate=None, parentview=None, wins_to_update: Iterable = None):
-        "Edit in the widget window and collect the results. Also updates any windows passed in to it each cycle."
+        """Edit in the widget window and collect the results. Also updates any windows passed in to it each cycle."""
         self.win.nodelay(True)
         while 1:
             curses.curs_set(1)
@@ -141,4 +256,4 @@ class ExtendedTextBox(curses.textpad.Textbox):
                     win.refresh()
             self.win.refresh()
         self.win.nodelay(False)
-        return self.gather()
+        return self.value
