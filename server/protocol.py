@@ -15,6 +15,7 @@ from django.forms.models import model_to_dict
 
 import rsa
 import json
+import os
 
 import maps
 
@@ -72,7 +73,8 @@ class Moonlapse(NetstringReceiver):
 
         self.logger: Log = Log()
 
-        with open("server/rsa_keys.json", 'r') as f:
+        serverdir = os.path.dirname(os.path.realpath(__file__))
+        with open(os.path.join(serverdir, "rsa_keys.json"), 'r') as f:
             d = json.load(f)
             self.public_key = rsa.key.PublicKey(d['PublicKey']['n'], d['PublicKey']['e'])
             self.private_key = rsa.key.PrivateKey(d['PrivateKey']['n'], d['PrivateKey']['e'], d['PrivateKey']['d'],
