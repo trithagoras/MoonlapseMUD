@@ -1,18 +1,17 @@
 import curses
 import curses.ascii
-import socket
 import string
 
 from networking import packet
 from typing import *
 from .menu import Menu
 from ..views.registerview import RegisterView
+from client.utils import NetworkState
 
 
 class RegisterMenu(Menu):
-    def __init__(self, s: socket.socket, public_key):
-        self.s: socket.socket = s
-        self.public_key = public_key
+    def __init__(self, ns: NetworkState):
+        self.ns = ns
 
         self.username: str = ''
         self.password: str = ''
@@ -61,9 +60,8 @@ class RegisterMenu(Menu):
             self.view.title = "Char must be an ASCII single length character."
             return
 
-        packet.send(packet.RegisterPacket(self.username, self.password, self.char), self.s, public_key=self.public_key)
-
-        response: Union[packet.OkPacket, packet.DenyPacket] = packet.receive(self.s)
+        self.ns.send_packet(packet.RegisterPacket(self.username, self.password, self.char))
+        response: Union[packet.OkPacket, packet.DenyPacket] = self.ns.receive_packet()
 
         if isinstance(response, packet.OkPacket):
             self.view.title = "Registration successful! Press CTRL+C or ESC to go back and log in."

@@ -9,6 +9,7 @@ parent, root = file.parent, file.parents[1]
 sys.path.append(str(root))
 
 from client.controllers.mainmenu import MainMenu
+from client.utils import NetworkState
 
 
 def handle_arguments() -> Tuple[str, int]:
@@ -58,7 +59,9 @@ def main() -> None:
         except Exception as e:
             print(f"Could not establish a connection to {address[0]}:{address[1]}. {e}.")
             sys.exit(-1)
-        mainmenu = MainMenu(s)
+
+        ns = NetworkState(s, None)
+        mainmenu = MainMenu(ns)
         mainmenu.start()
 
 

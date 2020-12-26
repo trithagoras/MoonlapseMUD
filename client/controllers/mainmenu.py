@@ -1,4 +1,4 @@
-import socket
+from client.utils import NetworkState
 from networking import packet
 from .loginmenu import LoginMenu
 from .menu import Menu
@@ -8,27 +8,28 @@ import rsa
 
 
 class MainMenu(Menu):
-    def __init__(self, s: socket.socket):
+    def __init__(self, ns: NetworkState):
         super().__init__({
             "Login": self.login,
             "Register": self.register
         })
 
-        self.s: socket.socket = s
-
+        self.ns = ns
         self.view = MenuView(self, "Welcome to MoonlapseMUD")
 
         # Receive the message of the day
-        p: packet.Packet = packet.receive(self.s)
         # if isinstance(p, packet.WelcomePacket):
         #     self.view.title = p.payloads[0].value
+
+        # receive public key
+        p = self.ns.receive_packet()
         if isinstance(p, packet.ClientKeyPacket):
-            self.public_key = rsa.PublicKey(p.payloads[0].value, p.payloads[1].value)
+            self.ns.public_key = rsa.PublicKey(p.payloads[0].value, p.payloads[1].value)
 
     def login(self):
-        LoginMenu(self.s, self.public_key).start()
+        LoginMenu(self.ns).start()
         self.start()
 
     def register(self):
-        RegisterMenu(self.s, self.public_key).start()
+        RegisterMenu(self.ns).start()
         self.start()

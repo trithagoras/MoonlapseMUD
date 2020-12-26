@@ -1,7 +1,6 @@
 import curses
 import curses.ascii
 import os
-import socket
 import threading
 import time
 import models
@@ -12,6 +11,7 @@ from networking import packet
 from networking.logger import Log
 from .controller import Controller
 from ..views.gameview import GameView
+from client.utils import NetworkState
 
 
 class Action(Enum):
@@ -20,10 +20,9 @@ class Action(Enum):
 
 
 class Game(Controller):
-    def __init__(self, s: socket.socket, username: str, public_key):
+    def __init__(self, ns: NetworkState):
         super().__init__()
-        self.s: socket.socket = s
-        self.public_key = public_key
+        self.ns = ns
 
         self.action: Optional[Action] = None
 
@@ -60,14 +59,14 @@ class Game(Controller):
             try:
                 # Get initial room data if not already done
                 while not self.ready() and self._logged_in:
-                    p: packet.Packet = packet.receive(self.s)
+                    p = self.ns.receive_packet()
                     if isinstance(p, packet.ServerModelPacket):
                         self.initialise_models(p.payloads[0].value, p.payloads[1].value)
                     elif isinstance(p, packet.ServerTickRatePacket):
                         self.tick_rate = p.payloads[0].value
 
                 # Get volatile data such as player positions, etc.
-                p: packet.Packet = packet.receive(self.s)
+                p = self.ns.receive_packet()
 
                 if isinstance(p, packet.ServerModelPacket):
                     type: str = p.payloads[0].value
@@ -186,7 +185,7 @@ class Game(Controller):
             directionpacket = packet.MoveLeftPacket()
 
         if directionpacket:
-            packet.send(directionpacket, self.s, public_key=self.public_key)
+            self.ns.send_packet(directionpacket)
 
         # Changing window focus
         elif key in (ord('1'), ord('2'), ord('3')):
@@ -213,13 +212,13 @@ class Game(Controller):
 
         # Quit on Windows. TODO: Figure out how to make CTRL+C or ESC work.
         elif key == ord('q'):
-            packet.send(packet.LogoutPacket(self.user.username), self.s, public_key=self.public_key)
+            self.ns.send_packet(packet.LogoutPacket(self.user.username))
             self.action = Action.LOGOUT
 
         return key
 
     def chat(self, message: str) -> None:
-        packet.send(packet.ChatPacket(message), self.s, public_key=self.public_key)
+        self.ns.send_packet(packet.ChatPacket(message))
         self.view.chatbox.value = ''
 
     def ready(self) -> bool:

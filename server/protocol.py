@@ -130,7 +130,6 @@ class Moonlapse(NetstringReceiver):
         Call this to communicate information back to the game client application.
         """
         self.sendString(p.tobytes())
-        # self.transport.write(p.tobytes())
         self._debug(f"Sent data to my client: {p.tobytes()}")
 
     def processPacket(self, p: packet.Packet) -> None:

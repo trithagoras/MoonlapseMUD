@@ -1,19 +1,18 @@
 import curses
 import curses.ascii
-import socket
 from networking import packet
 from typing import *
 from .game import Game
 from .menu import Menu
 from ..views.loginview import LoginView
+from client.utils import NetworkState
 
 
 class LoginMenu(Menu):
-    def __init__(self, s: socket.socket, public_key):
-        self.s: socket.socket = s
+    def __init__(self, ns: NetworkState):
+        self.ns = ns
         self.username: str = ''
         self.password: str = ''
-        self.public_key = public_key
 
         super().__init__({
             "Username": self.login,
@@ -41,17 +40,17 @@ class LoginMenu(Menu):
         # encrypted_pword = pbkdf2.hash_password(self.password)
 
         self.view.title = "Please wait..."
-        packet.send(packet.LoginPacket(self.username, self.password), self.s, public_key=self.public_key)
+        self.ns.send_packet(packet.LoginPacket(self.username, self.password))
         self.view.title = "Sent login request..."
         try:
-            response: Union[packet.OkPacket, packet.DenyPacket] = packet.receive(self.s)
+            response: Union[packet.OkPacket, packet.DenyPacket] = self.ns.receive_packet()
         except Exception as e:
             self.view.title = str(e)
         else:
             self.view.title = "Got response..."
             if isinstance(response, packet.OkPacket):
                 self.view.title = "Entering game..."
-                Game(self.s, self.username, self.public_key).start()
+                Game(self.ns).start()
                 self.start()       
             elif isinstance(response, packet.DenyPacket):
                 self.view.title = response.payloads[0].value
