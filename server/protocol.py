@@ -365,8 +365,10 @@ class Moonlapse(NetstringReceiver):
                     model_room = models.Room.objects.get(id=model['room'])
                     entity = models.Entity(id=model['id'], room=model_room, y=model['y'], x=model['x'], char=model['char'],
                                            typename=model['typename'], name=model['name'])
-                    self._debug(f"Entity {entity.name} in view, adding to visible entities")
-                    self._visible_entities.add(entity)
+
+                    if entity not in self._visible_entities:
+                        self._visible_entities.add(entity)
+                        self._debug(f"Entity {entity.name} in view, adding to visible entities")
             else:
                 # Else, it's not in our view but check if it WAS so we can say goodbye to it
                 self._debug(f"Entity not in view, not telling my client about it")
@@ -482,7 +484,7 @@ class Moonlapse(NetstringReceiver):
         self._entity.save()
 
         # Broadcast our new position to other protocols in the room
-        self.broadcast(packet.ServerModelPacket('Entity', model_to_dict(self._entity)))
+        self.broadcast(packet.ServerModelPacket('Entity', model_to_dict(self._entity)), excluding=(self,))
         # Process the entities around us
         self._process_visible_entities()
 
