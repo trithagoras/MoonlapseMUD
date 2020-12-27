@@ -49,7 +49,7 @@ class Moonlapse(NetstringReceiver):
     doesn't necessarily have to be sent to any clients.
     """
 
-    def __init__(self, server: MoonlapseServer, roomid: Optional[int], others: Set['Moonlapse']):
+    def __init__(self, server: MoonlapseServer, others: Set['Moonlapse']):
         super().__init__()
 
         # Information specific to this protocol
@@ -196,7 +196,7 @@ class Moonlapse(NetstringReceiver):
         print(f"\nmove_rooms(dest_roomid={dest_roomid})\n")
 
         # Tell people in the current (old) room we are leaving
-        self.broadcast(packet.GoodbyePacket(self._entity.id), excluding=(self._user.username,))
+        self.broadcast(packet.GoodbyePacket(self._entity.id), excluding=(self,))
 
         # Reset visible entities (so things don't "follow" us between rooms)
         self._visible_entities = set()
@@ -250,11 +250,11 @@ class Moonlapse(NetstringReceiver):
         self.sendPacket(packet.ServerModelPacket('Player', playerdict))
 
         self.state = self._PLAY
-        self.broadcast(packet.ServerLogPacket(f"{self._user.username} has arrived."), excluding=(self._user.username))
+        self.broadcast(packet.ServerLogPacket(f"{self._user.username} has arrived."), excluding=(self,))
         self._logged_in = True
 
         # Tell entities in view that we have arrived
-        self.broadcast(packet.HelloPacket(model_to_dict(self._entity)), excluding=(self._user.username,))
+        self.broadcast(packet.HelloPacket(model_to_dict(self._entity)), excluding=(self,))
 
         # Tell our client about all the entities around
         self._process_visible_entities()
@@ -272,6 +272,13 @@ class Moonlapse(NetstringReceiver):
         ybounds, xbounds = self._get_view_bounds()
         for entity in models.Entity.objects.filter(room=self._room, y__gte=ybounds[0], y__lte=ybounds[1], x__gte=xbounds[0], x__lte=xbounds[1]):
             # TODO: Stop looping through entities that belong to logged out players
+            if entity.typename == 'Player':
+                other_entities_protocols = {p._entity: p for p in self._others}
+                if entity not in other_entities_protocols:
+                    continue
+                if other_entities_protocols[entity]._room != self._room:
+                    continue
+
             model_packet = packet.ServerModelPacket('Entity', model_to_dict(entity))
             self.process_model(model_packet)
 
@@ -280,7 +287,7 @@ class Moonlapse(NetstringReceiver):
         if username == self._user.username:
             # Tell our client it's OK to log out
             self.sendPacket(packet.OkPacket())
-            self.broadcast(packet.GoodbyePacket(self._entity.id), excluding=(self._user.username,))
+            self.broadcast(packet.GoodbyePacket(self._entity.id), excluding=(self,))
             self.move_rooms(None)
             self._logged_in = False
             self.state = self._GETENTRY
@@ -333,7 +340,7 @@ class Moonlapse(NetstringReceiver):
             return
 
         # Broadcasts our entity model to the other player's protocol
-        self.broadcast(packet.ServerModelPacket('Entity', model_to_dict(self._entity)), including=(other_proto._user.username,))
+        self.broadcast(packet.ServerModelPacket('Entity', model_to_dict(self._entity)), including=(other_proto,))
 
     def process_model(self, p: packet.ServerModelPacket):
         type: str = p.payloads[0].value
@@ -394,28 +401,28 @@ class Moonlapse(NetstringReceiver):
             self._debug(f"Deleted self from others list")
 
         # Tell all still connected protocols about this disconnection
-        self.broadcast(packet.GoodbyePacket(self._entity.id), including=(o._user.username for o in self._others))
+        self.broadcast(packet.GoodbyePacket(self._entity.id))
 
-    def broadcast(self, *packets: packet.Packet, including: Iterable[str] = tuple(),
-                  excluding: Iterable[str] = tuple()) -> None:
+    def broadcast(self, *packets: packet.Packet, including: Iterable['Moonlapse'] = tuple(), excluding: Iterable['Moonlapse'] = tuple()) -> None:
         """
-        Sends packets to all protocols specified in "including" except for the ones for the usernames specified in
+        Sends packets to all protocols specified in "including" except for the ones for the protocols specified in
         "excluding", if any.
         If no protocols are specified in "including", the default behaviour is to send to *all* protocols on the server
         except for the ones specified in "excluding", if any.
 
         Examples:
-            * broadcast(packet.ServerLogPacket("Hello"), excluding=("Josh",)) will send to everyone but Josh
-            * broadcast(packet.ServerLogPacket("Hello"), including=("Sue", "James")) will send to only Sue and James
-            * broadcast(packet.ServerLogPacket("Hello"), including=("Mary",), excluding=("Mary",)) will send to noone
+            * broadcast(packet.ServerLogPacket("Hello"), excluding=(Josh,)) will send to everyone but Josh
+            * broadcast(packet.ServerLogPacket("Hello"), including=(Sue, James)) will send to only Sue and James
+            * broadcast(packet.ServerLogPacket("Hello"), including=(Mary,), excluding=(Mary,)) will send to noone
         """
-        self._debug(f"Broadcasting {packets} to {including if including else 'everyone'} except {excluding}")
+        self._debug(f"Broadcasting {packets} to {tuple(p._user.username for p in including) if including else 'everyone'} "
+                    f"{'except' + str(tuple(p._user.username for p in excluding)) if tuple(p._user.username for p in excluding) else ''}")
 
         sendto: Set['Moonlapse'] = self._others
         if including:
-            sendto = {proto for proto in self._others if proto._user.username in including}
+            sendto = including
 
-        sendto = {proto for proto in sendto if proto._user.username not in excluding}
+        sendto = {proto for proto in sendto if proto not in excluding}
 
         for proto in sendto:
             for p in packets:

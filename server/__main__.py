@@ -82,7 +82,7 @@ class MoonlapseServer(Factory):
     def buildProtocol(self, addr):
         print("Adding a new client.")
         # Give the new client their protocol in the "lobby"
-        return protocol.Moonlapse(self, None, self.rooms_protocols[None])
+        return protocol.Moonlapse(self, self.rooms_protocols[None])
 
     def moveProtocols(self, proto, dest_roomid: int):
         # Remove the player from the old room
