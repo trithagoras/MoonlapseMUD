@@ -160,8 +160,6 @@ class Moonlapse(NetstringReceiver):
             self.move_rooms(p.payloads[0].value)
         elif isinstance(p, packet.ServerModelPacket):
             self.process_model(p)
-        elif isinstance(p, packet.HelloPacket):
-            self.greet(p)
 
     def _GETENTRY(self, p: Union[packet.LoginPacket, packet.RegisterPacket]) -> None:
         """
@@ -259,14 +257,21 @@ class Moonlapse(NetstringReceiver):
         self.broadcast(packet.HelloPacket(model_to_dict(self._entity)), excluding=(self._user.username,))
 
         # Tell our client about all the entities around
-        self._process_entities()
+        self._process_visible_entities()
 
-    def _process_entities(self):
-        for entity in models.Entity.objects.filter(room=self._room):
-            # TODO: Don't loop through all players
-            if entity.id in (p.entity.id for p in models.Player.objects.all()):
-                # Don't send players as that's done separately
-                continue
+    def _process_visible_entities(self):
+        """
+        Say goodbye to old entities no longer in view and process the new and still-existing entities in view
+        """
+        for entity in list(self._visible_entities):  # Loop through list to avoid changing set size during iteration
+            currently_in_view = self._coord_in_view(entity.y, entity.x)
+            if not currently_in_view:
+                self.sendPacket(packet.GoodbyePacket(entity.id))
+                self._visible_entities.remove(entity)
+
+        ybounds, xbounds = self._get_view_bounds()
+        for entity in models.Entity.objects.filter(room=self._room, y__gte=ybounds[0], y__lte=ybounds[1], x__gte=xbounds[0], x__lte=xbounds[1]):
+            # TODO: Stop looping through entities that belong to logged out players
             model_packet = packet.ServerModelPacket('Entity', model_to_dict(entity))
             self.process_model(model_packet)
 
@@ -319,55 +324,49 @@ class Moonlapse(NetstringReceiver):
 
         self.sendPacket(packet.OkPacket())
 
-    # Interaction plan
-    # Cases:
-    # 1. * Player A already in room
-    #    * Player B joins room and broadcasts its entity model to every protocol in the room
-    #    * Player A's protocol checks if Player B's entity is within view; if so:
-    #          * Player A tells its client about Player B
-    #    * Player A broadcasts its entity model to Player B's protocol
-    #    * Player B's protocol checks if Player A's entity is within view; if so:
-    #          * Player B tells its client about Player A
     def greet(self, p: packet.HelloPacket):
         model: dict = p.payloads[0].value
-        # Obtain Player B's protocol
+
+        # We don't greet entities that don't belong to other protocols
         other_proto: Optional['Moonlapse'] = next((p for p in self._others if p._entity.id == model['id']), None)
         if other_proto is None:
             return
 
-        # Player A's protocol checks if Player B's entity is within view; if so:
-        if self.coord_in_view(other_proto._entity.y, other_proto._entity.x):
-            self._visible_entities.add(other_proto._entity)
-            # Player A tells its client about Player B
-            self.sendPacket(packet.ServerModelPacket('Entity', model))
-        else:
-            self._debug(f"{other_proto._entity.name} not in my view so I won't tell my client about it")
-
-        # Player A broadcasts its entity model to Player B's protocol
-        other_proto.processPacket(packet.ServerModelPacket('Entity', model_to_dict(self._entity)))
-
-        # Now the rest of the logic is passed to proto.process_model
+        # Broadcasts our entity model to the other player's protocol
+        self.broadcast(packet.ServerModelPacket('Entity', model_to_dict(self._entity)), including=(other_proto._user.username,))
 
     def process_model(self, p: packet.ServerModelPacket):
         type: str = p.payloads[0].value
         model: dict = p.payloads[1].value
+        entityid: int = model['id']
+        currently_in_view = self._coord_in_view(model['y'], model['x'])
+        previously_in_view = entityid in {e.id for e in self._visible_entities}
 
         # Send the new model to the client if it's still within our view - otherwise remove it from our list of visible
         # entities
         if type == 'Entity':
-            if self.coord_in_view(model['y'], model['x']):
-                # If it's in our view, tell our client about it
-                self.sendPacket(p)
-                model_room = models.Room.objects.get(id=model['room'])
-                entity = models.Entity(id=model['id'], room=model_room, y=model['y'], x=model['x'], char=model['char'],
-                                       typename=model['typename'], name=model['name'])
-                self._debug(f"Entity {entity.name} in view, adding to visible entities")
-                self._visible_entities.add(entity)
+            if currently_in_view:
+                # If it's in our view, and it wasn't PREVIOUSLY in our view, say hello to it
+                if not previously_in_view:
+                    self._debug("Entity currently in view, and wasn't there before, so greet it")
+                    self._visible_entities.add(models.Entity.objects.get(id=model['id']))
+                    self.sendPacket(p)
+                    self.greet(packet.HelloPacket(model))
+                else:
+                    # If it was previously in our view and still is, tell our client about it
+                    self.sendPacket(p)
+                    model_room = models.Room.objects.get(id=model['room'])
+                    entity = models.Entity(id=model['id'], room=model_room, y=model['y'], x=model['x'], char=model['char'],
+                                           typename=model['typename'], name=model['name'])
+                    self._debug(f"Entity {entity.name} in view, adding to visible entities")
+                    self._visible_entities.add(entity)
             else:
                 # Else, it's not in our view but check if it WAS so we can say goodbye to it
-                entityid: int = model['id']
-                self.sendPacket(packet.GoodbyePacket(entityid))
-                self._remove_visible_entity(entityid)
+                self._debug(f"Entity not in view, not telling my client about it")
+                if previously_in_view:
+                    self._debug(f"Actually, it was previously in view but it's not now so I'll tell my client to remove it")
+                    self.sendPacket(packet.GoodbyePacket(entityid))
+                    self._remove_visible_entity(entityid)
 
     def _remove_visible_entity(self, entityid: int):
         self._visible_entities = {e for e in self._visible_entities if e.id != entityid}
@@ -395,8 +394,7 @@ class Moonlapse(NetstringReceiver):
             self._debug(f"Deleted self from others list")
 
         # Tell all still connected protocols about this disconnection
-        for proto in self._others:
-            proto.processPacket(packet.GoodbyePacket(self._entity.id))
+        self.broadcast(packet.GoodbyePacket(self._entity.id), including=(o._user.username for o in self._others))
 
     def broadcast(self, *packets: packet.Packet, including: Iterable[str] = tuple(),
                   excluding: Iterable[str] = tuple()) -> None:
@@ -478,18 +476,18 @@ class Moonlapse(NetstringReceiver):
 
         # Broadcast our new position to other protocols in the room
         self.broadcast(packet.ServerModelPacket('Entity', model_to_dict(self._entity)))
-        # Send greetings to keep the views up to date
-        self.broadcast(packet.HelloPacket(model_to_dict(self._entity)))
         # Process the entities around us
-        self._process_entities()
+        self._process_visible_entities()
 
-        # For players which were previously in our view but aren't any more, remove them from our view
-        for old_entity_in_view in tuple(
-                self._visible_entities):  # Iterate over tuple to void "Set changed size during iteration" errors
-            if not self.coord_in_view(old_entity_in_view.y, old_entity_in_view.x):
-                self._visible_entities.remove(old_entity_in_view)
+    def _coord_in_view(self, y: int, x: int) -> bool:
+        ybounds, xbounds = self._get_view_bounds()
+        return within_bounds(y, x, ybounds[0], xbounds[0], ybounds[1], xbounds[1])
 
-    def coord_in_view(self, y: int, x: int) -> bool:
-        topleft_y, topleft_x = self._entity.y - self._player.view_radius, self._entity.x - self._player.view_radius
-        botright_y, botright_x = self._entity.y + self._player.view_radius, self._entity.x + self._player.view_radius
-        return within_bounds(y, x, topleft_y, topleft_x, botright_y, botright_x)
+    def _get_view_bounds(self) -> Tuple[Tuple[int, int], Tuple[int, int]]:
+        """
+        Returns two tuples: ((ymin, ymax), (xmin, xmax)) where ymin is the smallest y-coordinate the player can see, etc.
+        :return:
+        """
+        yview = self._entity.y - self._player.view_radius, self._entity.y + self._player.view_radius
+        xview = self._entity.x - self._player.view_radius, self._entity.x + self._player.view_radius
+        return yview, xview
