@@ -29,6 +29,17 @@ def within_bounds(y: int, x: int, ymin: int, xmin: int, ymax: int, xmax: int) ->
     return ymin <= y <= ymax and xmin <= x <= xmax
 
 
+def get_dict_delta(before: dict, after: dict) -> dict:
+    delta = {'id': before['id']}
+    for k, v in after.items():
+        if k == 'id':
+            continue
+        if v != before[k]:
+            delta[k] = v
+
+    return delta
+
+
 class Moonlapse(NetstringReceiver):
     """
     A protocol that sends and receives netstrings. See http://cr.yp.to/proto/netstrings.txt for the 
@@ -353,22 +364,19 @@ class Moonlapse(NetstringReceiver):
         # entities
         if type == 'Entity':
             if currently_in_view:
+                stored_entity = models.Entity.objects.get(id=model['id'])
                 # If it's in our view, and it wasn't PREVIOUSLY in our view, say hello to it
                 if not previously_in_view:
                     self._debug("Entity currently in view, and wasn't there before, so greet it")
-                    self._visible_entities.add(models.Entity.objects.get(id=model['id']))
+                    self._visible_entities.add(stored_entity)
                     self.sendPacket(p)
                     self.greet(packet.HelloPacket(model))
                 else:
-                    # If it was previously in our view and still is, tell our client about it
-                    self.sendPacket(p)
-                    model_room = models.Room.objects.get(id=model['room'])
-                    entity = models.Entity(id=model['id'], room=model_room, y=model['y'], x=model['x'], char=model['char'],
-                                           typename=model['typename'], name=model['name'])
-
-                    if entity not in self._visible_entities:
-                        self._visible_entities.add(entity)
-                        self._debug(f"Entity {entity.name} in view, adding to visible entities")
+                    # If it was previously in our view and still is, tell our client about it only if it's changed
+                    before = model_to_dict(stored_entity)
+                    if model != before:
+                        delta = get_dict_delta(before, model)
+                        self.sendPacket(packet.ServerModelPacket('Entity', delta))
             else:
                 # Else, it's not in our view but check if it WAS so we can say goodbye to it
                 self._debug(f"Entity not in view, not telling my client about it")
@@ -481,12 +489,13 @@ class Moonlapse(NetstringReceiver):
 
         self._entity.y = desired_y
         self._entity.x = desired_x
-        self._entity.save()
 
         # Broadcast our new position to other protocols in the room
-        self.broadcast(packet.ServerModelPacket('Entity', model_to_dict(self._entity)), excluding=(self,))
+        self.broadcast(packet.ServerModelPacket('Entity', model_to_dict(self._entity)))
         # Process the entities around us
         self._process_visible_entities()
+
+        self._entity.save()
 
     def _coord_in_view(self, y: int, x: int) -> bool:
         ybounds, xbounds = self._get_view_bounds()

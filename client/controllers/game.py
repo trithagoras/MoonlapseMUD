@@ -73,19 +73,15 @@ class Game(Controller):
                     model: dict = p.payloads[1].value
 
                     if type == 'Entity':
-                        # If the incoming entity is our player, update it
                         entity = models.Entity(model)
-                        if entity.id == self.entity.id:
-                            self.entity = entity
-
-                        # If the incoming entity is already visible to us, update it
-                        for e in self.visible_entities:
-                            if e.id == entity.id:
-                                self.visible_entities.remove(e)
-                                self.visible_entities.add(entity)
-
-                        # Else, add it to the visible list (it is only ever sent to us if it's in view)
-                        self.visible_entities.add(entity)
+                        visible_entity = next((e for e in self.visible_entities if e.id == entity.id), None)
+                        if visible_entity:  # If the incoming entity is already visible to us, update it
+                            visible_entity.update(model)
+                            # If the incoming entity is ours, update it
+                            if entity.id == self.entity.id:
+                                self.entity.update(model)
+                        else:  # If it's not visible to us already, add it to the visible list (it is only ever sent to us if it's in view)
+                            self.visible_entities.add(entity)
 
                 elif isinstance(p, packet.ServerLogPacket):
                     self.logger.log(p.payloads[0].value)
