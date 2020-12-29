@@ -1,6 +1,5 @@
 import curses
 import curses.ascii
-import os
 import threading
 import time
 import models
@@ -27,12 +26,12 @@ class Game(Controller):
         self.action: Optional[Action] = None
 
         # Game data
-        self.user: Optional[models.User] = None
         self.room: Optional[models.Room] = None
-        self.entity: Optional[models.Entity] = None
+        self.instance: Optional[models.InstancedEntity] = None
         self.player: Optional[models.Player] = None
 
-        self.visible_entities: Set[models.Entity] = set()
+        self.visible_instances: Set[models.InstancedEntity] = set()
+        self.entities: Set[models.Entity] = set()
         self.tick_rate: Optional[int] = None
 
         self.logger: Log = Log()
@@ -73,15 +72,25 @@ class Game(Controller):
                     model: dict = p.payloads[1].value
 
                     if type == 'Entity':
+                        # todo: stupid naming convention. Cannot override __eq__ without making Entity unhashable. figure something else out
+                        a = True
                         entity = models.Entity(model)
-                        visible_entity = next((e for e in self.visible_entities if e.id == entity.id), None)
-                        if visible_entity:  # If the incoming entity is already visible to us, update it
-                            visible_entity.update(model)
+                        for e in self.entities:
+                            if entity.id == e.id:
+                                a = False
+                        if a:
+                            self.entities.add(entity)
+
+                    elif type == 'Instance':
+                        instance = models.InstancedEntity(model)
+                        visible_instance = next((e for e in self.visible_instances if e.id == instance.id), None)
+                        if visible_instance:  # If the incoming entity is already visible to us, update it
+                            visible_instance.update(model)
                             # If the incoming entity is ours, update it
-                            if entity.id == self.entity.id:
-                                self.entity.update(model)
+                            if instance.id == self.instance.id:
+                                self.instance.update(model)
                         else:  # If it's not visible to us already, add it to the visible list (it is only ever sent to us if it's in view)
-                            self.visible_entities.add(entity)
+                            self.visible_instances.add(instance)
 
                 elif isinstance(p, packet.ServerLogPacket):
                     self.logger.log(p.payloads[0].value)
@@ -89,9 +98,9 @@ class Game(Controller):
                 # Another player has logged out, left the room, or disconnected so we remove them from the game.
                 elif isinstance(p, packet.GoodbyePacket):
                     entityid: int = p.payloads[0].value
-                    departed: models.Entity = next((e for e in self.visible_entities if e.id == entityid), None)
+                    departed: models.InstancedEntity = next((e for e in self.visible_instances if e.id == entityid), None)
                     if departed:
-                        self.visible_entities.remove(departed)
+                        self.visible_instances.remove(departed)
 
                 if isinstance(p, packet.MoveRoomsPacket):
                     self.action = Action.MOVE_ROOMS
@@ -119,17 +128,18 @@ class Game(Controller):
         self.logger.log("Seems you've stopped listening friend...")
 
     def initialise_models(self, type: str, data: dict):
-        if type == 'User':
-            self.user = models.User(data)
-
-        elif type == 'Room':
+        if type == 'Room':
             # if not self._client_has_map_layout(data):
             #     self._add_map_layout(data)
 
             self.room = maps.Room(data['id'], data['name'], data['file_name'])
 
+        # todo: this is how we get base entity information
         elif type == 'Entity':
-            self.entity = models.Entity(data)
+            self.entities.add(models.Entity(data))
+
+        elif type == 'Instance':
+            self.instance = models.InstancedEntity(data)
 
         elif type == 'Player':
             self.player = models.Player(data)
@@ -206,7 +216,7 @@ class Game(Controller):
 
         # Quit on Windows. TODO: Figure out how to make CTRL+C or ESC work.
         elif key == ord('q'):
-            self.ns.send_packet(packet.LogoutPacket(self.user.username))
+            self.ns.send_packet(packet.LogoutPacket(self.ns.username))
             self.action = Action.LOGOUT
 
         return key
@@ -216,13 +226,22 @@ class Game(Controller):
         self.view.chatbox.value = ''
 
     def ready(self) -> bool:
-        return False not in [bool(data) for data in (self.user, self.entity, self.player, self.room, self.tick_rate)]
+        return False not in [bool(data) for data in (self.instance, self.player, self.room, self.tick_rate)]
 
     def reinitialize(self):
-        self.entity = None
-        self.visible_entities = set()
+        self.instance = None
+        self.visible_instances = set()
+        self.entities = set()
         self.tick_rate = None
 
     def stop(self) -> None:
         self._logged_in = False
         super().stop()
+
+    def find_entity(self, id) -> models.Entity:
+        ids = ""
+        for e in self.entities:
+            ids += f"{e.id}, "
+            if e.id == id:
+                return e
+        # raise Exception(f"Could not find entity with id={id} within {ids}")

@@ -50,6 +50,7 @@ class LoginMenu(Menu):
             self.view.title = "Got response..."
             if isinstance(response, packet.OkPacket):
                 self.view.title = "Entering game..."
+                self.ns.username = self.username
                 Game(self.ns).start()
                 self.start()       
             elif isinstance(response, packet.DenyPacket):

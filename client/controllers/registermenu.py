@@ -16,13 +16,11 @@ class RegisterMenu(Menu):
         self.username: str = ''
         self.password: str = ''
         self.confirmpassword: str = ''
-        self.char: chr = ''
 
         super().__init__({
             "Username": self.register,
             "Password": self.register,
             "Confirm password": self.register,
-            "Character": self.register
         })
 
         self.view = RegisterView(self, title="Please enter your desired username and password\n" +
@@ -40,27 +38,20 @@ class RegisterMenu(Menu):
             elif self.cursor == 2:
                 self.view.confirmpasswordbox.modal(first_key=key)
                 self.confirmpassword = self.view.confirmpasswordbox.value
-            elif self.cursor == 3:
-                self.view.charbox.modal(first_key=key)
-                self.char = self.view.charbox.value
         return key
 
     def register(self):
-        if '' in (self.username, self.password, self.confirmpassword, self.char):
+        if '' in (self.username, self.password, self.confirmpassword):
             self.view.title = "Field must not be blank"
             return
 
-        self.view.title = f"Attempted registration as {self.username} with password {self.password} and character {self.char}"
+        self.view.title = f"Attempted registration as {self.username} with password {self.password}"
 
         if self.password != self.confirmpassword:
             self.view.title = "Passwords do not match!"
             return
 
-        if len(self.char) != 1 or self.char not in (string.ascii_letters + string.digits + string.punctuation):
-            self.view.title = "Char must be an ASCII single length character."
-            return
-
-        self.ns.send_packet(packet.RegisterPacket(self.username, self.password, self.char))
+        self.ns.send_packet(packet.RegisterPacket(self.username, self.password))
         response: Union[packet.OkPacket, packet.DenyPacket] = self.ns.receive_packet()
 
         if isinstance(response, packet.OkPacket):

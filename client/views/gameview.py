@@ -112,21 +112,18 @@ class GameView(View):
         self.draw_log()
 
     def draw_map(self):
-        view_radius = self.game.player.view_radius
+        view_radius = 10
         win1_hwidth, win1_hheight = self.win1_width // 2, self.win1_height // 2
         room: maps.Room = self.game.room
 
         for row in range(-view_radius, view_radius + 1):
             for col in range(-view_radius, view_radius + 1):
-                pos = (self.game.entity.y + row, self.game.entity.x + col)
+                pos = (self.game.instance.y + row, self.game.instance.x + col)
                 random.seed(hash(pos))
 
                 if self.coordinate_exists(*pos):
                     cy, cx = win1_hheight + row, win1_hwidth + col * 2
                     c = room.at(*pos)
-
-                    self.title(self.win1, f"{pos[0]},{pos[1]}")
-                    # raise Exception(room.at(*pos))
 
                     if c == maps.GRASS_FLOOR:
                         color_addch(self.win1, cy, cx, random.choice([',', '`']), Color.GREEN)
@@ -141,44 +138,22 @@ class GameView(View):
                     elif c == maps.WOOD_FLOOR:
                         color_addch(self.win1, cy, cx, '.', Color.YELLOW)
 
-
-                    # for map_data in (room.groundmap, room.solidmap):
-                    #     if pos not in map_data:
-                    #         continue
-                    #     c = map_data[pos]
-                    #     if c == maps.STONE:
-                    #         color_addch(self.win1, cy, cx, '·', Color.WHITE)
-                    #     elif c == maps.GRASS:
-                    #         color_addch(self.win1, cy, cx, random.choice([',', '`']), Color.GREEN)
-                    #     elif c == maps.SAND:
-                    #         color_addch(self.win1, cy, cx, '~', Color.YELLOW)
-                    #     elif c == maps.WATER:
-                    #         color_addch(self.win1, cy, cx, '#', Color.BLUE)
-                    #     elif c == maps.LEAF:
-                    #         color_addch(self.win1, cy, cx, random.choice(['╭', '╮', '╯', '╰']), Color.GREEN)
-                    #     elif c == maps.COBBLESTONE:
-                    #         color_addch(self.win1, cy, cx, '░', Color.WHITE)
-                    #     elif c == maps.WOOD:
-                    #         color_addch(self.win1, cy, cx, '·', Color.YELLOW)
-                    #
-                    # # Overrides: Enter in here if solid must look different from ground, for example
-                    # map_data = room.solidmap
-                    # if pos in map_data:
-                    #     c = map_data[pos]
-                    #     if c == maps.STONE:
-                    #         color_addch(self.win1, cy, cx, '█', Color.WHITE)
-                    #     elif c == maps.WOOD:
-                    #         color_addch(self.win1, cy, cx, '◍', Color.YELLOW)
-
         # Draw entities
-        for e in self.game.visible_entities:
-            if e.id != self.game.entity.id:
-                y: int = win1_hheight + (e.y - self.game.entity.y)
-                x: int = win1_hwidth + (e.x - self.game.entity.x) * 2
-                color_addch(self.win1, y, x, e.char, Color.WHITE)
+        for e in self.game.visible_instances:
+            if e.id != self.game.instance.id:
+                y: int = win1_hheight + (e.y - self.game.instance.y)
+                x: int = win1_hwidth + (e.x - self.game.instance.x) * 2
+
+                ent = self.game.find_entity(e.entity)
+                typename = ent.typename
+
+                if typename == 'Portal':
+                    color_addch(self.win1, y, x, 'O', Color.WHITE)
+                elif typename == 'Player':
+                    color_addch(self.win1, y, x, 'C', Color.WHITE)
 
         # Draw player in middle of screen
-        color_addch(self.win1, win1_hheight, win1_hwidth, self.game.entity.char, Color.WHITE)
+        color_addch(self.win1, win1_hheight, win1_hwidth, '@', Color.WHITE)
 
     def draw_help_win(self):
         with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'assets', 'help.txt'), 'r') as helpfile:
@@ -193,8 +168,13 @@ class GameView(View):
             self.spinner_it = iter(self.spinners)
             spinner = next(self.spinner_it)
 
-        self.win2.addstr(1, 2, f"{spinner}{self.game.entity.name}, Guardian of Forgotten Moor @ ({self.game.entity.y},{self.game.entity.x})")
-        self.win2.addstr(3, 2, f"Level 15 {self.progress_bar(7, 10)} (7/10 skill levels to 16)")
+        # self.win2.addstr(1, 2, f"{spinner}{self.game.entity.name}, Guardian of Forgotten Moor @ ({self.game.entity.y},{self.game.entity.x})")
+        self.win2.addstr(1, 2, f"{spinner}name, Guardian of Forgotten Moor @ ({self.game.instance.y},{self.game.instance.x})")
+        # self.win2.addstr(3, 2, f"Level 15 {self.progress_bar(7, 10)} (7/10 skill levels to 16)")
+        s = ""
+        for e in self.game.entities:
+            s += f"{e.id}:{e.name}, "
+        self.win2.addstr(3, 2, f"{s}")
 
         self.win2.addstr(5, 2, f"Vitality      31/31 {self.progress_bar(3, 10)} (3,000/10,000)")
         self.win2.addstr(6, 2, f"Strength      10/10 {self.progress_bar(3, 10)} (3,000/10,000)")

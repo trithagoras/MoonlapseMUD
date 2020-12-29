@@ -21,10 +21,16 @@
     "pk": 0,
     "fields": {
       "name": "portal",
+      "typename": "Portal"
+    }
+  },
+  {
+    "model": "networking.instancedentity",
+    "pk": 0,
+    "fields": {
+      "entity_id": 0,
       "y": 9,
       "x": 7,
-      "char": "O",
-      "typename": "Portal",
       "room_id": 0
     }
   },
@@ -44,10 +50,16 @@
     "pk": 1,
     "fields": {
       "name": "portal",
+      "typename": "Portal"
+    }
+  },
+  {
+    "model": "networking.instancedentity",
+    "pk": 1,
+    "fields": {
+      "entity_id": 1,
       "y": 14,
       "x": 14,
-      "char": "O",
-      "typename": "Portal",
       "room_id": 1
     }
   },

@@ -15,6 +15,7 @@ class NetworkState:
     def __init__(self, socket, public_key):
         self.socket = socket
         self.public_key = public_key
+        self.username = ""
 
     def send_packet(self, p: packet.Packet):
         """
