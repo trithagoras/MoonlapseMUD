@@ -31,7 +31,7 @@ class Game(Controller):
         self.player: Optional[models.Player] = None
 
         self.visible_instances: Set[models.InstancedEntity] = set()
-        self.entities: Set[models.Entity] = set()
+        self.entities = {}
         self.tick_rate: Optional[int] = None
 
         self.logger: Log = Log()
@@ -72,14 +72,8 @@ class Game(Controller):
                     model: dict = p.payloads[1].value
 
                     if type == 'Entity':
-                        # todo: stupid naming convention. Cannot override __eq__ without making Entity unhashable. figure something else out
-                        a = True
                         entity = models.Entity(model)
-                        for e in self.entities:
-                            if entity.id == e.id:
-                                a = False
-                        if a:
-                            self.entities.add(entity)
+                        self.entities[entity.id] = entity
 
                     elif type == 'Instance':
                         instance = models.InstancedEntity(model)
@@ -134,9 +128,10 @@ class Game(Controller):
 
             self.room = maps.Room(data['id'], data['name'], data['file_name'])
 
-        # todo: this is how we get base entity information
+        # todo: this is how we get our base entity information
         elif type == 'Entity':
-            self.entities.add(models.Entity(data))
+            entity = models.Entity(data)
+            self.entities[entity.id] = entity
 
         elif type == 'Instance':
             self.instance = models.InstancedEntity(data)
@@ -231,17 +226,9 @@ class Game(Controller):
     def reinitialize(self):
         self.instance = None
         self.visible_instances = set()
-        self.entities = set()
+        self.entities = {}
         self.tick_rate = None
 
     def stop(self) -> None:
         self._logged_in = False
         super().stop()
-
-    def find_entity(self, id) -> models.Entity:
-        ids = ""
-        for e in self.entities:
-            ids += f"{e.id}, "
-            if e.id == id:
-                return e
-        # raise Exception(f"Could not find entity with id={id} within {ids}")

@@ -285,15 +285,6 @@ class Moonlapse(NetstringReceiver):
                 if other_protocols[instance]._room != self._room:
                     continue
 
-            model = model_to_dict(instance.entity)
-            self.sendPacket(packet.ServerModelPacket('Entity', model))
-
-            # stored_entity = models.Entity.objects.get(id=model['id'])
-            # before = model_to_dict(stored_entity)
-            # if model != before:
-            #     delta = get_dict_delta(before, model)
-            #     self.sendPacket(packet.ServerModelPacket('Entity', delta))
-
             model_packet = packet.ServerModelPacket('Instance', model_to_dict(instance))
             self.process_model(model_packet)
 
@@ -358,7 +349,6 @@ class Moonlapse(NetstringReceiver):
             return
 
         # Broadcasts our entity model to the other player's protocol
-        self.broadcast(packet.ServerModelPacket('Entity', model_to_dict(self._instance.entity)), including=(other_proto,))
         self.broadcast(packet.ServerModelPacket('Instance', model_to_dict(self._instance)), including=(other_proto,))
 
     def process_model(self, p: packet.ServerModelPacket):
@@ -366,13 +356,9 @@ class Moonlapse(NetstringReceiver):
         model: dict = p.payloads[1].value
         instanceid: int = model['id']
 
-        if type == 'Entity':
-            self.sendPacket(p)
-            pass
-
         # Send the new model to the client if it's still within our view - otherwise remove it from our list of visible
         # entities
-        elif type == 'Instance':
+        if type == 'Instance':
             currently_in_view = self._coord_in_view(model['y'], model['x'])
             previously_in_view = instanceid in {e.id for e in self._visible_instances}
 
@@ -380,8 +366,9 @@ class Moonlapse(NetstringReceiver):
                 stored_instance = models.InstancedEntity.objects.get(id=model['id'])
                 # If it's in our view, and it wasn't PREVIOUSLY in our view, say hello to it
                 if not previously_in_view:
-                    self._debug("Entity currently in view, and wasn't there before, so greet it")
+                    self._debug("Instance currently in view, and wasn't there before, so greet it")
                     self._visible_instances.add(stored_instance)
+                    self.sendPacket(packet.ServerModelPacket('Entity', model_to_dict(stored_instance.entity)))
                     self.sendPacket(p)
                     self.greet(packet.HelloPacket(model))
                 else:

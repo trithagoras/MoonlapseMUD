@@ -144,7 +144,7 @@ class GameView(View):
                 y: int = win1_hheight + (e.y - self.game.instance.y)
                 x: int = win1_hwidth + (e.x - self.game.instance.x) * 2
 
-                ent = self.game.find_entity(e.entity)
+                ent = self.game.entities[e.entity]
                 typename = ent.typename
 
                 if typename == 'Portal':
@@ -168,13 +168,9 @@ class GameView(View):
             self.spinner_it = iter(self.spinners)
             spinner = next(self.spinner_it)
 
-        # self.win2.addstr(1, 2, f"{spinner}{self.game.entity.name}, Guardian of Forgotten Moor @ ({self.game.entity.y},{self.game.entity.x})")
-        self.win2.addstr(1, 2, f"{spinner}name, Guardian of Forgotten Moor @ ({self.game.instance.y},{self.game.instance.x})")
-        # self.win2.addstr(3, 2, f"Level 15 {self.progress_bar(7, 10)} (7/10 skill levels to 16)")
-        s = ""
-        for e in self.game.entities:
-            s += f"{e.id}:{e.name}, "
-        self.win2.addstr(3, 2, f"{s}")
+        entity = self.game.entities[self.game.instance.entity]
+        self.win2.addstr(1, 2, f"{spinner}{entity.name}, Guardian of Forgotten Moor @ ({self.game.instance.y},{self.game.instance.x})")
+        self.win2.addstr(3, 2, f"Level 15 {self.progress_bar(7, 10)} (7/10 skill levels to 16)")
 
         self.win2.addstr(5, 2, f"Vitality      31/31 {self.progress_bar(3, 10)} (3,000/10,000)")
         self.win2.addstr(6, 2, f"Strength      10/10 {self.progress_bar(3, 10)} (3,000/10,000)")
