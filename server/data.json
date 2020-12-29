@@ -72,5 +72,31 @@
       "linkedx": 8,
       "linkedroom_id": 0
     }
+  },
+  {
+    "model": "networking.entity",
+    "pk": 2,
+    "fields": {
+      "name": "Beer",
+      "typename": "Item"
+    }
+  },
+  {
+    "model": "networking.instancedentity",
+    "pk": 2,
+    "fields": {
+      "entity_id": 2,
+      "y": 5,
+      "x": 10,
+      "room_id": 1
+    }
+  },
+  {
+    "model": "networking.item",
+    "pk": 2,
+    "fields": {
+      "entity_id": 2,
+      "value": 6
+    }
   }
 ]

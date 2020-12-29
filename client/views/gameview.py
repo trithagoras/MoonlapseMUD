@@ -151,6 +151,10 @@ class GameView(View):
                     color_addch(self.win1, y, x, 'O', Color.WHITE)
                 elif typename == 'Player':
                     color_addch(self.win1, y, x, 'C', Color.WHITE)
+                elif typename == 'Item':
+                    color_addch(self.win1, y, x, '$', Color.MAGENTA)
+                else:
+                    color_addch(self.win1, y, x, '?', Color.MAGENTA)
 
         # Draw player in middle of screen
         color_addch(self.win1, win1_hheight, win1_hwidth, '@', Color.WHITE)
