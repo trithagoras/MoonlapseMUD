@@ -114,7 +114,7 @@ class GameView(View):
     def draw_map(self):
         view_radius = self.game.player.view_radius
         win1_hwidth, win1_hheight = self.win1_width // 2, self.win1_height // 2
-        room = self.game.room
+        room: maps.Room = self.game.room
 
         for row in range(-view_radius, view_radius + 1):
             for col in range(-view_radius, view_radius + 1):
@@ -123,33 +123,52 @@ class GameView(View):
 
                 if self.coordinate_exists(*pos):
                     cy, cx = win1_hheight + row, win1_hwidth + col * 2
-                    for map_data in (room.groundmap, room.solidmap):
-                        if pos not in map_data:
-                            continue
-                        c = map_data[pos]
-                        if c == maps.STONE:
-                            color_addch(self.win1, cy, cx, '·', Color.WHITE)
-                        elif c == maps.GRASS:
-                            color_addch(self.win1, cy, cx, random.choice([',', '`']), Color.GREEN)
-                        elif c == maps.SAND:
-                            color_addch(self.win1, cy, cx, '~', Color.YELLOW)
-                        elif c == maps.WATER:
-                            color_addch(self.win1, cy, cx, '#', Color.BLUE)
-                        elif c == maps.LEAF:
-                            color_addch(self.win1, cy, cx, random.choice(['╭', '╮', '╯', '╰']), Color.GREEN)
-                        elif c == maps.COBBLESTONE:
-                            color_addch(self.win1, cy, cx, '░', Color.WHITE)
-                        elif c == maps.WOOD:
-                            color_addch(self.win1, cy, cx, '·', Color.YELLOW)
+                    c = room.at(*pos)
 
-                    # Overrides: Enter in here if solid must look different from ground, for example
-                    map_data = room.solidmap
-                    if pos in map_data:
-                        c = map_data[pos]
-                        if c == maps.STONE:
-                            color_addch(self.win1, cy, cx, '█', Color.WHITE)
-                        elif c == maps.WOOD:
-                            color_addch(self.win1, cy, cx, '◍', Color.YELLOW)
+                    self.title(self.win1, f"{pos[0]},{pos[1]}")
+                    # raise Exception(room.at(*pos))
+
+                    if c == maps.GRASS_FLOOR:
+                        color_addch(self.win1, cy, cx, random.choice([',', '`']), Color.GREEN)
+                    elif c == maps.BUSH_WALL:
+                        color_addch(self.win1, cy, cx, '░', Color.GREEN)
+                    elif c == maps.STONE_FLOOR:
+                        color_addch(self.win1, cy, cx, '·', Color.WHITE)
+                    elif c == maps.STONE_WALL:
+                        color_addch(self.win1, cy, cx, '█', Color.WHITE)
+                    elif c == maps.WOOD_WALL:
+                        color_addch(self.win1, cy, cx, '█', Color.YELLOW)
+                    elif c == maps.WOOD_FLOOR:
+                        color_addch(self.win1, cy, cx, '.', Color.YELLOW)
+
+
+                    # for map_data in (room.groundmap, room.solidmap):
+                    #     if pos not in map_data:
+                    #         continue
+                    #     c = map_data[pos]
+                    #     if c == maps.STONE:
+                    #         color_addch(self.win1, cy, cx, '·', Color.WHITE)
+                    #     elif c == maps.GRASS:
+                    #         color_addch(self.win1, cy, cx, random.choice([',', '`']), Color.GREEN)
+                    #     elif c == maps.SAND:
+                    #         color_addch(self.win1, cy, cx, '~', Color.YELLOW)
+                    #     elif c == maps.WATER:
+                    #         color_addch(self.win1, cy, cx, '#', Color.BLUE)
+                    #     elif c == maps.LEAF:
+                    #         color_addch(self.win1, cy, cx, random.choice(['╭', '╮', '╯', '╰']), Color.GREEN)
+                    #     elif c == maps.COBBLESTONE:
+                    #         color_addch(self.win1, cy, cx, '░', Color.WHITE)
+                    #     elif c == maps.WOOD:
+                    #         color_addch(self.win1, cy, cx, '·', Color.YELLOW)
+                    #
+                    # # Overrides: Enter in here if solid must look different from ground, for example
+                    # map_data = room.solidmap
+                    # if pos in map_data:
+                    #     c = map_data[pos]
+                    #     if c == maps.STONE:
+                    #         color_addch(self.win1, cy, cx, '█', Color.WHITE)
+                    #     elif c == maps.WOOD:
+                    #         color_addch(self.win1, cy, cx, '◍', Color.YELLOW)
 
         # Draw entities
         for e in self.game.visible_entities:

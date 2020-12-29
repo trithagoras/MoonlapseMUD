@@ -123,12 +123,10 @@ class Game(Controller):
             self.user = models.User(data)
 
         elif type == 'Room':
-            if not self._client_has_map_layout(data):
-                self._add_map_layout(data)
+            # if not self._client_has_map_layout(data):
+            #     self._add_map_layout(data)
 
-            self.room = maps.Room(data['name'])
-            if not self.room.is_unpacked():
-                self.room.unpack()
+            self.room = maps.Room(data['id'], data['name'], data['file_name'])
 
         elif type == 'Entity':
             self.entity = models.Entity(data)
@@ -136,35 +134,35 @@ class Game(Controller):
         elif type == 'Player':
             self.player = models.Player(data)
 
-    def _client_has_map_layout(self, data: dict) -> bool:
-        for expected_attr in 'name', 'ground_data', 'solid_data', 'roof_data', 'height', 'width':
-            if expected_attr not in data:
-                raise KeyError("Model dict invalid for room")
-
-        roomname = data['name']
-        roompath = os.path.join(os.path.dirname(os.path.realpath(maps.__file__)), "layouts", roomname)
-
-        if not os.path.exists(roompath) or not os.path.isdir(roompath):
-            return False
-
-        for dtype in "ground", "solid", "roof":
-            dpath = os.path.join(roompath, f"{dtype}.data")
-            if not os.path.exists(dpath) or not os.path.isfile(dpath):
-                return False
-
-        return True
-
-    def _add_map_layout(self, data: dict):
-        roomname: str = data['name']
-        roompath = os.path.join(os.path.dirname(os.path.realpath(maps.__file__)), "layouts", roomname)
-        try:
-            os.makedirs(roompath)
-        except FileExistsError:
-            pass
-
-        for dtype in "ground", "solid", "roof":
-            with open(os.path.join(roompath, f"{dtype}.data"), 'w') as f:
-                f.writelines('\n'.join(data[f"{dtype}_data"]))
+    # def _client_has_map_layout(self, data: dict) -> bool:
+    #     for expected_attr in 'name', 'ground_data', 'solid_data', 'roof_data', 'height', 'width':
+    #         if expected_attr not in data:
+    #             raise KeyError("Model dict invalid for room")
+    #
+    #     roomname = data['name']
+    #     roompath = os.path.join(os.path.dirname(os.path.realpath(maps.__file__)), "layouts", roomname)
+    #
+    #     if not os.path.exists(roompath) or not os.path.isdir(roompath):
+    #         return False
+    #
+    #     for dtype in "ground", "solid", "roof":
+    #         dpath = os.path.join(roompath, f"{dtype}.data")
+    #         if not os.path.exists(dpath) or not os.path.isfile(dpath):
+    #             return False
+    #
+    #     return True
+    #
+    # def _add_map_layout(self, data: dict):
+    #     roomname: str = data['name']
+    #     roompath = os.path.join(os.path.dirname(os.path.realpath(maps.__file__)), "layouts", roomname)
+    #     try:
+    #         os.makedirs(roompath)
+    #     except FileExistsError:
+    #         pass
+    #
+    #     for dtype in "ground", "solid", "roof":
+    #         with open(os.path.join(roompath, f"{dtype}.data"), 'w') as f:
+    #             f.writelines('\n'.join(data[f"{dtype}_data"]))
 
     def handle_input(self) -> int:
         key = super().handle_input()

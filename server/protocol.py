@@ -228,9 +228,7 @@ class Moonlapse(NetstringReceiver):
         self._entity.save()
 
         self._room = models.Room.objects.get(id=dest_roomid)
-        self._roommap = maps.Room(self._room.name)
-        if not self._roommap.is_unpacked():
-            self._roommap.unpack()
+        self._roommap = maps.Room(self._room.pk, self._room.name, self._room.file_name)
 
         self._others = self._server.rooms_protocols[dest_roomid]
         self._establish_player_in_world()
@@ -481,9 +479,7 @@ class Moonlapse(NetstringReceiver):
                 if self._room != portal.linkedroom:
                     self.move_rooms(portal.linkedroom.id)
 
-        if (desired_y, desired_x) in self._roommap.solidmap or not within_bounds(desired_y, desired_x, 0, 0,
-                                                                                 self._room.height - 1,
-                                                                                 self._room.width - 1):
+        if not within_bounds(desired_y, desired_x, 0, 0, self._roommap.height - 1, self._roommap.width - 1) or self._roommap.at(desired_y, desired_x) in maps.SOLIDS:
             self.sendPacket(packet.DenyPacket("Can't move there"))
             return
 

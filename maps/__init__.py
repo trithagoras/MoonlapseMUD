@@ -1,217 +1,58 @@
-from typing import *
+from PIL import Image
 import os
 
-_ = ' '
-_ = '!'
-_ = '"'
-WATER = '#'
-LEAF = '$'
-_ = '%'
-_ = '&'
-_ = '\''
-GRASS = '('
-_ = ')'
-_ = '*'
-_ = '+'
-_ = ''
-_ = '-'
-_ = '.'
-_ = '/'
-_ = ':'
-_ = ';'
-_ = '<'
-_ = '='
-_ = '>'
-_ = '?'
-_ = '@'
-_ = 'A'
-WOOD = 'B'
-_ = 'C'
-_ = 'D'
-_ = 'E'
-_ = 'F'
-_ = 'G'
-_ = 'H'
-_ = 'I'
-_ = 'J'
-_ = 'K'
-_ = 'L'
-_ = 'M'
-_ = 'N'
-_ = 'O'
-_ = 'P'
-_ = 'Q'
-_ = 'R'
-_ = 'S'
-_ = 'T'
-_ = 'U'
-_ = 'V'
-_ = 'W'
-_ = 'X'
-_ = 'Y'
-SAND = 'Z'
-_ = '['
-_ = '\\'
-_ = ']'
-_ = '^'
-_ = '_'
-_ = '`'
-_ = 'a'
-_ = 'b'
-_ = 'c'
-_ = 'd'
-_ = 'e'
-_ = 'f'
-_ = 'g'
-_ = 'h'
-NOTHING = 'i'
-_ = 'j'
-_ = 'k'
-_ = 'l'
-_ = 'm'
-_ = 'n'
-_ = 'o'
-_ = 'p'
-_ = 'q'
-_ = 'r'
-_ = 's'
-_ = 't'
-_ = 'u'
-_ = 'v'
-_ = 'w'
-_ = 'x'
-_ = 'y'
-COBBLESTONE = 'z'
-_ = '{'
-_ = '|'
-STONE = '}'
 
+BUSH_WALL = (0, 255, 0)
+GRASS_FLOOR = (0, 128, 0)
+STONE_WALL = (192, 192, 192)
+STONE_FLOOR = (96, 96, 96)
+WOOD_WALL = (220, 180, 132)
+WOOD_FLOOR = (110, 90, 66)
+WATER = (0, 0, 255)
+SAND_FLOOR = (255, 255, 0)
 
-class AsciiRun:
-    """
-    A strip of a length of colours (84) possible represented as ascii characters of 32 (' ') and 96 ('`') excluding
-    digits.
-    """
-    def __init__(self, asciirunstr):
-        lengthstr = ''
-        self.ascii = ''
-        for c in asciirunstr:
-            if c.isdigit():
-                lengthstr += c
-            else:
-                self.ascii += c
-
-        try:
-            self.length = int(lengthstr)
-        except ValueError:
-            self.length = 1
-
-    def inflate(self):
-        return self.ascii * self.length
-
-
-def ml2asciilist(ml_file: List[str]) -> List[str]:
-    asciilist = []
-
-    for line in ml_file:
-        thisasciirun = ''
-        thisasciiline = ''
-
-        i = 0
-        while i < len(line):
-            c = line[i]
-            thisasciirun += c
-            while c.isdigit():
-                i += 1
-                c = line[i]
-                thisasciirun += c
-            ar = AsciiRun(thisasciirun)
-            thisasciiline += ar.inflate()
-            thisasciirun = ''
-            i += 1
-
-        asciilist.append(thisasciiline)
-
-    return asciilist
-
-
-def map_path_to_list(mappath) -> List[str]:
-    # Load in the map files and convert them to palatable data types to be sent out to the client.
-    with open(mappath, 'r') as f:
-        lines = [line.strip('\n') for line in f.readlines()]
-
-    return lines
+SOLIDS = {
+    BUSH_WALL, STONE_WALL, WOOD_WALL, WATER
+}
 
 
 class Room:
-    def __init__(self, name: str):
+    def __init__(self, room_id, name, file_name):
+        self.id = room_id
         self.name = name
-        pwd: str = os.path.dirname(__file__)
-        path_to_room_dir = os.path.join(pwd, 'layouts', self.name)
-        
-        groundmappath = os.path.join(path_to_room_dir, 'ground.data')
-        solidmappath = os.path.join(path_to_room_dir, 'solid.data')
-        roofmappath = os.path.join(path_to_room_dir, 'roof.data')
+        self._file_name = file_name
 
-        self.grounddata: List[str] = map_path_to_list(groundmappath)
-        self.soliddata: List[str] = map_path_to_list(solidmappath)
-        self.roofdata: List[str] = map_path_to_list(roofmappath)
+        self.height = 0
+        self.width = 0
 
-        self.height = len(self.grounddata)
-        self.width = len(ml2asciilist([self.grounddata[0]])[0])  # TODO: Think of a less hacky way (works for now)
+        self._ground = None
+        self._ceiling = None
 
-        self.groundmap: Dict[Tuple[int, int], chr] = {}
-        self.solidmap: Dict[Tuple[int, int], chr] = {}
-        self.roofmap: Dict[Tuple[int, int], chr] = {}
+        self._unpack()
 
-        self._is_unpacked = False
+    def _unpack(self):
+        mapsdir = os.path.dirname(os.path.realpath(__file__))
+        mapdir = os.path.join(mapsdir, self._file_name)
+        im = Image.open(os.path.join(mapdir, 'ground.png'))
+        self.width, self.height = im.size
+        self._ground = im.load()
+        self._ceiling = Image.open(os.path.join(mapdir, 'ceiling.png')).load()
 
-    def unpack(self):
+    def at(self, y, x) -> (int, int, int):
         """
-        Calculations to be run client side which unpacks the compressed map data into a more readable format.
-        Don't call this before sending over the network unless you call pack first.
+        returns ground info at given position
+        :param y:
+        :param x:
+        :return: 3-tuple of RGB
         """
-        inflated_gd: List[str] = ml2asciilist(self.grounddata)
-        inflated_sd: List[str] = ml2asciilist(self.soliddata)
-        inflated_rd: List[str] = ml2asciilist(self.roofdata)
-        for y, (grow, srow, rrow) in enumerate(zip(inflated_gd, inflated_sd, inflated_rd)):
-            for x, (gc, sc, rc) in enumerate(zip(grow, srow, rrow)):
-                if gc != NOTHING:
-                    self.groundmap[(y, x)] = gc
-                if sc != NOTHING:
-                    self.solidmap[(y, x)] = sc
-                if rc != NOTHING:
-                    self.roofmap[(y, x)] = rc
+        rgba = self._ground[x, y]
+        return rgba[0], rgba[1], rgba[2]
 
-        self._is_unpacked = True
-
-    def is_unpacked(self):
-        return self._is_unpacked
-
-    def pack(self):
-        self.groundmap = {}
-        self.solidmap = {}
-        self.roofmap = {}
-
-        self._is_unpacked = False
-
-    def __eq__(self, o: object) -> bool:
-        return isinstance(o, Room) and o.name == self.name
-
-
-if __name__ == '__main__':
-    asciilist = ml2asciilist([
-        "64$",
-        "30$}$}2$}2$2}24$",
-        "24$6(10}24$",
-        "24$5(4}2z4}3(22$",
-        "24$4(5}2z5}6(18$",
-        "21$5(6}4z6}5(2$3(12$",
-        "20$6(5}6z5}11(11$"
-    ])
-    for line in asciilist:
-        print(line)
-
-    f = Room("forest")
-    f.unpack()
-    print(f.groundmap)
+    def is_ceil_at(self, y, x) -> bool:
+        """
+        returns if ceiling is at given position
+        :param y:
+        :param x:
+        :return: true if ceiling
+        """
+        return self._ceiling[x, y] == (0, 0, 0, 255)

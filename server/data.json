@@ -1,0 +1,64 @@
+[
+  {
+    "model": "networking.room",
+    "pk": 0,
+    "fields": {
+      "name": "Garden",
+      "file_name": "garden"
+    }
+  },
+  {
+    "model": "networking.room",
+    "pk": 1,
+    "fields": {
+      "name": "Tavern",
+      "file_name": "tavern"
+    }
+  },
+
+  {
+    "model": "networking.entity",
+    "pk": 0,
+    "fields": {
+      "name": "portal",
+      "y": 9,
+      "x": 7,
+      "char": "O",
+      "typename": "Portal",
+      "room_id": 0
+    }
+  },
+  {
+    "model": "networking.portal",
+    "pk": 0,
+    "fields": {
+      "entity_id": 0,
+      "linkedy": 13,
+      "linkedx": 14,
+      "linkedroom_id": 1
+    }
+  },
+
+  {
+    "model": "networking.entity",
+    "pk": 1,
+    "fields": {
+      "name": "portal",
+      "y": 14,
+      "x": 14,
+      "char": "O",
+      "typename": "Portal",
+      "room_id": 1
+    }
+  },
+  {
+    "model": "networking.portal",
+    "pk": 1,
+    "fields": {
+      "entity_id": 1,
+      "linkedy": 9,
+      "linkedx": 8,
+      "linkedroom_id": 0
+    }
+  }
+]
