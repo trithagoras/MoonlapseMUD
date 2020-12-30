@@ -1,3 +1,4 @@
 python server/manage.py makemigrations networking
 python server/manage.py migrate
+python server/manage.py loaddata server/data.json
 python server
