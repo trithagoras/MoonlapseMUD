@@ -123,20 +123,23 @@ class GameView(View):
 
                 if self.coordinate_exists(*pos):
                     cy, cx = win1_hheight + row, win1_hwidth + col * 2
-                    c = room.at(*pos)
+                    for what in ('ground', 'solid'):
+                        c = room.at(what, *pos)
 
-                    if c == maps.GRASS_FLOOR:
-                        color_addch(self.win1, cy, cx, random.choice([',', '`']), Color.GREEN)
-                    elif c == maps.BUSH_WALL:
-                        color_addch(self.win1, cy, cx, '░', Color.GREEN)
-                    elif c == maps.STONE_FLOOR:
-                        color_addch(self.win1, cy, cx, '·', Color.WHITE)
-                    elif c == maps.STONE_WALL:
-                        color_addch(self.win1, cy, cx, '█', Color.WHITE)
-                    elif c == maps.WOOD_WALL:
-                        color_addch(self.win1, cy, cx, '█', Color.YELLOW)
-                    elif c == maps.WOOD_FLOOR:
-                        color_addch(self.win1, cy, cx, '.', Color.YELLOW)
+                        if c == maps.STONE:
+                            color_addch(self.win1, cy, cx, '·', Color.WHITE)
+                        elif c == maps.GRASS:
+                            color_addch(self.win1, cy, cx, random.choice([',', '`']), Color.GREEN)
+                        elif c == maps.SAND:
+                            color_addch(self.win1, cy, cx, '~', Color.YELLOW)
+                        elif c == maps.WATER:
+                            color_addch(self.win1, cy, cx, '#', Color.BLUE)
+                        elif c == maps.LEAF:
+                            color_addch(self.win1, cy, cx, random.choice(['╭', '╮', '╯', '╰']), Color.GREEN)
+                        elif c == maps.COBBLESTONE:
+                            color_addch(self.win1, cy, cx, '░', Color.WHITE)
+                        elif c == maps.WOOD:
+                            color_addch(self.win1, cy, cx, '·', Color.YELLOW)
 
         # Draw entities
         for e in self.game.visible_instances:

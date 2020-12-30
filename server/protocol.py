@@ -12,7 +12,7 @@ import pbkdf2
 from typing import *
 import time
 from django.forms.models import model_to_dict
-import string
+from django.core.exceptions import ObjectDoesNotExist
 
 import rsa
 import json
@@ -326,7 +326,10 @@ class Moonlapse(NetstringReceiver):
         entity.save()
 
         # Create and save a new instance
-        instance = models.InstancedEntity(entity=entity, room=models.Room.objects.first())
+        initial_room: models.Room = models.Room.objects.first()
+        if not initial_room:
+            raise ObjectDoesNotExist("Initial room not loaded. Did you run manage.py loaddata data.json?")
+        instance = models.InstancedEntity(entity=entity, room=initial_room)
         instance.save()
 
         # Create and save a new container
@@ -481,7 +484,7 @@ class Moonlapse(NetstringReceiver):
                 if self._room != portal.linkedroom:
                     self.move_rooms(portal.linkedroom.id)
 
-        if not within_bounds(desired_y, desired_x, 0, 0, self._roommap.height - 1, self._roommap.width - 1) or self._roommap.at(desired_y, desired_x) in maps.SOLIDS:
+        if not within_bounds(desired_y, desired_x, 0, 0, self._roommap.height - 1, self._roommap.width - 1) or self._roommap.at('solid', desired_y, desired_x) != maps.NOTHING:
             self.sendPacket(packet.DenyPacket("Can't move there"))
             return
 

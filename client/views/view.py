@@ -44,20 +44,20 @@ class View:
 
     def _update_display(self):
         self.stdscr.erase()
-        try:
+        if True:#try:
             self.draw()
             self.stdscr.refresh()
-        except Exception as e:
-            error: str = f"Error: {e}"
-            for ttl in range(3, 0, -1):
-                self.stdscr.erase()
-                hh: int = self.height // 2
-                color_addstr(self.stdscr, hh, (self.width - len(error)) // 2, error, Color.RED)
-                msg: str = f"Trying again in {ttl}"
-                color_addstr(self.stdscr, hh + 1, (self.width - len(msg)) // 2, msg, Color.WHITE)
-                self.stdscr.refresh()
-                time.sleep(1)
-            self._update_display()
+        # except Exception as e:
+        #     error: str = f"Error: {e}"
+        #     for ttl in range(3, 0, -1):
+        #         self.stdscr.erase()
+        #         hh: int = self.height // 2
+        #         color_addstr(self.stdscr, hh, (self.width - len(error)) // 2, error, Color.RED)
+        #         msg: str = f"Trying again in {ttl}"
+        #         color_addstr(self.stdscr, hh + 1, (self.width - len(msg)) // 2, msg, Color.WHITE)
+        #         self.stdscr.refresh()
+        #         time.sleep(1)
+        #     self._update_display()
 
     def draw(self) -> None:
         # Max terminal size
