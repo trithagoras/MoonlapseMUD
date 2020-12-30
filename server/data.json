@@ -3,31 +3,31 @@
     "model": "networking.room",
     "pk": 0,
     "fields": {
-      "name": "Forest",
-      "file_name": "forest"
-    }
-  },
-  {
-    "model": "networking.room",
-    "pk": 1,
-    "fields": {
       "name": "Garden",
       "file_name": "garden"
     }
   },
   {
     "model": "networking.room",
-    "pk": 2,
+    "pk": 1,
     "fields": {
       "name": "Tavern",
       "file_name": "tavern"
     }
   },
   {
+    "model": "networking.room",
+    "pk": 2,
+    "fields": {
+      "name": "Forest",
+      "file_name": "forest"
+    }
+  },
+  {
     "model": "networking.entity",
     "pk": 0,
     "fields": {
-      "name": "portal",
+      "name": "Garden portal",
       "typename": "Portal"
     }
   },
@@ -46,17 +46,16 @@
     "pk": 0,
     "fields": {
       "entity_id": 0,
-      "linkedy": 13,
+      "linkedy": 14,
       "linkedx": 14,
       "linkedroom_id": 1
     }
   },
-
   {
     "model": "networking.entity",
     "pk": 1,
     "fields": {
-      "name": "portal",
+      "name": "Tavern portal 1",
       "typename": "Portal"
     }
   },
@@ -76,7 +75,7 @@
     "fields": {
       "entity_id": 1,
       "linkedy": 9,
-      "linkedx": 8,
+      "linkedx": 7,
       "linkedroom_id": 0
     }
   },
@@ -114,6 +113,72 @@
       "y": 5,
       "x": 12,
       "room_id": 1
+    }
+  },
+  {
+    "model": "networking.entity",
+    "pk": 3,
+    "fields": {
+      "name": "Forest portal",
+      "typename": "Portal"
+    }
+  },
+
+  {
+    "model": "networking.entity",
+    "pk": 4,
+    "fields": {
+      "name": "Tavern portal 2",
+      "typename": "Portal"
+    }
+  },
+  {
+    "model": "networking.instancedentity",
+    "pk": 4,
+    "fields": {
+      "entity_id": 4,
+      "y": 1,
+      "x": 1,
+      "room_id": 1
+    }
+  },
+  {
+    "model": "networking.portal",
+    "pk": 2,
+    "fields": {
+      "entity_id": 4,
+      "linkedy": 12,
+      "linkedx": 34,
+      "linkedroom_id": 2
+    }
+  },
+
+  {
+    "model": "networking.entity",
+    "pk": 5,
+    "fields": {
+      "name": "Forest portal",
+      "typename": "Portal"
+    }
+  },
+  {
+    "model": "networking.instancedentity",
+    "pk": 5,
+    "fields": {
+      "entity_id": 5,
+      "y": 12,
+      "x": 34,
+      "room_id": 2
+    }
+  },
+  {
+    "model": "networking.portal",
+    "pk": 3,
+    "fields": {
+      "entity_id": 5,
+      "linkedy": 1,
+      "linkedx": 1,
+      "linkedroom_id": 1
     }
   }
 ]

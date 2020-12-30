@@ -143,6 +143,13 @@ class GameView(View):
                         elif c == maps.WOOD:
                             color_addch(self.win1, cy, cx, '·', Color.YELLOW)
 
+                    # Overrides: Enter in here if solid must look different from ground, for example
+                    c = room.at('solid', *pos)
+                    if c == maps.STONE:
+                        color_addch(self.win1, cy, cx, '█', Color.WHITE)
+                    elif c == maps.WOOD:
+                        color_addch(self.win1, cy, cx, '◍', Color.YELLOW)
+
         # Draw entities
         for e in self.game.visible_instances:
             if e.id != self.game.instance.id:
@@ -152,7 +159,7 @@ class GameView(View):
                 typename = e.entity["typename"]
 
                 if typename == 'Portal':
-                    color_addch(self.win1, y, x, 'O', Color.WHITE)
+                    color_addch(self.win1, y, x, 'O', Color.CYAN)
                 elif typename == 'Player':
                     color_addch(self.win1, y, x, 'C', Color.WHITE)
                 elif typename == 'Item':
