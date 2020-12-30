@@ -3,19 +3,26 @@
     "model": "networking.room",
     "pk": 0,
     "fields": {
-      "name": "Garden",
-      "file_name": "garden"
+      "name": "Forest",
+      "file_name": "forest"
     }
   },
   {
     "model": "networking.room",
     "pk": 1,
     "fields": {
+      "name": "Garden",
+      "file_name": "garden"
+    }
+  },
+  {
+    "model": "networking.room",
+    "pk": 2,
+    "fields": {
       "name": "Tavern",
       "file_name": "tavern"
     }
   },
-
   {
     "model": "networking.entity",
     "pk": 0,
