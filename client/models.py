@@ -33,22 +33,21 @@ class Entity(Model):
 
 class Item(Model):
     def __init__(self, attr: dict):
-        self.entity_id = 0
+        self.entity = {}
         self.value = 0
         super().__init__(attr)
 
 
 class Player(Model):
     def __init__(self, attr: dict):
-        self.user_id = 0
-        self.entity_id = 0
+        self.entity = {}
         self.inventory_id = 0
         super().__init__(attr)
 
 
 class Portal(Model):
     def __init__(self, attr: dict):
-        self.entity_id = 0
+        self.entity = {}
         self.linkedy = 0
         self.linkedx = 0
         self.linkedroom_id = 0
@@ -57,7 +56,7 @@ class Portal(Model):
 
 class InstancedEntity(Model):
     def __init__(self, attr: dict):
-        self.entity_id = 0
+        self.entity = {}
         self.y = 0
         self.x = 0
         self.room_id = 0
@@ -73,6 +72,6 @@ class Container(Model):
 class ContainerItem(Model):
     def __init__(self, attr: dict):
         self.container_id = 0
-        self.item_id = 0
+        self.item = {}
         self.amount = 0
         super().__init__(attr)

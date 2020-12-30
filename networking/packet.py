@@ -252,6 +252,14 @@ class ClientKeyPacket(Packet):
         super().__init__(Payload(n), Payload(e))
 
 
+class GrabItemPacket(Packet):
+    """
+    A packet send from a client to its protocol to pick up an item off the ground where the player is
+    """
+    def __init__(self):
+        super().__init__()
+
+
 def frombytes(data: bytes) -> Packet:
     """
     Constructs a proper packet type from bytes encoding a netstring. See 

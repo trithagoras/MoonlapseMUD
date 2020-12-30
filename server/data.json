@@ -82,6 +82,14 @@
     }
   },
   {
+    "model": "networking.item",
+    "pk": 2,
+    "fields": {
+      "entity_id": 2,
+      "value": 6
+    }
+  },
+  {
     "model": "networking.instancedentity",
     "pk": 2,
     "fields": {
@@ -92,11 +100,13 @@
     }
   },
   {
-    "model": "networking.item",
-    "pk": 2,
+    "model": "networking.instancedentity",
+    "pk": 3,
     "fields": {
       "entity_id": 2,
-      "value": 6
+      "y": 5,
+      "x": 12,
+      "room_id": 1
     }
   }
 ]

@@ -31,7 +31,7 @@ class Game(Controller):
         self.player: Optional[models.Player] = None
 
         self.visible_instances: Set[models.InstancedEntity] = set()
-        self.entities = {}
+        self.inventory = {}     # item_id : ContainerItem
         self.tick_rate: Optional[int] = None
 
         self.logger: Log = Log()
@@ -71,11 +71,7 @@ class Game(Controller):
                     type: str = p.payloads[0].value
                     model: dict = p.payloads[1].value
 
-                    if type == 'Entity':
-                        entity = models.Entity(model)
-                        self.entities[entity.id] = entity
-
-                    elif type == 'Instance':
+                    if type == 'Instance':
                         instance = models.InstancedEntity(model)
                         visible_instance = next((e for e in self.visible_instances if e.id == instance.id), None)
                         if visible_instance:  # If the incoming entity is already visible to us, update it
@@ -85,6 +81,12 @@ class Game(Controller):
                                 self.instance.update(model)
                         else:  # If it's not visible to us already, add it to the visible list (it is only ever sent to us if it's in view)
                             self.visible_instances.add(instance)
+
+                    elif type == 'ContainerItem':
+                        # this type is only sent when player picks up an item to inventory
+                        # this only assumes that no items have state. e.g. no durability; allowing stacking
+                        ci = models.ContainerItem(model)
+                        self.inventory[ci.item["id"]] = ci
 
                 elif isinstance(p, packet.ServerLogPacket):
                     self.logger.log(p.payloads[0].value)
@@ -127,11 +129,6 @@ class Game(Controller):
             #     self._add_map_layout(data)
 
             self.room = maps.Room(data['id'], data['name'], data['file_name'])
-
-        # todo: this is how we get our base entity information
-        elif type == 'Entity':
-            entity = models.Entity(data)
-            self.entities[entity.id] = entity
 
         elif type == 'Instance':
             self.instance = models.InstancedEntity(data)
@@ -183,8 +180,13 @@ class Game(Controller):
         elif key == curses.KEY_LEFT:
             directionpacket = packet.MoveLeftPacket()
 
-        if directionpacket:
-            self.ns.send_packet(directionpacket)
+        elif key == ord('g'):
+            self.ns.send_packet(packet.GrabItemPacket())
+
+        # todo: this is a debug: dropping should be handled in inventory
+        # elif key == ord('d'):
+        #     for key in self.inventory:
+        #         self.ns.send_packet(packet.DropItemPacket(key))
 
         # Changing window focus
         elif key in (ord('1'), ord('2'), ord('3')):
@@ -214,6 +216,9 @@ class Game(Controller):
             self.ns.send_packet(packet.LogoutPacket(self.ns.username))
             self.action = Action.LOGOUT
 
+        if directionpacket:
+            self.ns.send_packet(directionpacket)
+
         return key
 
     def chat(self, message: str) -> None:
@@ -226,7 +231,6 @@ class Game(Controller):
     def reinitialize(self):
         self.instance = None
         self.visible_instances = set()
-        self.entities = {}
         self.tick_rate = None
 
     def stop(self) -> None:
