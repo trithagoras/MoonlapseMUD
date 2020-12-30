@@ -107,6 +107,8 @@ class GameView(View):
             self.draw_status_win()
         elif self.win2_focus == GameView.Window2Focus.HELP:
             self.draw_help_win()
+        elif self.win2_focus == GameView.Window2Focus.INVENTORY:
+            self.draw_inventory_win()
 
         # Window 3 content
         self.draw_log()
@@ -147,13 +149,16 @@ class GameView(View):
                 y: int = win1_hheight + (e.y - self.game.instance.y)
                 x: int = win1_hwidth + (e.x - self.game.instance.x) * 2
 
-                ent = self.game.entities[e.entity]
-                typename = ent.typename
+                typename = e.entity["typename"]
 
                 if typename == 'Portal':
                     color_addch(self.win1, y, x, 'O', Color.WHITE)
                 elif typename == 'Player':
                     color_addch(self.win1, y, x, 'C', Color.WHITE)
+                elif typename == 'Item':
+                    color_addch(self.win1, y, x, '$', Color.MAGENTA)
+                else:
+                    color_addch(self.win1, y, x, '?', Color.MAGENTA)
 
         # Draw player in middle of screen
         color_addch(self.win1, win1_hheight, win1_hwidth, '@', Color.WHITE)
@@ -164,6 +169,10 @@ class GameView(View):
             for y, line in enumerate(lines, 2):
                 self.win2.addstr(y, 2, line)
 
+    def draw_inventory_win(self):
+        win = self.win2
+        win.addstr(1, 2, f"{self.game.inventory}")
+
     def draw_status_win(self):
         try:
             spinner = next(self.spinner_it)
@@ -171,8 +180,8 @@ class GameView(View):
             self.spinner_it = iter(self.spinners)
             spinner = next(self.spinner_it)
 
-        entity = self.game.entities[self.game.instance.entity]
-        self.win2.addstr(1, 2, f"{spinner}{entity.name}, Guardian of Forgotten Moor @ ({self.game.instance.y},{self.game.instance.x})")
+        entity = self.game.instance.entity
+        self.win2.addstr(1, 2, f"{spinner}{entity['name']}, Guardian of Forgotten Moor @ ({self.game.instance.y},{self.game.instance.x})")
         self.win2.addstr(3, 2, f"Level 15 {self.progress_bar(7, 10)} (7/10 skill levels to 16)")
 
         self.win2.addstr(5, 2, f"Vitality      31/31 {self.progress_bar(3, 10)} (3,000/10,000)")

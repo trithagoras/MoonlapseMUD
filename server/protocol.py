@@ -40,6 +40,28 @@ def get_dict_delta(before: dict, after: dict) -> dict:
     return delta
 
 
+def create_dict(model_type: str, model) -> dict:
+    """
+    Creates recursive dict to replace model_to_dict
+    :param model_type: one of ('Instance', 'ContainerItem')
+    :param model: a django.model
+    :return:
+    """
+    if model_type == 'Instance':
+        instancedict = model_to_dict(model)
+        entdict = model_to_dict(model.entity)
+        instancedict["entity"] = entdict
+        return instancedict
+
+    elif model_type == 'ContainerItem':
+        cidict = model_to_dict(model)
+        itemdict = model_to_dict(model.item)
+        entdict = model_to_dict(model.item.entity)
+        cidict["item"] = itemdict
+        cidict["item"]["entity"] = entdict
+        return cidict
+
+
 class Moonlapse(NetstringReceiver):
     """
     A protocol that sends and receives netstrings. See http://cr.yp.to/proto/netstrings.txt for the 
@@ -171,6 +193,8 @@ class Moonlapse(NetstringReceiver):
             self.move_rooms(p.payloads[0].value)
         elif isinstance(p, packet.ServerModelPacket):
             self.process_model(p)
+        elif isinstance(p, packet.GrabItemPacket):
+            self.grab_item_here()
 
     def _GETENTRY(self, p: Union[packet.LoginPacket, packet.RegisterPacket]) -> None:
         """
@@ -204,7 +228,7 @@ class Moonlapse(NetstringReceiver):
         print(f"\nmove_rooms(dest_roomid={dest_roomid})\n")
 
         # Tell people in the current (old) room we are leaving
-        self.broadcast(packet.GoodbyePacket(self._instance.entity.id), excluding=(self,))
+        self.broadcast(packet.GoodbyePacket(self._instance.id), excluding=(self,))
 
         # Reset visible entities (so things don't "follow" us between rooms)
         self._visible_instances = set()
@@ -246,21 +270,23 @@ class Moonlapse(NetstringReceiver):
         roomdict: dict = model_to_dict(self._room)
         self.sendPacket(packet.ServerModelPacket('Room', roomdict))
 
-        entitydict: dict = model_to_dict(self._player.entity)
-        self.sendPacket(packet.ServerModelPacket('Entity', entitydict))
-
-        instancedict: dict = model_to_dict(self._instance)
-        self.sendPacket(packet.ServerModelPacket('Instance', instancedict))
+        self.sendPacket(packet.ServerModelPacket('Instance', create_dict('Instance', self._instance)))
 
         playerdict: dict = model_to_dict(self._player)
+        playerdict["entity"] = model_to_dict(self._player.entity)
         self.sendPacket(packet.ServerModelPacket('Player', playerdict))
+
+        # send inventory to player
+        items = models.ContainerItem.objects.filter(container=self._player.inventory)
+        for ci in items:
+            self.sendPacket(packet.ServerModelPacket('ContainerItem', create_dict('ContainerItem', ci)))
 
         self.state = self._PLAY
         self.broadcast(packet.ServerLogPacket(f"{self.username} has arrived."), excluding=(self,))
         self._logged_in = True
 
         # Tell entities in view that we have arrived
-        self.broadcast(packet.HelloPacket(model_to_dict(self._instance)), excluding=(self,))
+        self.broadcast(packet.HelloPacket(create_dict('Instance', self._instance)), excluding=(self,))
 
         # Tell our client about all the entities around
         self._process_visible_instances()
@@ -285,7 +311,7 @@ class Moonlapse(NetstringReceiver):
                 if other_protocols[instance]._room != self._room:
                     continue
 
-            model_packet = packet.ServerModelPacket('Instance', model_to_dict(instance))
+            model_packet = packet.ServerModelPacket('Instance', create_dict('Instance', instance))
             self.process_model(model_packet)
 
     def logout(self, p: packet.LogoutPacket):
@@ -304,6 +330,9 @@ class Moonlapse(NetstringReceiver):
 
         if other_instance in self._visible_instances:
             self._visible_instances.remove(other_instance)
+
+        #todo: remove this comment otherwise picking up a beer broadcasts 'Beer has departed.'
+        # if other_instance.entity.typename == 'Player':
         self.sendPacket(packet.ServerLogPacket(f"{other_instance.entity.name} has departed."))
         self.sendPacket(p)
 
@@ -352,7 +381,7 @@ class Moonlapse(NetstringReceiver):
             return
 
         # Broadcasts our entity model to the other player's protocol
-        self.broadcast(packet.ServerModelPacket('Instance', model_to_dict(self._instance)), including=(other_proto,))
+        self.broadcast(packet.ServerModelPacket('Instance', create_dict('Instance', self._instance)), including=(other_proto,))
 
     def process_model(self, p: packet.ServerModelPacket):
         type: str = p.payloads[0].value
@@ -371,7 +400,6 @@ class Moonlapse(NetstringReceiver):
                 if not previously_in_view:
                     self._debug("Instance currently in view, and wasn't there before, so greet it")
                     self._visible_instances.add(stored_instance)
-                    self.sendPacket(packet.ServerModelPacket('Entity', model_to_dict(stored_instance.entity)))
                     self.sendPacket(p)
                     self.greet(packet.HelloPacket(model))
                 else:
@@ -386,10 +414,10 @@ class Moonlapse(NetstringReceiver):
                 if previously_in_view:
                     self._debug(f"Actually, it was previously in view but it's not now so I'll tell my client to remove it")
                     self.sendPacket(packet.GoodbyePacket(instanceid))
-                    self._remove_visible_entity(instanceid)
+                    self._remove_visible_instance(instanceid)
 
-    def _remove_visible_entity(self, entityid: int):
-        self._visible_instances = {e for e in self._visible_instances if e.id != entityid}
+    def _remove_visible_instance(self, instanceid: int):
+        self._visible_instances = {i for i in self._visible_instances if i.id != instanceid}
 
     def _DISCONNECT(self, p: packet.DisconnectPacket):
         """
@@ -492,7 +520,7 @@ class Moonlapse(NetstringReceiver):
         self._instance.x = desired_x
 
         # Broadcast our new position to other protocols in the room
-        self.broadcast(packet.ServerModelPacket('Instance', model_to_dict(self._instance)))
+        self.broadcast(packet.ServerModelPacket('Instance', create_dict('Instance', self._instance)))
         # Process the entities around us
         self._process_visible_instances()
 
@@ -510,3 +538,25 @@ class Moonlapse(NetstringReceiver):
         yview = self._instance.y - 10, self._instance.y + 10
         xview = self._instance.x - 10, self._instance.x + 10
         return yview, xview
+
+    def grab_item_here(self):
+        # Check if we're standing on an item
+        for i in self._visible_instances:
+            if i.entity.typename == "Item" and i.y == self._instance.y and i.x == self._instance.x:
+                # remove instanced item from visible instances
+                self.broadcast(packet.GoodbyePacket(i.pk))
+                # remove instanced item from database
+                dbi = models.InstancedEntity.objects.get(pk=i.pk)
+                dbi.delete()
+                # create ContainerItem from item and add to player.inventory
+                itm = models.Item.objects.get(entity_id=dbi.entity_id)
+                ci = models.ContainerItem.objects.filter(item=itm).first()
+                if ci:
+                    ci.amount += i.amount
+                    ci.save()
+                else:
+                    ci = models.ContainerItem(item=itm, amount=i.amount, container=self._player.inventory)
+                    ci.save()
+                # send client ContainerItem packet
+                self.sendPacket(packet.ServerModelPacket('ContainerItem', create_dict('ContainerItem', ci)))
+                return
