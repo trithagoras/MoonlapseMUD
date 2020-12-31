@@ -36,6 +36,8 @@ class Game(Controller):
 
         self.logger: Log = Log()
 
+        self.weather = "Clear"
+
         # UI
         self.chatbox = None
         self.view = GameView(self)
@@ -98,8 +100,11 @@ class Game(Controller):
                     if departed:
                         self.visible_instances.remove(departed)
 
-                if isinstance(p, packet.MoveRoomsPacket):
+                elif isinstance(p, packet.MoveRoomsPacket):
                     self.action = Action.MOVE_ROOMS
+
+                elif isinstance(p, packet.WeatherChangePacket):
+                    self.weather = p.payloads[0].value
 
                 elif isinstance(p, packet.OkPacket):
                     if self.action == Action.MOVE_ROOMS:

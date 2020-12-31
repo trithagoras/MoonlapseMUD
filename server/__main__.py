@@ -1,7 +1,7 @@
 import twisted
 import django
 from twisted.internet.protocol import Factory
-from twisted.internet import reactor
+from twisted.internet import reactor, task
 from typing import *
 import os
 import manage
@@ -14,7 +14,7 @@ parent, root = file.parent, file.parents[1]
 sys.path.append(str(root))
 
 from server import protocol
-from networking import models
+from networking import models, packet
 import maps
 
 
@@ -28,6 +28,20 @@ class MoonlapseServer(Factory):
         # }
         # If the roomname is None, the protocols inside have not logged in to the game yet.
         self.rooms_protocols: Dict[Optional[int], Set[protocol.Moonlapse]] = {None: set()}
+
+        self.weather = "Clear"
+
+        # weather change check
+        loop = task.LoopingCall(self.rain_check)
+        loop.start(30, False)
+
+    def broadcast_to_all(self, p: packet.Packet):
+        for room_id in self.rooms_protocols:
+            self.broadcast_to_room(room_id, p)
+
+    def broadcast_to_room(self, room_id: int, p: packet.Packet):
+        for proto in self.rooms_protocols[room_id]:
+            proto.broadcast(p)
 
     def buildProtocol(self, addr):
         print("Adding a new client.")
@@ -43,6 +57,29 @@ class MoonlapseServer(Factory):
         if dest_roomid not in self.rooms_protocols:
             self.rooms_protocols[dest_roomid] = set()
         self.rooms_protocols[dest_roomid].add(proto)
+
+    def change_weather(self, new_weather: str):
+        print(f"Weather changed from {self.weather} to {new_weather}")
+
+        self.broadcast_to_all(packet.WeatherChangePacket(new_weather))
+        self.weather = new_weather
+
+        if self.weather == "Rain":
+            self.broadcast_to_all(packet.ServerLogPacket("It has begun to rain..."))
+            self.broadcast_to_all(packet.WeatherChangePacket("Rain"))
+
+        elif self.weather == "Clear":
+            self.broadcast_to_all(packet.ServerLogPacket("The rain has cleared."))
+            self.broadcast_to_all(packet.WeatherChangePacket("Clear"))
+
+    def rain_check(self):
+        # random check here
+
+        if self.weather == "Clear":
+            self.change_weather("Rain")
+
+        elif self.weather == "Rain":
+            self.change_weather("Clear")
 
 
 if __name__ == '__main__':

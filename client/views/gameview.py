@@ -143,6 +143,13 @@ class GameView(View):
                         elif c == maps.WOOD:
                             color_addch(self.win1, cy, cx, '·', Color.YELLOW)
 
+                    # rain splashes
+                    if self.game.weather == "Rain":
+                        if room.at('ground', pos[0], pos[1]) and room.at('ceiling', pos[0], pos[1]) == maps.NOTHING:
+                            random.seed()
+                            if random.randrange(0, 8) == 0:
+                                color_addch(self.win1, cy, cx, random.choice([',', '.', '`']), Color.BLUE)
+
                     # Overrides: Enter in here if solid must look different from ground, for example
                     c = room.at('solid', *pos)
                     if c == maps.STONE:

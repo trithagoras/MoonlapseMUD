@@ -260,6 +260,19 @@ class GrabItemPacket(Packet):
         super().__init__()
 
 
+class WeatherChangePacket(Packet):
+    """
+    A packet send from a protocol to its client to indicate change in weather
+
+    possible weathers:
+    - Clear
+    - Rain
+    - Storm
+    """
+    def __init__(self, new_weather: str):
+        super().__init__(Payload(new_weather))
+
+
 def frombytes(data: bytes) -> Packet:
     """
     Constructs a proper packet type from bytes encoding a netstring. See 

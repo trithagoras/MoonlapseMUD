@@ -138,6 +138,6 @@ class Room:
         else:
             raise ValueError(f"what must be one of 'ground', 'solid', or 'ceiling' - {what} provided instead")
 
-        rgb = map_data[x, y]
-        return rgb[0], rgb[1], rgb[2]
+        rgba = map_data[x, y]
+        return rgba[0], rgba[1], rgba[2]
 

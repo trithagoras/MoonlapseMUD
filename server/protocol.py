@@ -195,6 +195,8 @@ class Moonlapse(NetstringReceiver):
             self.process_model(p)
         elif isinstance(p, packet.GrabItemPacket):
             self.grab_item_here()
+        elif isinstance(p, packet.WeatherChangePacket):
+            self.sendPacket(p)
 
     def _GETENTRY(self, p: Union[packet.LoginPacket, packet.RegisterPacket]) -> None:
         """
@@ -275,6 +277,9 @@ class Moonlapse(NetstringReceiver):
         playerdict: dict = model_to_dict(self._player)
         playerdict["entity"] = model_to_dict(self._player.entity)
         self.sendPacket(packet.ServerModelPacket('Player', playerdict))
+
+        # send weather info to player
+        self.sendPacket(packet.WeatherChangePacket(self._server.weather))
 
         # send inventory to player
         items = models.ContainerItem.objects.filter(container=self._player.inventory)
@@ -560,3 +565,6 @@ class Moonlapse(NetstringReceiver):
                 # send client ContainerItem packet
                 self.sendPacket(packet.ServerModelPacket('ContainerItem', create_dict('ContainerItem', ci)))
                 return
+
+
+
