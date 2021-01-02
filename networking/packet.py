@@ -5,28 +5,21 @@ from . import payload
 from .payload import Payload
 from typing import *
 
-# Required to import from shared modules
-import sys
-from pathlib import Path
-file = Path(__file__).resolve()
-parent, root = file.parent, file.parents[1]
-sys.path.append(str(root))
-
 
 class Packet:
     """
-    A custom Packet data type encapsulating a netstring. See http://cr.yp.to/proto/netstrings.txt for 
+    A custom Packet data type encapsulating a netstring. See http://cr.yp.to/proto/netstrings.txt for
     the specification of netstrings.
 
-    Every netstring starts with decimal digits that specify the length of the rest of the data. This 
+    Every netstring starts with decimal digits that specify the length of the rest of the data. This
     length specification is separated from the data by a colon. The data is terminated with a comma.
 
-    You can send a packet using the self.tobytes method which will pickle all payloads and format it 
-    into a netstring. On the receiving end, you can use the module's frombytes function which reverses 
-    the pickling and constructs the data back into the specific packet type (one of the standard 
+    You can send a packet using the self.tobytes method which will pickle all payloads and format it
+    into a netstring. On the receiving end, you can use the module's frombytes function which reverses
+    the pickling and constructs the data back into the specific packet type (one of the standard
     implementations defined in this module).
 
-    The receiving end should make use of this module's receive function to ensure the entire data is 
+    The receiving end should make use of this module's receive function to ensure the entire data is
     received and nothing more than that.
 
     For example:
@@ -39,8 +32,8 @@ class Packet:
             loginpacket: packet.LoginPacket = packet.frombytes(netstring)
             dostuff(loginpacket)
 
-    When receiving packets, always use python's built-in isinstance function to execute code blocks 
-    specific to the packet type you're after. For example, a protocol's stringReceived method might 
+    When receiving packets, always use python's built-in isinstance function to execute code blocks
+    specific to the packet type you're after. For example, a protocol's stringReceived method might
     look like this:
         def stringReceived(netstring: bytes):
             p: packet.Packet = packet.frombytes(netstring)
@@ -51,7 +44,7 @@ class Packet:
             ...
     """
     MAX_LENGTH: int = 2 ** 63 - 1
-        
+
     def __init__(self, *payloads: Payload):
         self.action: str = type(self).__name__
         self.payloads: Tuple[Payload] = payloads
@@ -76,19 +69,21 @@ class OkPacket(Packet):
 
 class DenyPacket(Packet):
     """
-    A packet sent from a protocol to a client to signify there was an error with the request and it 
-    shouldn't proceed. An optional reason can be supplied which the client should probably display 
+    A packet sent from a protocol to a client to signify there was an error with the request and it
+    shouldn't proceed. An optional reason can be supplied which the client should probably display
     to the user.
     """
+
     def __init__(self, reason: str = "unspecified"):
         super().__init__(Payload(reason))
 
 
 class WelcomePacket(Packet):
     """
-    A packet sent from a protocol to a client after a connection is established. An optional message 
+    A packet sent from a protocol to a client after a connection is established. An optional message
     of the day can be supplied which the client can display to the user.
     """
+
     def __init__(self, motd: str = "Welcome to MoonlapseMUD"):
         super().__init__(Payload(motd))
 
@@ -98,6 +93,7 @@ class GoodbyePacket(Packet):
     A packet sent from a protocol to a client after a moving rooms. Can also be sent from a protocol to
     a client to indicate someone else has left the room.
     """
+
     def __init__(self, entityid: int):
         super().__init__(Payload(entityid))
 
@@ -106,6 +102,7 @@ class LoginPacket(Packet):
     """
     A packet sent from a client to a protocol to request a login.
     """
+
     def __init__(self, username, password: str):
         pusername = Payload(username)
         ppassword = Payload(password)
@@ -119,10 +116,11 @@ class LogoutPacket(Packet):
 
 class RegisterPacket(Packet):
     """
-    A packet sent from a client to a protocol to request registration. Note that this is identical 
-    technically to the LoginPacket but it's important to have a separate name to distinguish the 
+    A packet sent from a client to a protocol to request registration. Note that this is identical
+    technically to the LoginPacket but it's important to have a separate name to distinguish the
     different use cases when handling these packets on the protocol's end.
     """
+
     def __init__(self, username, password: str):
         pusername = Payload(username)
         ppassword = Payload(password)
@@ -141,6 +139,7 @@ class ServerModelPacket(Packet):
         "char": "@"
     }
     """
+
     def __init__(self, type: str, modeldict: dict):
         ptype: Payload = Payload(type)
         pmodel: Payload = Payload(modeldict)
@@ -152,6 +151,7 @@ class HelloPacket(Packet):
     A packet representing an entity model from the server in the form of a dictionary.
     Use only to broadcast yourself when first connecting to a new room.
     """
+
     def __init__(self, modeldict: dict):
         pmodel: Payload = Payload(modeldict)
         super().__init__(pmodel)
@@ -162,6 +162,7 @@ class ChatPacket(Packet):
     A packet sent from a client or a protocol to communicate a player's chat message to other players.
     The message is truncated to the first 80 characters.
     """
+
     def __init__(self, message: str):
         pmessage: Payload = Payload(message[:80])
         super().__init__(pmessage)
@@ -212,6 +213,7 @@ class DisconnectPacket(Packet):
     A packet sent to signify the client's connection has been lost. An optional reason
     can be supplied which could be displayed to other clients.
     """
+
     def __init__(self, username: str, reason: Optional[str] = None):
         pusername: Payload = Payload(username)
         preason: Payload = Payload(reason)
@@ -222,24 +224,27 @@ class ServerLogPacket(Packet):
     """
     A packet sent from a protocol to a client to convey a server-specific message.
     """
+
     def __init__(self, log: str):
         super().__init__(Payload(log))
 
 
 class ServerRoomFullPacket(Packet):
     """
-    A packet sent from a protocol to its client to indicate the room it's trying to join 
+    A packet sent from a protocol to its client to indicate the room it's trying to join
     is at maximum capacity.
     """
+
     def __init__(self):
         super().__init__()
 
 
 class ServerTickRatePacket(Packet):
     """
-    A packet sent from a protocol to its client describing the tick rate of the room it's connected to. This 
+    A packet sent from a protocol to its client describing the tick rate of the room it's connected to. This
     should be interpreted by the game client for handling input and refreshing the screen, etc.
     """
+
     def __init__(self, tickrate: int):
         super().__init__(Payload(tickrate))
 
@@ -248,6 +253,7 @@ class ClientKeyPacket(Packet):
     """
     A packet sent from a protocol to its client with the client's public key used in encrypting traffic.
     """
+
     def __init__(self, n: int, e: int):
         super().__init__(Payload(n), Payload(e))
 
@@ -256,6 +262,7 @@ class GrabItemPacket(Packet):
     """
     A packet send from a client to its protocol to pick up an item off the ground where the player is
     """
+
     def __init__(self):
         super().__init__()
 
@@ -269,19 +276,20 @@ class WeatherChangePacket(Packet):
     - Rain
     - Storm
     """
+
     def __init__(self, new_weather: str):
         super().__init__(Payload(new_weather))
 
 
 def frombytes(data: bytes) -> Packet:
     """
-    Constructs a proper packet type from bytes encoding a netstring. See 
+    Constructs a proper packet type from bytes encoding a netstring. See
     http://cr.yp.to/proto/netstrings.txt for the specification of netstrings.
 
-    Every netstring starts with decimal digits that specify the length of the rest of the data. This 
+    Every netstring starts with decimal digits that specify the length of the rest of the data. This
     length specification is separated from the data by a colon. The data is terminated with a comma.
 
-    The payload is automatically pickled and converted to a hex string in order to be sent over 
+    The payload is automatically pickled and converted to a hex string in order to be sent over
     the network. This allows you to send and receive all picklable Python objects.
     """
     obj_dict: Dict[str, str] = json.loads(data)
@@ -295,7 +303,7 @@ def frombytes(data: bytes) -> Packet:
         elif key[0] == 'p':
             index: int = int(key[1:])
             payloads_values.insert(index, payload.deserialize(value).value)
-    
+
     # Use reflection to construct the specific packet type we're looking for
     specificPacketClassName: str = action
     try:

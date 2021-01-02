@@ -1,9 +1,15 @@
+import curses
 import random
 import string
+import threading
+import time
 
 from Crypto.Cipher import AES
 import rsa
 
+from client.controllers.game import Game
+from client.controllers import menus
+from client.views.view import Window
 from networking import packet
 
 
@@ -12,9 +18,9 @@ class NetworkState:
     Higher level abstraction for keeping network state. Keeps public_key and socket in neat spot.
     """
 
-    def __init__(self, socket, public_key):
-        self.socket = socket
-        self.public_key = public_key
+    def __init__(self):
+        self.socket = None
+        self.public_key = None
         self.username = ""
 
     def send_packet(self, p: packet.Packet):
@@ -108,3 +114,62 @@ class NetworkState:
 
 class PacketParseError(Exception):
     pass
+
+
+class ClientState:
+    def __init__(self, stdscr, ns: NetworkState):
+        self.ns = ns
+        self.controller = None
+        self.stdscr = stdscr
+        self.running = True
+
+        self.window = Window(self.stdscr, 0, 0, 40, 106)
+
+        self.packets = []
+
+        # Listen for data in its own thread
+        threading.Thread(target=self._receive_data, daemon=True).start()
+
+        self.init_curses()
+        self.change_controller("MainMenu")
+
+    def init_curses(self):
+        self.stdscr.keypad(True)
+        self.stdscr.nodelay(True)
+
+        # Start colors in curses
+        curses.start_color()
+
+        # Init color pairs
+        curses.init_pair(curses.COLOR_WHITE, curses.COLOR_BLACK, curses.COLOR_WHITE)
+        curses.init_pair(curses.COLOR_CYAN, curses.COLOR_CYAN, curses.COLOR_BLACK)
+        curses.init_pair(curses.COLOR_RED, curses.COLOR_RED, curses.COLOR_BLACK)
+        curses.init_pair(curses.COLOR_GREEN, curses.COLOR_GREEN, curses.COLOR_BLACK)
+        curses.init_pair(curses.COLOR_MAGENTA, curses.COLOR_MAGENTA, curses.COLOR_BLACK)
+        curses.init_pair(curses.COLOR_YELLOW, curses.COLOR_YELLOW, curses.COLOR_BLACK)
+        curses.init_pair(curses.COLOR_BLUE, curses.COLOR_BLUE, curses.COLOR_BLACK)
+
+        curses.curs_set(False)
+
+    def change_controller(self, controller: str):
+        if self.controller:
+            self.controller.stop()
+        if controller == Game.__name__:
+            self.controller = Game(self)
+        elif controller == menus.MainMenu.__name__:
+            self.controller = menus.MainMenu(self)
+        elif controller == menus.LoginMenu.__name__:
+            self.controller = menus.LoginMenu(self)
+        elif controller == menus.RegisterMenu.__name__:
+            self.controller = menus.RegisterMenu(self)
+
+        self.controller.start()
+
+    def _receive_data(self):
+        while self.running:
+            try:
+                p = self.ns.receive_packet()
+                self.packets.append(p)
+                time.sleep(0.002)
+            except Exception as e:
+                pass

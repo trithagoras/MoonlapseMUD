@@ -1,3 +1,5 @@
+import curses
+import os
 import socket
 import sys
 from typing import *
@@ -8,8 +10,7 @@ file = Path(__file__).resolve()
 parent, root = file.parent, file.parents[1]
 sys.path.append(str(root))
 
-from client.controllers.mainmenu import MainMenu
-from client.utils import NetworkState
+from client.utils import ClientState, NetworkState
 
 
 def handle_arguments() -> Tuple[str, int]:
@@ -27,11 +28,11 @@ def handle_arguments() -> Tuple[str, int]:
 
     :return: The hostname and/or port specified in the command line arguments, otherwise ('moonlapse.net', 8081).
     """
-    hostname: str = 'play.moonlapse.net'
-    port: int = 42523
+    hostname = 'play.moonlapse.net'
+    port = 42523
 
     # sys.argv will return something like ['client', 'localhost', 8123]
-    n_args: int = len(sys.argv)
+    n_args = len(sys.argv)
 
     if n_args not in (1, 2, 3):
         print("Usage: client [hostname=moonlapse.net] [port=42523]", file=sys.stderr)
@@ -50,19 +51,23 @@ def main() -> None:
     the command line arguments) to begin the game. Prints error details to stderr and exits if there was an exception.
     """
     address = handle_arguments()
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        try:
-            s.connect(address)
-        except ConnectionRefusedError:
-            print(f"Connection to {address[0]}:{address[1]} refused. Is the server up?")
-            sys.exit(-1)
-        except Exception as e:
-            print(f"Could not establish a connection to {address[0]}:{address[1]}. {e}.")
-            sys.exit(-1)
 
-        ns = NetworkState(s, None)
-        mainmenu = MainMenu(ns)
-        mainmenu.start()
+    try:
+        s = socket.create_connection(address)
+    except ConnectionRefusedError:
+        print(f"Connection to {address[0]}:{address[1]} refused. Is the server up?")
+        sys.exit(-1)
+    except Exception as e:
+        print(f"Could not establish a connection to {address[0]}:{address[1]}. {e}.")
+        sys.exit(-1)
+
+    ns = NetworkState()
+    ns.socket = s
+
+    # Eliminate delay in the program after the ESC key is pressed
+    os.environ.setdefault('ESCDELAY', '25')
+
+    curses.wrapper(ClientState, ns)
 
 
 if __name__ == '__main__':
