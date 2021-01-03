@@ -195,8 +195,6 @@ class Moonlapse(NetstringReceiver):
             self.process_model(p)
         elif isinstance(p, packet.GrabItemPacket):
             self.grab_item_here()
-        elif isinstance(p, packet.WeatherChangePacket):
-            self.sendPacket(p)
 
     def _GETENTRY(self, p: Union[packet.LoginPacket, packet.RegisterPacket]) -> None:
         """
@@ -215,13 +213,18 @@ class Moonlapse(NetstringReceiver):
             return
 
         user = models.User.objects.get(username=username)
+        player = models.Player.objects.get(user=user)
+        if self._server.is_logged_in(player.pk):
+            self.sendPacket(packet.DenyPacket("Player is already inhabiting this realm."))
+            return
+
         if not pbkdf2.verify_password(user.password, password):
             self.sendPacket(packet.DenyPacket("Incorrect password"))
             return
 
         # The user exists in the database so retrieve the player and entity objects
         self.username = user.username
-        self._player = models.Player.objects.get(user=user)
+        self._player = player
         self._instance = models.InstancedEntity.objects.get(entity=self._player.entity)
 
         self.move_rooms(self._instance.room.id)
@@ -324,7 +327,6 @@ class Moonlapse(NetstringReceiver):
         if username == self.username:
             # Tell our client it's OK to log out
             self.sendPacket(packet.OkPacket())
-            self.broadcast(packet.GoodbyePacket(self._instance.id), excluding=(self,))
             self.move_rooms(None)
             self._logged_in = False
             self.state = self._GETENTRY
@@ -447,7 +449,8 @@ class Moonlapse(NetstringReceiver):
             self._debug(f"Deleted self from others list")
 
         # Tell all still connected protocols about this disconnection
-        self.broadcast(packet.GoodbyePacket(self._instance.id))
+        if self._room is not None:
+            self.broadcast(packet.GoodbyePacket(self._instance.id))
 
     def broadcast(self, *packets: packet.Packet, including: Iterable['Moonlapse'] = tuple(), excluding: Iterable['Moonlapse'] = tuple()) -> None:
         """

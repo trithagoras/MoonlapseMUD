@@ -42,6 +42,15 @@ class MoonlapseServer(Factory):
         loop = task.LoopingCall(self.rain_check)
         loop.start(30, False)
 
+    def is_logged_in(self, pid: int) -> bool:
+        for room_id in self.rooms_protocols:
+            for proto in self.rooms_protocols[room_id]:
+                if proto._logged_in:
+                    if proto._player:
+                        if pid == proto._player.pk:
+                            return True
+        return False
+
     def broadcast_to_all(self, p: packet.Packet, state=ProtocolState.ANY):
         for room_id in self.rooms_protocols:
             self.broadcast_to_room(room_id, p, state)
