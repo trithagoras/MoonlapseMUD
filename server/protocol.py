@@ -555,7 +555,7 @@ class Moonlapse(NetstringReceiver):
                 dbi.delete()
                 # create ContainerItem from item and add to player.inventory
                 itm = models.Item.objects.get(entity_id=dbi.entity_id)
-                ci = models.ContainerItem.objects.filter(item=itm).first()
+                ci = models.ContainerItem.objects.filter(item=itm, container=self._player.inventory).first()
                 if ci:
                     ci.amount += i.amount
                     ci.save()

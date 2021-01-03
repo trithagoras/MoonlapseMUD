@@ -62,15 +62,15 @@ class MainMenu(Menu):
         self.stop()
         self.cs.running = False
 
-    def process_packet(self, p) -> bool:
-        if super().process_packet(p):
-            return True
-        if isinstance(p, packet.OkPacket):
-            pass
-        else:
-            return False
-
-        return True
+    # def process_packet(self, p) -> bool:
+    #     if super().process_packet(p):
+    #         return True
+    #     if isinstance(p, packet.OkPacket):
+    #         pass
+    #     else:
+    #         return False
+    #
+    #     return True
 
 
 class LoginMenu(Menu):
@@ -104,8 +104,6 @@ class LoginMenu(Menu):
     def process_packet(self, p) -> bool:
         if super().process_packet(p):
             return True
-        if isinstance(p, packet.ClientKeyPacket):
-            self.cs.ns.public_key = rsa.PublicKey(p.payloads[0].value, p.payloads[1].value)
         elif isinstance(p, packet.OkPacket):
             self.cs.ns.username = self.widgets[0].value
             self.cs.change_controller("Game")
@@ -151,8 +149,6 @@ class RegisterMenu(Menu):
     def process_packet(self, p) -> bool:
         if super().process_packet(p):
             return True
-        if isinstance(p, packet.ClientKeyPacket):
-            self.cs.ns.public_key = rsa.PublicKey(p.payloads[0].value, p.payloads[1].value)
         elif isinstance(p, packet.OkPacket):
             self.view.title = "Registration successful! Press Esc to return to main menu"
         else:

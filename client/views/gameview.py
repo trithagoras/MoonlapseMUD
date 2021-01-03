@@ -118,13 +118,18 @@ class GameView(View):
         win = self.win2
         win.title("Inventory")
 
-        # win.addstr(1, 1, f"{self.controller.inventory.items()}")
+        win.addstr(1, 2, "Name")
+        win.addstr(1, 12, "Value")
+        win.addstr(1, 22, "Amount")
 
-        line = 1
+        line = 3
         for key, val in self.controller.inventory.items():
             name = val['item']['entity']['name']
             amount = val['amount']
-            win.addstr(line, 1, f"{name} x{amount}")
+            value = val['item']['value']
+            win.addstr(line, 2, f"{name}")
+            win.addstr(line, 12, f"{value}")
+            win.addstr(line, 22, f"{amount}")
             line += 1
 
 

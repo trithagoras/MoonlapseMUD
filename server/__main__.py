@@ -18,6 +18,13 @@ from networking import models, packet
 import maps
 
 
+class ProtocolState:
+    ANY = 0
+    GET_ENTRY = 1
+    PLAY = 2
+    DISCONNECT = 3
+
+
 class MoonlapseServer(Factory):
     def __init__(self):
         # Keep track of room ids and a set of protocols inside, e.g.
@@ -35,13 +42,19 @@ class MoonlapseServer(Factory):
         loop = task.LoopingCall(self.rain_check)
         loop.start(30, False)
 
-    def broadcast_to_all(self, p: packet.Packet):
+    def broadcast_to_all(self, p: packet.Packet, state=ProtocolState.ANY):
         for room_id in self.rooms_protocols:
-            self.broadcast_to_room(room_id, p)
+            self.broadcast_to_room(room_id, p, state)
 
-    def broadcast_to_room(self, room_id: int, p: packet.Packet):
+    def broadcast_to_room(self, room_id: int, p: packet.Packet, state=ProtocolState.ANY):
+
         for proto in self.rooms_protocols[room_id]:
-            proto.broadcast(p)
+            accept = ((ProtocolState.GET_ENTRY, proto._GETENTRY),
+                      (ProtocolState.PLAY, proto._PLAY),
+                      (ProtocolState.DISCONNECT, proto._DISCONNECT))
+
+            if (state, proto.state) in accept or state == ProtocolState.ANY:
+                proto.sendPacket(p)
 
     def buildProtocol(self, addr):
         print("Adding a new client.")
@@ -61,16 +74,14 @@ class MoonlapseServer(Factory):
     def change_weather(self, new_weather: str):
         print(f"Weather changed from {self.weather} to {new_weather}")
 
-        self.broadcast_to_all(packet.WeatherChangePacket(new_weather))
+        self.broadcast_to_all(packet.WeatherChangePacket(new_weather), state=ProtocolState.PLAY)
         self.weather = new_weather
 
         if self.weather == "Rain":
-            self.broadcast_to_all(packet.ServerLogPacket("It has begun to rain..."))
-            self.broadcast_to_all(packet.WeatherChangePacket("Rain"))
+            self.broadcast_to_all(packet.ServerLogPacket("It has begun to rain..."), state=ProtocolState.PLAY)
 
         elif self.weather == "Clear":
-            self.broadcast_to_all(packet.ServerLogPacket("The rain has cleared."))
-            self.broadcast_to_all(packet.WeatherChangePacket("Clear"))
+            self.broadcast_to_all(packet.ServerLogPacket("The rain has cleared."), state=ProtocolState.PLAY)
 
     def rain_check(self):
         # random check here

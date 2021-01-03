@@ -24,6 +24,12 @@ class Model:
         return self.__dict__[item]
 
 
+class State:
+    NORMAL = 0
+    LOGOUT = 1
+    MOVE_ROOMS = 2
+
+
 class Game(Controller):
     def __init__(self, cs):
         super().__init__(cs)
@@ -34,6 +40,8 @@ class Game(Controller):
         self.player_instance = None  # id, entity, room_id, y, x
         self.inventory = {}     # item.id : {id, item, amount}
         self.room = None
+
+        self.state = State.NORMAL
 
         self.weather = "Clear"
 
@@ -64,13 +72,19 @@ class Game(Controller):
             self.weather = p.payloads[0].value
 
         elif isinstance(p, packet.MoveRoomsPacket):
-            self.reinitialize()
+            self.state = State.MOVE_ROOMS
 
         elif isinstance(p, packet.ServerLogPacket):
             self.logger.log(p.payloads[0].value)
 
         elif isinstance(p, packet.OkPacket):
-            pass
+            if self.state == State.LOGOUT:
+                self.cs.change_controller("MainMenu")
+            elif self.state == State.MOVE_ROOMS:
+                self.reinitialize()
+                self.state = State.NORMAL
+            else:
+                pass
         elif isinstance(p, packet.DenyPacket):
             pass
         elif isinstance(p, packet.ServerTickRatePacket):
@@ -104,9 +118,6 @@ class Game(Controller):
         elif mtype == 'ContainerItem':
             ci = Model(data)
             itemid = ci['item']['id']
-            # if itemid in self.inventory:
-            #     self.inventory[itemid]['amount'] += ci['amount']
-            # else:
             self.inventory[itemid] = ci
 
     def process_input(self, key: int):
@@ -120,7 +131,7 @@ class Game(Controller):
 
         if key == ord('q'):
             self.cs.ns.send_packet(packet.LogoutPacket(self.cs.ns.username))
-            self.cs.change_controller("MainMenu")
+            self.state = State.LOGOUT
         elif key == curses.KEY_UP:
             self.cs.ns.send_packet(packet.MoveUpPacket())
         elif key == curses.KEY_DOWN:
@@ -139,5 +150,6 @@ class Game(Controller):
         self.cs.ns.send_packet(packet.ChatPacket(message))
 
     def reinitialize(self):
+        self.room = None
         self.player_instance = None
         self.visible_instances = set()
