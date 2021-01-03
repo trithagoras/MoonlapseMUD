@@ -5,6 +5,7 @@ from typing import Dict
 
 import maps
 from client.views.view import View, Window
+import client.controllers.game as game
 
 
 class GameView(View):
@@ -42,6 +43,8 @@ class GameView(View):
 
         # Window 3 content
         self.draw_log()
+
+        self.addstr(2, 1, self.controller.quicklog)
 
     def draw_map(self):
         self.win1.title(self.controller.room.name)
@@ -92,8 +95,8 @@ class GameView(View):
         # Draw entities
         for e in self.controller.visible_instances:
             if e.id != self.controller.player_instance.id:
-                y: int = win1_hheight + (e.y - self.controller.player_instance.y)
-                x: int = win1_hwidth + (e.x - self.controller.player_instance.x) * 2
+                y = win1_hheight + (e.y - self.controller.player_instance.y)
+                x = win1_hwidth + (e.x - self.controller.player_instance.x) * 2
 
                 typename = e.entity["typename"]
 
@@ -110,6 +113,13 @@ class GameView(View):
 
         # Draw player in middle of screen
         self.win1.addstr(win1_hheight, win1_hwidth, '@', 0)
+
+        # if looking, draw look cursor
+        if self.controller.state == game.State.LOOKING:
+            cy, cx = self.controller.look_cursor_y, self.controller.look_cursor_x
+            y = win1_hheight + (cy - self.controller.player_instance.y)
+            x = win1_hwidth + (cx - self.controller.player_instance.x) * 2
+            self.win1.addstr(y, x, 'X', 0)
 
     def coordinate_exists(self, y: int, x: int) -> bool:
         return 0 <= y < self.controller.room.height and 0 <= x < self.controller.room.width
@@ -131,7 +141,6 @@ class GameView(View):
             win.addstr(line, 12, f"{value}")
             win.addstr(line, 22, f"{amount}")
             line += 1
-
 
     def draw_log(self):
         self.win3.title("Log")

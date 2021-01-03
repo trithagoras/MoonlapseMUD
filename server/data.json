@@ -27,7 +27,7 @@
     "model": "networking.entity",
     "pk": 0,
     "fields": {
-      "name": "Garden portal",
+      "name": "Door to Tavern",
       "typename": "Portal"
     }
   },
@@ -55,7 +55,7 @@
     "model": "networking.entity",
     "pk": 1,
     "fields": {
-      "name": "Tavern portal 1",
+      "name": "Door to Garden",
       "typename": "Portal"
     }
   },
@@ -128,7 +128,7 @@
     "model": "networking.entity",
     "pk": 4,
     "fields": {
-      "name": "Tavern portal 2",
+      "name": "Door to Forest",
       "typename": "Portal"
     }
   },
@@ -157,7 +157,7 @@
     "model": "networking.entity",
     "pk": 5,
     "fields": {
-      "name": "Forest portal",
+      "name": "Door to Tavern",
       "typename": "Portal"
     }
   },

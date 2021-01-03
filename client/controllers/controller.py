@@ -16,12 +16,16 @@ class Controller:
         # begin main loop
         while self.running:
             self._process_packet()
+            self.update()
             self.view._draw()
             self.cs.stdscr.refresh()
             self._get_input()
             time.sleep(0.002)
 
     def ready(self):
+        pass
+
+    def update(self):
         pass
 
     def _process_packet(self):

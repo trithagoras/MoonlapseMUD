@@ -24,10 +24,16 @@ class Model:
         return self.__dict__[item]
 
 
-class State:
+class Context:
     NORMAL = 0
     LOGOUT = 1
     MOVE_ROOMS = 2
+
+
+class State:
+    NORMAL = 0
+    LOOKING = 1
+    GRABBING_ITEM = 2
 
 
 class Game(Controller):
@@ -41,11 +47,16 @@ class Game(Controller):
         self.inventory = {}     # item.id : {id, item, amount}
         self.room = None
 
+        self.context = Context.NORMAL
         self.state = State.NORMAL
+
+        self.look_cursor_y = 0
+        self.look_cursor_x = 0
 
         self.weather = "Clear"
 
         self.logger = Log()
+        self.quicklog = ""      # line that appears above win1
 
         self.view = GameView(self)
 
@@ -72,17 +83,17 @@ class Game(Controller):
             self.weather = p.payloads[0].value
 
         elif isinstance(p, packet.MoveRoomsPacket):
-            self.state = State.MOVE_ROOMS
+            self.context = Context.MOVE_ROOMS
 
         elif isinstance(p, packet.ServerLogPacket):
             self.logger.log(p.payloads[0].value)
 
         elif isinstance(p, packet.OkPacket):
-            if self.state == State.LOGOUT:
+            if self.context == Context.LOGOUT:
                 self.cs.change_controller("MainMenu")
-            elif self.state == State.MOVE_ROOMS:
+            elif self.context == Context.MOVE_ROOMS:
                 self.reinitialize()
-                self.state = State.NORMAL
+                self.context = Context.NORMAL
             else:
                 pass
         elif isinstance(p, packet.DenyPacket):
@@ -118,21 +129,65 @@ class Game(Controller):
         elif mtype == 'ContainerItem':
             ci = Model(data)
             itemid = ci['item']['id']
+
+            amt = ci['amount']
+            if itemid in self.inventory:
+                amt -= self.inventory[itemid]['amount']
+
+            if self.state == State.GRABBING_ITEM:
+                self.quicklog = f"You pick up {amt} {ci['item']['entity']['name']}."
+                self.state = State.NORMAL
+
             self.inventory[itemid] = ci
 
+    def update(self):
+        if self.state == State.LOOKING:
+            cpos = self.look_cursor_y, self.look_cursor_x
+            for instance in self.visible_instances:
+                pos = instance['y'], instance['x']
+                if cpos == pos:
+                    self.quicklog = instance['entity']['name']
+                    return
+            self.quicklog = ""
+
     def process_input(self, key: int):
+        if self.process_global_input(key):
+            return
+
+        # input state machine
+        if self.state == State.NORMAL:
+            self.process_normal_input(key)
+        elif self.state == State.LOOKING:
+            self.process_look_input(key)
+
+    def process_global_input(self, key: int) -> bool:
         if self.chatbox.selected:
             if key == ord('\n'):
                 self.send_chat(self.chatbox.value)
                 self.chatbox.value = ""
                 self.chatbox.cursor = 0
             self.chatbox.process_input(key)
-            return
-
-        if key == ord('q'):
+            return True
+        elif key == ord('\n'):
+            self.chatbox.select()
+        elif key == ord('q'):
             self.cs.ns.send_packet(packet.LogoutPacket(self.cs.ns.username))
-            self.state = State.LOGOUT
-        elif key == curses.KEY_UP:
+            self.context = Context.LOGOUT
+        elif key == ord('k'):
+            self.quicklog = ""
+
+            if self.state != State.LOOKING:
+                self.state = State.LOOKING
+                self.look_cursor_y = self.player_instance['y']
+                self.look_cursor_x = self.player_instance['x']
+            else:
+                self.state = State.NORMAL
+        else:
+            return False
+        return True
+
+    def process_normal_input(self, key: int) -> bool:
+        if key == curses.KEY_UP:
             self.cs.ns.send_packet(packet.MoveUpPacket())
         elif key == curses.KEY_DOWN:
             self.cs.ns.send_packet(packet.MoveDownPacket())
@@ -141,10 +196,35 @@ class Game(Controller):
         elif key == curses.KEY_RIGHT:
             self.cs.ns.send_packet(packet.MoveRightPacket())
         elif key == ord('g'):
+            self.state = State.GRABBING_ITEM
             self.cs.ns.send_packet(packet.GrabItemPacket())
-        elif key == ord('\n'):
-            self.chatbox.select()
-        pass
+        else:
+            return False
+        return True
+
+    def process_look_input(self, key: int) -> bool:
+        desired_y = self.look_cursor_y
+        desired_x = self.look_cursor_x
+
+        if key == curses.KEY_UP:
+            desired_y -= 1
+            pass
+        elif key == curses.KEY_DOWN:
+            desired_y += 1
+        elif key == curses.KEY_LEFT:
+            desired_x -= 1
+        elif key == curses.KEY_RIGHT:
+            desired_x += 1
+        else:
+            return False
+
+        y, x = self.player_instance['y'], self.player_instance['x']
+        if self.view.coordinate_exists(desired_y, desired_x):
+            if abs(desired_y - y) <= 10 and abs(desired_x - x) <= 10:
+                self.look_cursor_y = desired_y
+                self.look_cursor_x = desired_x
+
+        return True
 
     def send_chat(self, message):
         self.cs.ns.send_packet(packet.ChatPacket(message))
