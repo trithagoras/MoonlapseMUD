@@ -568,6 +568,7 @@ class Moonlapse(NetstringReceiver):
                 # send client ContainerItem packet
                 self.sendPacket(packet.ServerModelPacket('ContainerItem', create_dict('ContainerItem', ci)))
                 return
+        self.sendPacket(packet.DenyPacket("There is no item here."))
 
 
 
