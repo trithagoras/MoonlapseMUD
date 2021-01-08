@@ -5,9 +5,9 @@ from Crypto.Cipher import AES
 
 from server.__main__ import MoonlapseServer
 from networking import packet
-from networking import models
+from server import models
 from networking.logger import Log
-import pbkdf2
+from server import pbkdf2
 
 from typing import *
 import time

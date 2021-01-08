@@ -1,10 +1,6 @@
-import twisted
-import django
 from twisted.internet.protocol import Factory
 from twisted.internet import reactor, task
 from typing import *
-import os
-import manage
 
 # Required to import from shared modules
 import sys
@@ -13,9 +9,8 @@ file = Path(__file__).resolve()
 parent, root = file.parent, file.parents[1]
 sys.path.append(str(root))
 
-from server import protocol
-from networking import models, packet
-import maps
+from server import protocol, manage
+from networking import packet
 
 
 class ProtocolState:

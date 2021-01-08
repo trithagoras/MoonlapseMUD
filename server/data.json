@@ -1,6 +1,6 @@
 [
   {
-    "model": "networking.room",
+    "model": "server.room",
     "pk": 0,
     "fields": {
       "name": "Garden",
@@ -8,7 +8,7 @@
     }
   },
   {
-    "model": "networking.room",
+    "model": "server.room",
     "pk": 1,
     "fields": {
       "name": "Tavern",
@@ -16,7 +16,7 @@
     }
   },
   {
-    "model": "networking.room",
+    "model": "server.room",
     "pk": 2,
     "fields": {
       "name": "Forest",
@@ -24,7 +24,7 @@
     }
   },
   {
-    "model": "networking.entity",
+    "model": "server.entity",
     "pk": 0,
     "fields": {
       "name": "Door to Tavern",
@@ -32,7 +32,7 @@
     }
   },
   {
-    "model": "networking.instancedentity",
+    "model": "server.instancedentity",
     "pk": 0,
     "fields": {
       "entity_id": 0,
@@ -42,7 +42,7 @@
     }
   },
   {
-    "model": "networking.portal",
+    "model": "server.portal",
     "pk": 0,
     "fields": {
       "entity_id": 0,
@@ -52,7 +52,7 @@
     }
   },
   {
-    "model": "networking.entity",
+    "model": "server.entity",
     "pk": 1,
     "fields": {
       "name": "Door to Garden",
@@ -60,7 +60,7 @@
     }
   },
   {
-    "model": "networking.instancedentity",
+    "model": "server.instancedentity",
     "pk": 1,
     "fields": {
       "entity_id": 1,
@@ -70,7 +70,7 @@
     }
   },
   {
-    "model": "networking.portal",
+    "model": "server.portal",
     "pk": 1,
     "fields": {
       "entity_id": 1,
@@ -80,7 +80,7 @@
     }
   },
   {
-    "model": "networking.entity",
+    "model": "server.entity",
     "pk": 2,
     "fields": {
       "name": "Beer",
@@ -88,7 +88,7 @@
     }
   },
   {
-    "model": "networking.item",
+    "model": "server.item",
     "pk": 2,
     "fields": {
       "entity_id": 2,
@@ -96,7 +96,7 @@
     }
   },
   {
-    "model": "networking.instancedentity",
+    "model": "server.instancedentity",
     "pk": 2,
     "fields": {
       "entity_id": 2,
@@ -106,7 +106,7 @@
     }
   },
   {
-    "model": "networking.instancedentity",
+    "model": "server.instancedentity",
     "pk": 3,
     "fields": {
       "entity_id": 2,
@@ -116,7 +116,7 @@
     }
   },
   {
-    "model": "networking.entity",
+    "model": "server.entity",
     "pk": 3,
     "fields": {
       "name": "Forest portal",
@@ -125,7 +125,7 @@
   },
 
   {
-    "model": "networking.entity",
+    "model": "server.entity",
     "pk": 4,
     "fields": {
       "name": "Door to Forest",
@@ -133,7 +133,7 @@
     }
   },
   {
-    "model": "networking.instancedentity",
+    "model": "server.instancedentity",
     "pk": 4,
     "fields": {
       "entity_id": 4,
@@ -143,7 +143,7 @@
     }
   },
   {
-    "model": "networking.portal",
+    "model": "server.portal",
     "pk": 2,
     "fields": {
       "entity_id": 4,
@@ -154,7 +154,7 @@
   },
 
   {
-    "model": "networking.entity",
+    "model": "server.entity",
     "pk": 5,
     "fields": {
       "name": "Door to Tavern",
@@ -162,7 +162,7 @@
     }
   },
   {
-    "model": "networking.instancedentity",
+    "model": "server.instancedentity",
     "pk": 5,
     "fields": {
       "entity_id": 5,
@@ -172,7 +172,7 @@
     }
   },
   {
-    "model": "networking.portal",
+    "model": "server.portal",
     "pk": 3,
     "fields": {
       "entity_id": 5,
