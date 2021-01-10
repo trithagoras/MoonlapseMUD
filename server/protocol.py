@@ -1,11 +1,12 @@
 import json
 import os
+import random
 
 import rsa
 from Crypto.Cipher import AES
 from django.core.exceptions import ObjectDoesNotExist
 from django.forms import model_to_dict
-from twisted.internet import reactor
+from twisted.internet import reactor, task
 from twisted.internet.protocol import connectionDone
 from twisted.protocols.basic import NetstringReceiver
 
@@ -15,6 +16,9 @@ from networking import packet
 from networking.logger import Log
 from server import models, pbkdf2
 import maps
+
+
+OOB = -32       # Out Of Bounds. All instances with y == OOB are awaiting to be respawned.
 
 
 def get_dict_delta(before: dict, after: dict) -> dict:
@@ -62,6 +66,7 @@ class MoonlapseProtocol(NetstringReceiver):
         self.logged_in = False
 
         self.state = self.GET_ENTRY
+        self.actionloop = None
 
         self.logger = Log()
 
@@ -221,32 +226,42 @@ class MoonlapseProtocol(NetstringReceiver):
             self.broadcast(packet.ServerLogPacket(message), include_self=True)
             self.logger.log(message)
 
+    def add_item_to_inventory(self, item: models.Item, amt: int):
+        # create ContainerItem from item and add to player.inventory
+        ci = models.ContainerItem.objects.filter(item=item, container=self.player_info.inventory).first()
+        if ci:
+            ci.amount += amt
+            ci.save()
+        else:
+            ci = models.ContainerItem(item=item, amount=amt, container=self.player_info.inventory)
+            ci.save()
+
+        # send client ContainerItem packet
+        self.send_packet(packet.ServerModelPacket('ContainerItem', create_dict('ContainerItem', ci)))
+
+    def kill_instance(self, instance):
+        """
+        Not 'kill', but flag for respawn. e.g. grabbing item / mining rocks / killing goblin / etc.
+        """
+        self.broadcast(packet.GoodbyePacket(instance.pk), include_self=True)
+
+        # a respawning instance isn't deleted, just temporarily displaced OOB
+        instance.y = OOB
+        reactor.callLater(instance.respawn_time, self.server.respawn_instance, instance.pk)
+        pass
+
     def grab_item_here(self):
         # Check if we're standing on an item
         for i in self.visible_instances:
-            if i.entity.typename == "Item" and i.y == self.player_instance.y and i.x == self.player_instance.x:
+            if i.entity.typename in ("Item", "Pickaxe", "Axe") \
+                    and i.y == self.player_instance.y and i.x == self.player_instance.x:
                 # remove instanced item from visible instances
-                self.broadcast(packet.GoodbyePacket(i.pk), include_self=True)
+                self.kill_instance(i)
 
-                dbi = models.InstancedEntity.objects.get(pk=i.pk)
-
-                # a respawning instance isn't deleted, just temporarily displaced OOB
-                i.y = -32
-                reactor.callLater(dbi.respawn_time, self.server.respawn_instance, i.pk)
-
-                # create ContainerItem from item and add to player.inventory
-                itm = models.Item.objects.get(entity_id=dbi.entity_id)
-                ci = models.ContainerItem.objects.filter(item=itm, container=self.player_info.inventory).first()
-                if ci:
-                    ci.amount += i.amount
-                    ci.save()
-                else:
-                    ci = models.ContainerItem(item=itm, amount=i.amount, container=self.player_info.inventory)
-                    ci.save()
-
-                # send client ContainerItem packet
-                self.send_packet(packet.ServerModelPacket('ContainerItem', create_dict('ContainerItem', ci)))
+                di = models.Item.objects.get(entity=i.entity)
+                self.add_item_to_inventory(di, i.amount)
                 return
+
         self.send_packet(packet.DenyPacket("There is no item here."))
 
     def depart_other(self, p: packet.GoodbyePacket):
@@ -262,11 +277,77 @@ class MoonlapseProtocol(NetstringReceiver):
 
         self.send_packet(p)
 
+    def can_gather(self, node: models.ResourceNode) -> bool:
+        requirements = {
+            'OreNode': 'Pickaxe',
+            'TreeNode': 'Axe'
+        }
+
+        cis = models.ContainerItem.objects.filter(container=self.player_info.inventory,
+                                                  item__entity__typename=requirements[node.entity.typename])
+        if not cis:
+            self.send_packet(packet.ServerLogPacket(f"You do not have a {requirements[node.entity.typename]}."))
+            return False
+
+        return True
+
+    def start_gather(self, instance: models.InstancedEntity):
+        node = models.ResourceNode.objects.get(entity=instance.entity)
+
+        # check if player has required level and item (e.g. pickaxe)
+        if not self.can_gather(node):
+            return
+
+        if node.entity.typename == "OreNode":
+            self.send_packet(packet.ServerLogPacket("You begin to mine at the rocks."))
+        elif node.entity.typename == "TreeNode":
+            self.send_packet(packet.ServerLogPacket("You begin to chop at the tree."))
+
+        if self.actionloop:
+            self.actionloop.stop()
+            self.actionloop = None
+        self.actionloop = task.LoopingCall(self.attempt_gather, instance, node)
+        self.actionloop.start(1, False)
+
+    def attempt_gather(self, instance: models.InstancedEntity, node: models.ResourceNode):
+        # if node has already been killed (by other player)
+        if instance.y == OOB:
+            self.actionloop.stop()
+            self.actionloop = None
+            return
+
+        if not self.can_gather(node):
+            return
+
+        # change change based on difficulty
+        if random.randint(0, 5) == 0:
+            # success
+            self.actionloop.stop()
+            self.actionloop = None
+
+            dropitems = set(models.DropTableItem.objects.filter(droptable=node.droptable))
+            for itm in dropitems:
+                if random.randint(1, itm.chance) == 1:
+                    amt = random.randint(itm.min_amt, itm.max_amt)
+                    item = itm.item
+                    self.add_item_to_inventory(item, amt)
+                    self.send_packet(packet.ServerLogPacket(f"You acquire {amt} {item.entity.name}."))
+
+            self.kill_instance(instance)
+        else:
+            # fail
+            self.send_packet(packet.ServerLogPacket(f"You continue gathering."))
+            pass
+        pass
+
     def move(self, p: packet.MovePacket):
         """
         Updates this protocol's player's position and sends the player back to all
         clients connected to the server.
         """
+        if self.actionloop:
+            self.actionloop.stop()
+            self.actionloop = None
 
         # Calculate the desired destination
         desired_y = self.player_instance.y
@@ -284,7 +365,7 @@ class MoonlapseProtocol(NetstringReceiver):
         # Check if we're going to land on a portal
         for instance in self.visible_instances:
             if instance.entity.typename == "Portal" and instance.y == desired_y and instance.x == desired_x:
-                portal: models.Portal = models.Portal.objects.get(entity=instance.entity)
+                portal = models.Portal.objects.get(entity=instance.entity)
                 desired_y = portal.linkedy
                 desired_x = portal.linkedx
                 self.player_instance.y = desired_y
@@ -292,6 +373,10 @@ class MoonlapseProtocol(NetstringReceiver):
                 if self.player_instance.room != portal.linkedroom:
                     self.move_rooms(portal.linkedroom.id)
                     return
+
+            elif instance.entity.typename in ("OreNode", "TreeNode") and instance.y == desired_y and instance.x == desired_x:
+                self.start_gather(instance)
+                return
 
         if (0 <= desired_y < self.roommap.height and 0 <= desired_x < self.roommap.width) and (self.roommap.at('solid', desired_y, desired_x) == maps.NOTHING):
             self.player_instance.y = desired_y
@@ -319,7 +404,6 @@ class MoonlapseProtocol(NetstringReceiver):
 
         # Move db instance to the new room
         self.player_instance.room_id = dest_roomid
-        # self.player_instance.save()
 
         room = self.player_instance.room
         self.roommap = maps.Room(room.pk, room.name, room.file_name)

@@ -32,16 +32,6 @@
     }
   },
   {
-    "model": "server.instancedentity",
-    "pk": 0,
-    "fields": {
-      "entity_id": 0,
-      "y": 9,
-      "x": 7,
-      "room_id": 0
-    }
-  },
-  {
     "model": "server.portal",
     "pk": 0,
     "fields": {
@@ -52,21 +42,21 @@
     }
   },
   {
+    "model": "server.instancedentity",
+    "pk": 0,
+    "fields": {
+      "entity_id": 0,
+      "y": 9,
+      "x": 7,
+      "room_id": 0
+    }
+  },
+  {
     "model": "server.entity",
     "pk": 1,
     "fields": {
       "name": "Door to Garden",
       "typename": "Portal"
-    }
-  },
-  {
-    "model": "server.instancedentity",
-    "pk": 1,
-    "fields": {
-      "entity_id": 1,
-      "y": 14,
-      "x": 14,
-      "room_id": 1
     }
   },
   {
@@ -80,6 +70,16 @@
     }
   },
   {
+    "model": "server.instancedentity",
+    "pk": 1,
+    "fields": {
+      "entity_id": 1,
+      "y": 14,
+      "x": 14,
+      "room_id": 1
+    }
+  },
+  {
     "model": "server.entity",
     "pk": 2,
     "fields": {
@@ -89,7 +89,7 @@
   },
   {
     "model": "server.item",
-    "pk": 2,
+    "pk": 1,
     "fields": {
       "entity_id": 2,
       "value": 6
@@ -125,7 +125,6 @@
       "typename": "Portal"
     }
   },
-
   {
     "model": "server.entity",
     "pk": 4,
@@ -154,7 +153,6 @@
       "linkedroom_id": 2
     }
   },
-
   {
     "model": "server.entity",
     "pk": 5,
@@ -181,6 +179,186 @@
       "linkedy": 1,
       "linkedx": 1,
       "linkedroom_id": 1
+    }
+  },
+  {
+    "model": "server.entity",
+    "pk": 6,
+    "fields": {
+      "name": "Iron Ore",
+      "typename": "OreNode"
+    }
+  },
+  {
+    "model": "server.entity",
+    "pk": 7,
+    "fields": {
+      "name": "Iron Ore",
+      "typename": "Ore"
+    }
+  },
+  {
+    "model": "server.item",
+    "pk": 7,
+    "fields": {
+      "entity_id": 7,
+      "value": 15
+    }
+  },
+  {
+    "model": "server.droptable",
+    "pk": 1,
+    "fields": {
+
+    }
+  },
+  {
+    "model": "server.droptableitem",
+    "pk": 1,
+    "fields": {
+      "droptable_id": 1,
+      "item_id": 7,
+      "min_amt": 1,
+      "max_amt": 1,
+      "chance": 1
+    }
+  },
+  {
+    "model": "server.resourcenode",
+    "pk": 1,
+    "fields": {
+      "entity_id": 6,
+      "droptable_id": 1,
+      "req_lvl": 1,
+      "xp_given": 5
+    }
+  },
+  {
+    "model": "server.instancedentity",
+    "pk": 10,
+    "fields": {
+      "entity_id": 6,
+      "y": 3,
+      "x": 4,
+      "room_id": 0,
+      "respawn_time": 10
+    }
+  },
+  {
+    "model": "server.entity",
+    "pk": 35,
+    "fields": {
+      "name": "Iron Pickaxe",
+      "typename": "Pickaxe"
+    }
+  },
+  {
+    "model": "server.item",
+    "pk": 35,
+    "fields": {
+      "entity_id": 35,
+      "value": 45
+    }
+  },
+  {
+    "model": "server.instancedentity",
+    "pk": 35,
+    "fields": {
+      "entity_id": 35,
+      "y": 16,
+      "x": 10,
+      "room_id": 0,
+      "respawn_time": 15
+    }
+  },
+  {
+    "model": "server.entity",
+    "pk": 15,
+    "fields": {
+      "name": "Iron Axe",
+      "typename": "Axe"
+    }
+  },
+  {
+    "model": "server.item",
+    "pk": 15,
+    "fields": {
+      "entity_id": 15,
+      "value": 35
+    }
+  },
+  {
+    "model": "server.instancedentity",
+    "pk": 15,
+    "fields": {
+      "entity_id": 15,
+      "y": 16,
+      "x": 15,
+      "room_id": 0,
+      "respawn_time": 15
+    }
+  },
+  {
+    "model": "server.entity",
+    "pk": 21,
+    "fields": {
+      "name": "Logs",
+      "typename": "Logs"
+    }
+  },
+  {
+    "model": "server.item",
+    "pk": 21,
+    "fields": {
+      "entity_id": 21,
+      "value": 15
+    }
+  },
+  {
+    "model": "server.droptable",
+    "pk": 2,
+    "fields": {
+
+    }
+  },
+  {
+    "model": "server.droptableitem",
+    "pk": 2,
+    "fields": {
+      "droptable_id": 2,
+      "item_id": 21,
+      "min_amt": 1,
+      "max_amt": 1,
+      "chance": 1
+    }
+  },
+  {
+    "model": "server.entity",
+    "pk": 20,
+    "fields": {
+      "name": "Tree",
+      "typename": "TreeNode"
+    }
+  },
+  {
+    "model": "server.resourcenode",
+    "pk": 20,
+    "fields": {
+      "entity_id": 20,
+      "droptable_id": 2,
+      "req_lvl": 1,
+      "xp_given": 5
+    }
+  },
+  {
+    "model": "server.instancedentity",
+    "pk": 20,
+    "fields": {
+      "entity_id": 20,
+      "y": 19,
+      "x": 21,
+      "room_id": 0,
+      "respawn_time": 10
     }
   }
 ]

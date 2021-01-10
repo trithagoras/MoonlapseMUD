@@ -21,6 +21,25 @@ class Item(models.Model):
     value = models.IntegerField(null=True, default=1)
 
 
+class DropTable(models.Model):
+    pass
+
+
+class DropTableItem(models.Model):
+    droptable = models.ForeignKey(DropTable, on_delete=models.RESTRICT)
+    item = models.ForeignKey(Item, on_delete=models.RESTRICT)
+    min_amt = models.IntegerField(null=True, default=1)
+    max_amt = models.IntegerField(null=True, default=1)
+    chance = models.IntegerField(null=True, default=1)
+
+
+class ResourceNode(models.Model):
+    entity = models.ForeignKey(Entity, on_delete=models.RESTRICT)
+    droptable = models.ForeignKey(DropTable, on_delete=models.RESTRICT)
+    req_lvl = models.IntegerField(null=True, default=1)
+    xp_given = models.IntegerField(null=True, default=5)
+
+
 class Container(models.Model):
     pass
 
