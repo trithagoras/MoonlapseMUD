@@ -216,6 +216,32 @@ class MoonlapseProtocol(NetstringReceiver):
             self.broadcast(packet.ServerLogPacket(message), include_self=True)
             self.logger.log(message)
 
+    def grab_item_here(self):
+        # Check if we're standing on an item
+        for i in self.visible_instances:
+            if i.entity.typename == "Item" and i.y == self.player_instance.y and i.x == self.player_instance.x:
+                # remove instanced item from visible instances
+                self.broadcast(packet.GoodbyePacket(i.pk), include_self=True)
+
+                # remove instanced item from database
+                dbi = models.InstancedEntity.objects.get(pk=i.pk)
+                dbi.delete()
+
+                # create ContainerItem from item and add to player.inventory
+                itm = models.Item.objects.get(entity_id=dbi.entity_id)
+                ci = models.ContainerItem.objects.filter(item=itm, container=self.player_info.inventory).first()
+                if ci:
+                    ci.amount += i.amount
+                    ci.save()
+                else:
+                    ci = models.ContainerItem(item=itm, amount=i.amount, container=self.player_info.inventory)
+                    ci.save()
+
+                # send client ContainerItem packet
+                self.send_packet(packet.ServerModelPacket('ContainerItem', create_dict('ContainerItem', ci)))
+                return
+        self.send_packet(packet.DenyPacket("There is no item here."))
+
     def depart_other(self, p: packet.GoodbyePacket):
         other_instanceid: int = p.payloads[0].value
         other_instance: models.InstancedEntity = models.InstancedEntity.objects.get(id=other_instanceid)
