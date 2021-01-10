@@ -1,32 +1,19 @@
-from twisted.protocols.basic import NetstringReceiver
-from twisted.python.failure import Failure
-
-from Crypto.Cipher import AES
-
-from server.__main__ import MoonlapseServer
-from networking import packet
-from server import models
-from networking.logger import Log
-from server import pbkdf2
-
-from typing import *
-import time
-from django.forms.models import model_to_dict
-from django.core.exceptions import ObjectDoesNotExist
-
-import rsa
 import json
 import os
 
+import rsa
+from Crypto.Cipher import AES
+from django.core.exceptions import ObjectDoesNotExist
+from django.forms import model_to_dict
+from twisted.internet.protocol import connectionDone
+from twisted.protocols.basic import NetstringReceiver
+
+from typing import *
+
+from networking import packet
+from networking.logger import Log
+from server import models, pbkdf2
 import maps
-
-
-def within_bounds(y: int, x: int, ymin: int, xmin: int, ymax: int, xmax: int) -> bool:
-    """
-    Checks if the given coordinates are inside the square defined by the top left and bottom right corners.
-    Includes all values in the square, even right/bottom-most parts.
-    """
-    return ymin <= y <= ymax and xmin <= x <= xmax
 
 
 def get_dict_delta(before: dict, after: dict) -> dict:
@@ -62,50 +49,22 @@ def create_dict(model_type: str, model) -> dict:
         return cidict
 
 
-class Moonlapse(NetstringReceiver):
-    """
-    A protocol that sends and receives netstrings. See http://cr.yp.to/proto/netstrings.txt for the 
-    specification of netstrings.
-
-    The constructing and sending of netstrings is handled by the networking.packet package, as Moonlapse 
-    has its own Packet class which encapsulates packet types and payloads as netstrings for communication 
-    between protocols and clients.
-
-    The self.stringReceived method handles received netstrings. This method is called with the netstring 
-    payload as a single argument whenever a complete netstring is received. This method should never be 
-    called external to the underlying twisted.protocols.basic.NetstringReceiver implementation. It is fired 
-    every time data this protocol receives a full netstring's worth of bytes data.
-
-    The self.sendPacket method is used to send a packet back to this protocol's client.
-
-    The self.processPacket method is used to tell another protocol on the server to process a packet which 
-    doesn't necessarily have to be sent to any clients.
-    """
-
-    def __init__(self, server: MoonlapseServer, others: Set['Moonlapse']):
-        super().__init__()
-
-        # Information specific to this protocol
-        self._server: MoonlapseServer = server
-        self._others: Set['Moonlapse'] = others
+class MoonlapseProtocol(NetstringReceiver):
+    def __init__(self, server):
+        self.server = server
 
         # Information specific to the player using this protocol
         self.username = ""
-        self._instance: Optional[models.InstancedEntity] = None
-        self._player: Optional[models.Player] = None
-        self._room: Optional[models.Room] = None
-        self._roommap: Optional[maps.Room] = None
-        self._visible_instances: Set[models.InstancedEntity] = set()
+        self.player_instance: Optional[models.InstancedEntity] = None
+        self.player_info: Optional[models.Player] = None
+        self.roommap: Optional[maps.Room] = None
+        self.logged_in = False
 
-        self._logged_in: bool = False
+        self.state = self.GET_ENTRY
 
-        # The state of the protocol which gets called as a function to process only the packets 
-        # intended to be processed in the protocol's current state. Should only be called in the 
-        # self.stringReceived method every time a complete netstring is received and converted to 
-        # a packet.
-        self.state: Callable = self._GETENTRY
+        self.logger = Log()
 
-        self.logger: Log = Log()
+        self.visible_instances: Set[models.InstancedEntity] = set()
 
         serverdir = os.path.dirname(os.path.realpath(__file__))
         with open(os.path.join(serverdir, "rsa_keys.json"), 'r') as f:
@@ -114,23 +73,15 @@ class Moonlapse(NetstringReceiver):
             self.private_key = rsa.key.PrivateKey(d['PrivateKey']['n'], d['PrivateKey']['e'], d['PrivateKey']['d'],
                                                   d['PrivateKey']['p'], d['PrivateKey']['q'])
 
-    def _debug(self, message: str):
-        print(f"[{self.username if self.username else None}]"
-              f"[{self.state.__name__}]"
-              f"[{self._instance.room.name if self._instance else None}]: {message}")
+    def connectionMade(self):
+        self.server.connected_protocols.add(self)
+        self.send_packet(packet.ClientKeyPacket(self.public_key.n, self.public_key.e))
 
-    def connectionMade(self) -> None:
-        super().connectionMade()
-        servertime: str = time.strftime('%d %B, %Y %R %p', time.gmtime())
-        # self.sendPacket(packet.WelcomePacket(f"Welcome to MoonlapseMUD. Server time is {servertime}"))
-        self.sendPacket(packet.ClientKeyPacket(self.public_key.n, self.public_key.e))
+    def connectionLost(self, reason=connectionDone):
+        self.logout(packet.LogoutPacket(self.username))
+        self.server.connected_protocols.remove(self)
 
-    def connectionLost(self, reason: Failure = None) -> None:
-        super().connectionLost()
-        self.state = self._DISCONNECT
-        self.processPacket(packet.DisconnectPacket(self.username, reason))
-
-    def _decrypt_string(self, string: bytes):
+    def decrypt_string(self, string: bytes):
         # first 64 bytes is the RSA encrypted AES key; remainder is AES encrypted message
         encrypted_key = string[:64]
         encrypted_message = string[64:]
@@ -142,213 +93,53 @@ class Moonlapse(NetstringReceiver):
         message = cipher.decrypt(encrypted_message)
         return message
 
-    def stringReceived(self, string: bytes) -> None:
-        """
-        Processes data sent from this protocol's client.
-        This should never be called directly. It's handled by NetStringReceiver 
-        on dataReceived.
-        """
-        self._debug(f"Received encrypted data from my client {string}")
-
+    def stringReceived(self, string):
         # attempt to decrypt packet
-        string = self._decrypt_string(string)
+        string = self.decrypt_string(string)
 
         p: packet.Packet = packet.frombytes(string)
-        self._debug(f"Received packet from my client {p}")
+        self.debug(f"Received packet from my client {p}")
+        self.process_packet(p)
+
+    def process_packet(self, p: packet.Packet):
         self.state(p)
 
-    def sendPacket(self, p: packet.Packet) -> None:
-        """
-        Sends a packet to this protocol's client.
-        Call this to communicate information back to the game client application.
-        """
-        self.sendString(p.tobytes())
-        self._debug(f"Sent data to my client: {p.tobytes()}")
-
-    def processPacket(self, p: packet.Packet) -> None:
-        """
-        Processes packets sent to this protocol from another protocol.
-        Call this to communicate with other protocols connected to the main server.
-        """
-        self._debug(f"Received packet from a protocol {p}")
-        self.state(p)
-
-    def _PLAY(self, p: packet.Packet) -> None:
-        """
-        Handles packets received when this protocol is in the PLAY state.
-        This should never be called directly and is instead handled by
-        stringReceived.
-        """
-        if isinstance(p, packet.MovePacket):
-            self.move(p)
-        elif isinstance(p, packet.ChatPacket):
-            self.chat(p)
-        elif isinstance(p, packet.LogoutPacket):
-            self.logout(p)
-        elif isinstance(p, packet.GoodbyePacket):
-            self.depart_other(p)
-        elif isinstance(p, packet.ServerLogPacket):
-            self.sendPacket(p)
-        elif isinstance(p, packet.MoveRoomsPacket):
-            self.move_rooms(p.payloads[0].value)
-        elif isinstance(p, packet.ServerModelPacket):
-            self.process_model(p)
-        elif isinstance(p, packet.GrabItemPacket):
-            self.grab_item_here()
-
-    def _GETENTRY(self, p: Union[packet.LoginPacket, packet.RegisterPacket]) -> None:
-        """
-        Handles packets received when this protocol is in the GETENTRY state.
-        This should never be called directly and is instead handled by
-        stringReceived.
-        """
+    def GET_ENTRY(self, p: packet.Packet):
         if isinstance(p, packet.LoginPacket):
-            self._login_user(p.payloads[0].value, p.payloads[1].value)
+            self.login_user(p)
         elif isinstance(p, packet.RegisterPacket):
-            self._register_user(p)
+            self.register_user(p)
 
-    def _login_user(self, username: str, password: str) -> None:
+    def login_user(self, p: packet.LoginPacket):
+        username, password = p.payloads[0].value, p.payloads[1].value
         if not models.User.objects.filter(username=username):
-            self.sendPacket(packet.DenyPacket("I don't know anybody by that name"))
+            self.send_packet(packet.DenyPacket("I don't know anybody by that name"))
             return
 
         user = models.User.objects.get(username=username)
         player = models.Player.objects.get(user=user)
-        if self._server.is_logged_in(player.pk):
-            self.sendPacket(packet.DenyPacket("Player is already inhabiting this realm."))
+
+        if self.server.is_logged_in(player.pk):
+            self.send_packet(packet.DenyPacket(f"{username} is already inhabiting this realm."))
             return
 
         if not pbkdf2.verify_password(user.password, password):
-            self.sendPacket(packet.DenyPacket("Incorrect password"))
+            self.send_packet(packet.DenyPacket("Incorrect password"))
             return
 
         # The user exists in the database so retrieve the player and entity objects
         self.username = user.username
-        self._player = player
-        self._instance = models.InstancedEntity.objects.get(entity=self._player.entity)
+        self.player_info = player
+        self.player_instance = models.InstancedEntity.objects.get(entity=self.player_info.entity)
 
-        self.move_rooms(self._instance.room.id)
+        self.send_packet(packet.OkPacket())
+        self.move_rooms(self.player_instance.room.id)
 
-    def move_rooms(self, dest_roomid: Optional[int]):
-        print(f"\nmove_rooms(dest_roomid={dest_roomid})\n")
-
-        # Tell people in the current (old) room we are leaving
-        self.broadcast(packet.GoodbyePacket(self._instance.id), excluding=(self,))
-
-        # Reset visible entities (so things don't "follow" us between rooms)
-        self._visible_instances = set()
-
-        # If the destination room is None (i.e. we are going to the lobby), skip the rest
-        if dest_roomid is None:
-            self._room = None
-            return
-
-        # Tell our client we're ready to switch rooms so it can reinitialise itself and wait for data again.
-        if self._room is not None:
-            self.sendPacket(packet.MoveRoomsPacket(dest_roomid))
-
-        # Move to the new room
-        self._server.moveProtocols(self, dest_roomid)
-
-        self._instance.room_id = dest_roomid
-        self._instance.save()
-
-        self._room = models.Room.objects.get(id=dest_roomid)
-        self._roommap = maps.Room(self._room.pk, self._room.name, self._room.file_name)
-
-        self._others = self._server.rooms_protocols[dest_roomid]
-        self._establish_player_in_world()
-
-    def _establish_player_in_world(self) -> None:
-        print(f"\n_establish_player_in_world()\n")
-        self.sendPacket(packet.OkPacket())
-
-        # Assign the starting position if not already done
-        if None in (self._instance.y, self._instance.x):
-            self._instance.y = 0
-            self._instance.x = 0
-            self._instance.save()
-
-        # Send new data to the client
-        self.sendPacket(packet.ServerTickRatePacket(100))
-
-        roomdict: dict = model_to_dict(self._room)
-        self.sendPacket(packet.ServerModelPacket('Room', roomdict))
-
-        self.sendPacket(packet.ServerModelPacket('Instance', create_dict('Instance', self._instance)))
-
-        playerdict: dict = model_to_dict(self._player)
-        playerdict["entity"] = model_to_dict(self._player.entity)
-        self.sendPacket(packet.ServerModelPacket('Player', playerdict))
-
-        # send weather info to player
-        self.sendPacket(packet.WeatherChangePacket(self._server.weather))
-
-        # send inventory to player
-        items = models.ContainerItem.objects.filter(container=self._player.inventory)
-        for ci in items:
-            self.sendPacket(packet.ServerModelPacket('ContainerItem', create_dict('ContainerItem', ci)))
-
-        self.state = self._PLAY
-        self.broadcast(packet.ServerLogPacket(f"{self.username} has arrived."), excluding=(self,))
-        self._logged_in = True
-
-        # Tell entities in view that we have arrived
-        self.broadcast(packet.HelloPacket(create_dict('Instance', self._instance)), excluding=(self,))
-
-        # Tell our client about all the entities around
-        self._process_visible_instances()
-
-    def _process_visible_instances(self):
-        """
-        Say goodbye to old entities no longer in view and process the new and still-existing entities in view
-        """
-        for instance in list(self._visible_instances):  # Loop through list to avoid changing set size during iteration
-            currently_in_view = self._coord_in_view(instance.y, instance.x)
-            if not currently_in_view:
-                self.sendPacket(packet.GoodbyePacket(instance.id))
-                self._visible_instances.remove(instance)
-
-        ybounds, xbounds = self._get_view_bounds()
-        for instance in models.InstancedEntity.objects.filter(room=self._room, y__gte=ybounds[0], y__lte=ybounds[1], x__gte=xbounds[0], x__lte=xbounds[1]):
-            # TODO: Stop looping through entities that belong to logged out players
-            if instance.entity.typename == 'Player':
-                other_protocols = {p._instance: p for p in self._others}
-                if instance not in other_protocols:
-                    continue
-                if other_protocols[instance]._room != self._room:
-                    continue
-
-            model_packet = packet.ServerModelPacket('Instance', create_dict('Instance', instance))
-            self.process_model(model_packet)
-
-    def logout(self, p: packet.LogoutPacket):
-        username: str = p.payloads[0].value
-        if username == self.username:
-            # Tell our client it's OK to log out
-            self.sendPacket(packet.OkPacket())
-            self.move_rooms(None)
-            self._logged_in = False
-            self.state = self._GETENTRY
-
-    def depart_other(self, p: packet.GoodbyePacket):
-        other_instanceid: int = p.payloads[0].value
-        other_instance: models.InstancedEntity = models.InstancedEntity.objects.get(id=other_instanceid)
-
-        if other_instance in self._visible_instances:
-            self._visible_instances.remove(other_instance)
-
-        #todo: remove this comment otherwise picking up a beer broadcasts 'Beer has departed.'
-        # if other_instance.entity.typename == 'Player':
-        self.sendPacket(packet.ServerLogPacket(f"{other_instance.entity.name} has departed."))
-        self.sendPacket(p)
-
-    def _register_user(self, p: packet.RegisterPacket) -> None:
-        username: str = p.payloads[0].value
-        password: str = p.payloads[1].value
+    def register_user(self, p: packet.RegisterPacket):
+        username, password = p.payloads[0].value, p.payloads[1].value
 
         if models.User.objects.filter(username=username):
-            self.sendPacket(packet.DenyPacket("Somebody else already goes by that name"))
+            self.send_packet(packet.DenyPacket("Somebody else already goes by that name"))
             return
 
         password = pbkdf2.hash_password(password)
@@ -362,145 +153,89 @@ class Moonlapse(NetstringReceiver):
         entity.save()
 
         # Create and save a new instance
-        initial_room: models.Room = models.Room.objects.first()
+        initial_room = models.Room.objects.first()
         if not initial_room:
             raise ObjectDoesNotExist("Initial room not loaded. Did you run manage.py loaddata data.json?")
-        instance = models.InstancedEntity(entity=entity, room=initial_room)
+        instance = models.InstancedEntity(entity=entity, room=initial_room, y=0, x=0)
         instance.save()
 
-        # Create and save a new container
+        # Create and save a new container (inventory)
         container = models.Container()
         container.save()
 
         # Create and save a new player
-        # TODO: Get default room
         player = models.Player(user=user, entity=entity, inventory=container)
         player.save()
 
-        self.sendPacket(packet.OkPacket())
+        self.send_packet(packet.OkPacket())
 
-    def greet(self, p: packet.HelloPacket):
-        model: dict = p.payloads[0].value
+    def logout(self, p: packet.LogoutPacket):
+        username = p.payloads[0].value
+        if username == self.username:
+            # Tell our client it's OK to log out
+            self.send_packet(packet.OkPacket())
 
-        # We don't greet entities that don't belong to other protocols
-        other_proto: Optional['Moonlapse'] = next((p for p in self._others if p._instance.id == model['id']), None)
-        if other_proto is None:
-            return
+            # tell everyone we're leaving
+            if self.player_instance:
+                self.broadcast(packet.GoodbyePacket(self.player_instance.pk))
 
-        # Broadcasts our entity model to the other player's protocol
-        self.broadcast(packet.ServerModelPacket('Instance', create_dict('Instance', self._instance)), including=(other_proto,))
+            self.logged_in = False
+            self.player_instance = None
+            self.player_info = None
+            self.roommap = None
+            self.username = ""
+            self.visible_instances = set()
+            self.state = self.GET_ENTRY
 
-    def process_model(self, p: packet.ServerModelPacket):
-        type: str = p.payloads[0].value
-        model: dict = p.payloads[1].value
-        instanceid: int = model['id']
+    def PLAY(self, p: packet.Packet):
+        if isinstance(p, packet.MovePacket):
+            self.move(p)
+        elif isinstance(p, packet.ChatPacket):
+            self.chat(p)
+        elif isinstance(p, packet.LogoutPacket):
+            self.logout(p)
+        elif isinstance(p, packet.GoodbyePacket):
+            self.depart_other(p)
+        elif isinstance(p, packet.ServerLogPacket):
+            self.send_packet(p)
+        elif isinstance(p, packet.MoveRoomsPacket):
+            self.move_rooms(p.payloads[0].value)
+        elif isinstance(p, packet.GrabItemPacket):
+            self.grab_item_here()
+        elif isinstance(p, packet.WeatherChangePacket):
+            self.send_packet(p)
 
-        # Send the new model to the client if it's still within our view - otherwise remove it from our list of visible
-        # entities
-        if type == 'Instance':
-            currently_in_view = self._coord_in_view(model['y'], model['x'])
-            previously_in_view = instanceid in {e.id for e in self._visible_instances}
-
-            if currently_in_view:
-                stored_instance = models.InstancedEntity.objects.get(id=model['id'])
-                # If it's in our view, and it wasn't PREVIOUSLY in our view, say hello to it
-                if not previously_in_view:
-                    self._debug("Instance currently in view, and wasn't there before, so greet it")
-                    self._visible_instances.add(stored_instance)
-                    self.sendPacket(p)
-                    self.greet(packet.HelloPacket(model))
-                else:
-                    # If it was previously in our view and still is, tell our client about it only if it's changed
-                    before = model_to_dict(stored_instance)
-                    if model != before:
-                        delta = get_dict_delta(before, model)
-                        self.sendPacket(packet.ServerModelPacket('Instance', delta))
-            else:
-                # Else, it's not in our view but check if it WAS so we can say goodbye to it
-                self._debug(f"Instance not in view, not telling my client about it")
-                if previously_in_view:
-                    self._debug(f"Actually, it was previously in view but it's not now so I'll tell my client to remove it")
-                    self.sendPacket(packet.GoodbyePacket(instanceid))
-                    self._remove_visible_instance(instanceid)
-
-    def _remove_visible_instance(self, instanceid: int):
-        self._visible_instances = {i for i in self._visible_instances if i.id != instanceid}
-
-    def _DISCONNECT(self, p: packet.DisconnectPacket):
-        """
-        Handles packets received when this protocol is in the DISCONNECT state.
-        Releases this protocol from the server and informs all other protocols
-        of this disconnection. No more code should be executed from this protocol.
-
-        This should never be called directly. Instead it should be handled by
-        self.connectionLost.
-        """
-        reason: Optional[Failure] = None
-        if len(p.payloads) > 1:
-            reason = p.payloads[1].value
-
-        if self._logged_in:
-            self.sendPacket(packet.DisconnectPacket(self.username, reason=reason.getErrorMessage()))
-            self._logged_in = False
-
-        # Release this protocol from the server
-        if self in self._others:
-            self._others.remove(self)
-            self._debug(f"Deleted self from others list")
-
-        # Tell all still connected protocols about this disconnection
-        if self._room is not None:
-            self.broadcast(packet.GoodbyePacket(self._instance.id))
-
-    def broadcast(self, *packets: packet.Packet, including: Iterable['Moonlapse'] = tuple(), excluding: Iterable['Moonlapse'] = tuple()) -> None:
-        """
-        Sends packets to all protocols specified in "including" except for the ones for the protocols specified in
-        "excluding", if any.
-        If no protocols are specified in "including", the default behaviour is to send to *all* protocols on the server
-        except for the ones specified in "excluding", if any.
-
-        Examples:
-            * broadcast(packet.ServerLogPacket("Hello"), excluding=(Josh,)) will send to everyone but Josh
-            * broadcast(packet.ServerLogPacket("Hello"), including=(Sue, James)) will send to only Sue and James
-            * broadcast(packet.ServerLogPacket("Hello"), including=(Mary,), excluding=(Mary,)) will send to noone
-        """
-        self._debug(f"Broadcasting {packets} to {tuple(p.username for p in including) if including else 'everyone'} "
-                    f"{'except' + str(tuple(p.username for p in excluding)) if tuple(p.username for p in excluding) else ''}")
-
-        sendto: Set['Moonlapse'] = self._others
-        if including:
-            sendto = including
-
-        sendto = {proto for proto in sendto if proto not in excluding}
-
-        for proto in sendto:
-            for p in packets:
-                proto.processPacket(p)
-
-    def chat(self, p: packet.ChatPacket) -> None:
+    def chat(self, p: packet.ChatPacket):
         """
         Broadcasts a chat message which includes this protocol's connected player name.
         Truncates to 80 characters. Cannot be empty.
         """
         message: str = p.payloads[0].value
         if message.strip() != '':
-            message: str = f"{self._instance.entity.name} says: {message[:80]}"
-            self.broadcast(packet.ServerLogPacket(message))
+            message: str = f"{self.player_instance.entity.name} says: {message[:80]}"
+            self.broadcast(packet.ServerLogPacket(message), include_self=True)
             self.logger.log(message)
 
-    def move(self, p: packet.MovePacket) -> None:
-        """
-        Updates this protocol's player's position and sends the player back to all 
-        clients connected to the server.
+    def depart_other(self, p: packet.GoodbyePacket):
+        other_instanceid: int = p.payloads[0].value
+        other_instance: models.InstancedEntity = models.InstancedEntity.objects.get(id=other_instanceid)
 
-        NOTE: This method should be avoided in a future release to prevent sending more
-              information than is required. A client will know all the information 
-              about every player connected to the server even if they are not in view.
+        if other_instance in self.visible_instances:
+            self.visible_instances.remove(other_instance)
+
+        if other_instance.entity.typename == 'Player':
+            self.send_packet(packet.ServerLogPacket(f"{other_instance.entity.name} has departed."))
+            self.send_packet(p)
+
+    def move(self, p: packet.MovePacket):
+        """
+        Updates this protocol's player's position and sends the player back to all
+        clients connected to the server.
         """
 
         # Calculate the desired destination
-        desired_y: int = self._instance.y
-        desired_x: int = self._instance.x
+        desired_y = self.player_instance.y
+        desired_x = self.player_instance.x
 
         if isinstance(p, packet.MoveUpPacket):
             desired_y -= 1
@@ -512,63 +247,138 @@ class Moonlapse(NetstringReceiver):
             desired_x -= 1
 
         # Check if we're going to land on a portal
-        for e in self._visible_instances:
-            if e.entity.typename == "Portal" and e.y == desired_y and e.x == desired_x:
-                portal: models.Portal = models.Portal.objects.get(entity=e.entity)
+        for instance in self.visible_instances:
+            if instance.entity.typename == "Portal" and instance.y == desired_y and instance.x == desired_x:
+                portal: models.Portal = models.Portal.objects.get(entity=instance.entity)
                 desired_y = portal.linkedy
                 desired_x = portal.linkedx
-                if self._room != portal.linkedroom:
+                self.player_instance.y = desired_y
+                self.player_instance.x = desired_x
+                self.player_instance.save()
+                if self.player_instance.room != portal.linkedroom:
                     self.move_rooms(portal.linkedroom.id)
+                    return
 
-        if not within_bounds(desired_y, desired_x, 0, 0, self._roommap.height - 1, self._roommap.width - 1) or self._roommap.at('solid', desired_y, desired_x) != maps.NOTHING:
-            self.sendPacket(packet.DenyPacket("Can't move there"))
-            return
+        if (0 <= desired_y < self.roommap.height and 0 <= desired_x < self.roommap.width) and (self.roommap.at('solid', desired_y, desired_x) == maps.NOTHING):
+            self.player_instance.y = desired_y
+            self.player_instance.x = desired_x
+            self.player_instance.save()
 
-        self._instance.y = desired_y
-        self._instance.x = desired_x
+            for proto in self.server.protocols_in_room(self.player_instance.room_id):
+                proto.process_visible_instances()
+        else:
+            self.send_packet(packet.DenyPacket("Can't move there"))
 
-        # Broadcast our new position to other protocols in the room
-        self.broadcast(packet.ServerModelPacket('Instance', create_dict('Instance', self._instance)))
-        # Process the entities around us
-        self._process_visible_instances()
+    def move_rooms(self, dest_roomid: Optional[int]):
+        print(f"\nmove_rooms(dest_roomid={dest_roomid})\n")
 
-        self._instance.save()
+        if self.logged_in:
+            # Tell people in the current (old) room we are leaving
+            self.broadcast(packet.GoodbyePacket(self.player_instance.pk))
 
-    def _coord_in_view(self, y: int, x: int) -> bool:
-        ybounds, xbounds = self._get_view_bounds()
-        return within_bounds(y, x, ybounds[0], xbounds[0], ybounds[1], xbounds[1])
+            # Reset visible entities (so things don't "follow" us between rooms)
+            self.visible_instances = set()
 
-    def _get_view_bounds(self) -> Tuple[Tuple[int, int], Tuple[int, int]]:
+        self.logged_in = True
+
+        # Tell our client we're ready to switch rooms so it can reinitialise itself and wait for data again.
+        self.send_packet(packet.MoveRoomsPacket(dest_roomid))
+
+        # Move db instance to the new room
+        self.player_instance.room_id = dest_roomid
+        self.player_instance.save()
+
+        room = self.player_instance.room
+        self.roommap = maps.Room(room.pk, room.name, room.file_name)
+
+        self.send_packet(packet.OkPacket())
+        self.establish_player_in_room()
+
+    def establish_player_in_room(self):
+        self.send_packet(packet.ServerModelPacket('Room', model_to_dict(self.player_instance.room)))
+        self.send_packet(packet.ServerModelPacket('Instance', create_dict('Instance', self.player_instance)))
+
+        playerdict = model_to_dict(self.player_info)
+        playerdict["entity"] = model_to_dict(self.player_info.entity)
+        self.send_packet(packet.ServerModelPacket('Player', playerdict))
+
+        self.send_packet(packet.WeatherChangePacket(self.server.weather))
+
+        # send inventory to player
+        items = models.ContainerItem.objects.filter(container=self.player_info.inventory)
+        for ci in items:
+            self.send_packet(packet.ServerModelPacket('ContainerItem', create_dict('ContainerItem', ci)))
+
+        self.state = self.PLAY
+        self.broadcast(packet.ServerLogPacket(f"{self.username} has arrived."))
+
+        # Tell other players in view that we have arrived
+        for proto in self.server.protocols_in_room(self.player_instance.room_id):
+            proto.process_visible_instances()
+
+    def process_visible_instances(self):
         """
-        Returns two tuples: ((ymin, ymax), (xmin, xmax)) where ymin is the smallest y-coordinate the player can see, etc.
-        :return:
+        Say goodbye to old entities no longer in view and process the new and still-existing entities in view
         """
-        yview = self._instance.y - 10, self._instance.y + 10
-        xview = self._instance.x - 10, self._instance.x + 10
-        return yview, xview
+        yview = self.player_instance.y - 10, self.player_instance.y + 10
+        xview = self.player_instance.x - 10, self.player_instance.x + 10
 
-    def grab_item_here(self):
-        # Check if we're standing on an item
-        for i in self._visible_instances:
-            if i.entity.typename == "Item" and i.y == self._instance.y and i.x == self._instance.x:
-                # remove instanced item from visible instances
-                self.broadcast(packet.GoodbyePacket(i.pk))
-                # remove instanced item from database
-                dbi = models.InstancedEntity.objects.get(pk=i.pk)
-                dbi.delete()
-                # create ContainerItem from item and add to player.inventory
-                itm = models.Item.objects.get(entity_id=dbi.entity_id)
-                ci = models.ContainerItem.objects.filter(item=itm, container=self._player.inventory).first()
-                if ci:
-                    ci.amount += i.amount
-                    ci.save()
-                else:
-                    ci = models.ContainerItem(item=itm, amount=i.amount, container=self._player.inventory)
-                    ci.save()
-                # send client ContainerItem packet
-                self.sendPacket(packet.ServerModelPacket('ContainerItem', create_dict('ContainerItem', ci)))
-                return
-        self.sendPacket(packet.DenyPacket("There is no item here."))
+        prev_in_view = self.visible_instances
 
+        instances_in_view = set(models.InstancedEntity.objects.filter(room=self.player_instance.room, y__gte=yview[0],
+                                                                      y__lte=yview[1], x__gte=xview[0],
+                                                                      x__lte=xview[1]))
+        # removing logged out players from view
+        for instance in set(instances_in_view):
+            if instance == self.player_instance:
+                continue
 
+            if instance.entity.typename == 'Player':
+                proto = self.server.get_proto_by_id(instance.entity.pk)
+                if not proto or not proto.logged_in:
+                    instances_in_view.remove(instance)
 
+        self.visible_instances = instances_in_view
+
+        # just left view
+        for instance in prev_in_view:
+            if instance not in self.visible_instances:
+                self.send_packet(packet.GoodbyePacket(instance.pk))
+
+        for instance in self.visible_instances:
+            # new to view
+            if instance not in prev_in_view:
+                self.send_packet(packet.ServerModelPacket('Instance', create_dict('Instance', instance)))
+                continue
+
+            # dict delta for those still in view
+            after = instance
+            for before in prev_in_view:
+                if before.pk == after.pk:
+                    delta = get_dict_delta(create_dict('Instance', before), create_dict('Instance', after))
+                    self.send_packet(packet.ServerModelPacket('Instance', delta))
+
+    def send_packet(self, p: packet.Packet):
+        """
+        Sends a packet to this protocol's client.
+        Call this to communicate information back to the game client application.
+        """
+        self.sendString(p.tobytes())
+        self.debug(f"Sent data to my client: {p.tobytes()}")
+
+    def broadcast(self, p: packet.Packet, include_self=False):
+        excluding = []
+        if not include_self:
+            excluding.append(self)
+        self.server.broadcast_to_room(p, self.player_instance.room.pk, excluding=excluding)
+
+    def debug(self, message: str):
+        print(f"[{self.username if self.username else None}]"
+              f"[{self.state.__name__}]"
+              f"[{self.player_instance.room.name if self.player_instance else None}]: {message}")
+
+    def coord_in_view(self, y: int, x: int) -> bool:
+        yview = self.player_instance.y - 10, self.player_instance.y + 10
+        xview = self.player_instance.x - 10, self.player_instance.x + 10
+
+        return yview[0] <= y <= yview[1] and xview[0] <= x <= xview[1]

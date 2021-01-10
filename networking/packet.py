@@ -94,8 +94,8 @@ class GoodbyePacket(Packet):
     a client to indicate someone else has left the room.
     """
 
-    def __init__(self, entityid: int):
-        super().__init__(Payload(entityid))
+    def __init__(self, instanceid: int):
+        super().__init__(Payload(instanceid))
 
 
 class LoginPacket(Packet):
