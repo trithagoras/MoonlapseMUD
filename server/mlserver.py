@@ -114,6 +114,7 @@ class MoonlapseServer(Factory):
             if instance.entity.typename == 'Player':
                 instance.save()
         print("Saved all player instances to DB")
+        self.broadcast_to_all(packet.ServerLogPacket("Game has been saved."), state='PLAY')
 
     def respawn_instance(self, instanceid: int):
         dbi = models.InstancedEntity.objects.get(pk=instanceid)
