@@ -15,7 +15,7 @@ class MoonlapseServer(Factory):
         self.weather = 'Clear'
         # weather change check
         loop = task.LoopingCall(self.rain_check)
-        loop.start(10, False)
+        loop.start(30, False)
 
     def protocols_in_room(self, roomid) -> Set[protocol.MoonlapseProtocol]:
         s = set()
