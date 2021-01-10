@@ -50,3 +50,4 @@ class InstancedEntity(models.Model):
     y = models.IntegerField(null=True, default=None)
     x = models.IntegerField(null=True, default=None)
     amount = models.IntegerField(null=True, default=1)
+    respawn_time = models.IntegerField(null=True, default=0)

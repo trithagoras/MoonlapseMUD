@@ -102,7 +102,8 @@
       "entity_id": 2,
       "y": 5,
       "x": 10,
-      "room_id": 1
+      "room_id": 1,
+      "respawn_time": 5
     }
   },
   {
@@ -112,7 +113,8 @@
       "entity_id": 2,
       "y": 5,
       "x": 12,
-      "room_id": 1
+      "room_id": 1,
+      "respawn_time": 3
     }
   },
   {

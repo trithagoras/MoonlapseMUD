@@ -228,13 +228,11 @@ class MoonlapseProtocol(NetstringReceiver):
                 # remove instanced item from visible instances
                 self.broadcast(packet.GoodbyePacket(i.pk), include_self=True)
 
-                # todo: instances should have a respawn timer. assuming 5s for now
                 dbi = models.InstancedEntity.objects.get(pk=i.pk)
-                # dbi.delete()
 
                 # a respawning instance isn't deleted, just temporarily displaced OOB
                 i.y = -32
-                reactor.callLater(5, self.server.respawn_instance, i.pk)
+                reactor.callLater(dbi.respawn_time, self.server.respawn_instance, i.pk)
 
                 # create ContainerItem from item and add to player.inventory
                 itm = models.Item.objects.get(entity_id=dbi.entity_id)
