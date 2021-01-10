@@ -10,14 +10,24 @@ import maps
 
 class MoonlapseServer(Factory):
     def __init__(self):
+        # all protocols connected to server
         self.connected_protocols: Set[protocol.MoonlapseProtocol] = set()
+
+        # dict of all instances in the game. instance.pk : instance
+        self.instances: Dict[int, models.InstancedEntity] = {}
+        for instance in models.InstancedEntity.objects.all():
+            self.instances[instance.pk] = instance
 
         self.weather = 'Clear'
         # weather change check
-        loop = task.LoopingCall(self.rain_check)
-        loop.start(30, False)
+        rainloop = task.LoopingCall(self.rain_check)
+        rainloop.start(30, False)
 
-    def protocols_in_room(self, roomid) -> Set[protocol.MoonlapseProtocol]:
+        # save all instances to DB after loop
+        dbsaveloop = task.LoopingCall(self.save_all_instances)
+        dbsaveloop.start(20, False)     # todo: 20s for testing; obvs should be less often
+
+    def protocols_in_room(self, roomid: int) -> Set[protocol.MoonlapseProtocol]:
         s = set()
         for proto in self.connected_protocols:
             if proto.logged_in and proto.player_instance.room.pk == roomid:
@@ -30,6 +40,13 @@ class MoonlapseServer(Factory):
                 return
             if proto.player_info.entity.pk == entityid:
                 return proto
+
+    def instances_in_room(self, roomid: int) -> Dict[int, models.InstancedEntity]:
+        d = {}
+        for key in self.instances:
+            if self.instances[key].room_id == roomid:
+                d[key] = self.instances[key]
+        return d
 
     def broadcast_to(self, p: packet.Packet, including: Iterable[protocol.MoonlapseProtocol],
                      excluding: Iterable[protocol.MoonlapseProtocol] = tuple(), state='ANY'):
@@ -91,3 +108,18 @@ class MoonlapseServer(Factory):
 
         elif self.weather == "Rain":
             self.change_weather("Clear")
+
+    def save_all_instances(self):
+        for key, instance in self.instances.items():
+            if instance.entity.typename == 'Player':
+                instance.save()
+        print("Saved all player instances to DB")
+
+    def respawn_instance(self, instanceid: int):
+        dbi = models.InstancedEntity.objects.get(pk=instanceid)
+        self.instances[instanceid].y = dbi.y
+        instance = self.instances[instanceid]
+
+        for proto in self.protocols_in_room(instance.room.pk):
+            if proto.coord_in_view(instance.y, instance.x):
+                proto.process_visible_instances()

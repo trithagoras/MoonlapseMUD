@@ -5,6 +5,7 @@ import rsa
 from Crypto.Cipher import AES
 from django.core.exceptions import ObjectDoesNotExist
 from django.forms import model_to_dict
+from twisted.internet import reactor
 from twisted.internet.protocol import connectionDone
 from twisted.protocols.basic import NetstringReceiver
 
@@ -131,6 +132,7 @@ class MoonlapseProtocol(NetstringReceiver):
         self.username = user.username
         self.player_info = player
         self.player_instance = models.InstancedEntity.objects.get(entity=self.player_info.entity)
+        self.player_instance = self.server.instances[self.player_instance.pk]
 
         self.send_packet(packet.OkPacket())
         self.move_rooms(self.player_instance.room.id)
@@ -166,6 +168,9 @@ class MoonlapseProtocol(NetstringReceiver):
         # Create and save a new player
         player = models.Player(user=user, entity=entity, inventory=container)
         player.save()
+
+        # adding instance to server
+        self.server.instances[instance.pk] = instance
 
         self.send_packet(packet.OkPacket())
 
@@ -223,9 +228,13 @@ class MoonlapseProtocol(NetstringReceiver):
                 # remove instanced item from visible instances
                 self.broadcast(packet.GoodbyePacket(i.pk), include_self=True)
 
-                # remove instanced item from database
+                # todo: instances should have a respawn timer. assuming 5s for now
                 dbi = models.InstancedEntity.objects.get(pk=i.pk)
-                dbi.delete()
+                # dbi.delete()
+
+                # a respawning instance isn't deleted, just temporarily displaced OOB
+                i.y = -32
+                reactor.callLater(5, self.server.respawn_instance, i.pk)
 
                 # create ContainerItem from item and add to player.inventory
                 itm = models.Item.objects.get(entity_id=dbi.entity_id)
@@ -244,14 +253,16 @@ class MoonlapseProtocol(NetstringReceiver):
 
     def depart_other(self, p: packet.GoodbyePacket):
         other_instanceid: int = p.payloads[0].value
-        other_instance: models.InstancedEntity = models.InstancedEntity.objects.get(id=other_instanceid)
+        # other_instance: models.InstancedEntity = models.InstancedEntity.objects.get(id=other_instanceid)
+        other_instance = self.server.instances[other_instanceid]
 
         if other_instance in self.visible_instances:
             self.visible_instances.remove(other_instance)
 
         if other_instance.entity.typename == 'Player':
             self.send_packet(packet.ServerLogPacket(f"{other_instance.entity.name} has departed."))
-            self.send_packet(p)
+
+        self.send_packet(p)
 
     def move(self, p: packet.MovePacket):
         """
@@ -280,7 +291,6 @@ class MoonlapseProtocol(NetstringReceiver):
                 desired_x = portal.linkedx
                 self.player_instance.y = desired_y
                 self.player_instance.x = desired_x
-                self.player_instance.save()
                 if self.player_instance.room != portal.linkedroom:
                     self.move_rooms(portal.linkedroom.id)
                     return
@@ -288,7 +298,6 @@ class MoonlapseProtocol(NetstringReceiver):
         if (0 <= desired_y < self.roommap.height and 0 <= desired_x < self.roommap.width) and (self.roommap.at('solid', desired_y, desired_x) == maps.NOTHING):
             self.player_instance.y = desired_y
             self.player_instance.x = desired_x
-            self.player_instance.save()
 
             for proto in self.server.protocols_in_room(self.player_instance.room_id):
                 proto.process_visible_instances()
@@ -312,7 +321,7 @@ class MoonlapseProtocol(NetstringReceiver):
 
         # Move db instance to the new room
         self.player_instance.room_id = dest_roomid
-        self.player_instance.save()
+        # self.player_instance.save()
 
         room = self.player_instance.room
         self.roommap = maps.Room(room.pk, room.name, room.file_name)
@@ -346,14 +355,13 @@ class MoonlapseProtocol(NetstringReceiver):
         """
         Say goodbye to old entities no longer in view and process the new and still-existing entities in view
         """
-        yview = self.player_instance.y - 10, self.player_instance.y + 10
-        xview = self.player_instance.x - 10, self.player_instance.x + 10
-
         prev_in_view = self.visible_instances
+        instances_in_view = set()
 
-        instances_in_view = set(models.InstancedEntity.objects.filter(room=self.player_instance.room, y__gte=yview[0],
-                                                                      y__lte=yview[1], x__gte=xview[0],
-                                                                      x__lte=xview[1]))
+        for key, instance in self.server.instances_in_room(self.player_instance.room_id).items():
+            if self.coord_in_view(instance.y, instance.x):
+                instances_in_view.add(instance)
+
         # removing logged out players from view
         for instance in set(instances_in_view):
             if instance == self.player_instance:
@@ -377,12 +385,14 @@ class MoonlapseProtocol(NetstringReceiver):
                 self.send_packet(packet.ServerModelPacket('Instance', create_dict('Instance', instance)))
                 continue
 
+            self.send_packet(packet.ServerModelPacket('Instance', create_dict('Instance', instance)))
+
             # dict delta for those still in view
-            after = instance
-            for before in prev_in_view:
-                if before.pk == after.pk:
-                    delta = get_dict_delta(create_dict('Instance', before), create_dict('Instance', after))
-                    self.send_packet(packet.ServerModelPacket('Instance', delta))
+            # after = instance
+            # for before in prev_in_view:
+            #     if before.pk == after.pk:
+            #         delta = get_dict_delta(create_dict('Instance', before), create_dict('Instance', after))
+            #         self.send_packet(packet.ServerModelPacket('Instance', delta))
 
     def send_packet(self, p: packet.Packet):
         """
