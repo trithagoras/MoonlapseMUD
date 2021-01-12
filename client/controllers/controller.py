@@ -20,7 +20,6 @@ class Controller:
             self.view._draw()
             self.cs.stdscr.refresh()
             self._get_input()
-            time.sleep(0.002)
 
     def ready(self):
         pass

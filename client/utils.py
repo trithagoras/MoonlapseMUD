@@ -170,6 +170,5 @@ class ClientState:
             try:
                 p = self.ns.receive_packet()
                 self.packets.append(p)
-                time.sleep(0.002)
             except Exception as e:
                 pass
