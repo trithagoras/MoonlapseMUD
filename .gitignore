@@ -8,3 +8,4 @@ server/connectionstrings.json
 venv/*
 /.idea/dictionaries/*
 /.idea/misc.xml
+networking/migrations/*
