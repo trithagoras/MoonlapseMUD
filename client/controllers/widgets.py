@@ -1,5 +1,6 @@
 import curses
 import curses.ascii
+from . import keybindings
 
 
 class Widget:
@@ -101,9 +102,9 @@ class TextField(Widget):
             self.cursor += 1
         elif key == curses.ascii.ESC:
             self.process_exit()
-        elif key == ord('\n'):  # press enter
+        elif keybindings.enter(key):
             self.process_submit()
-        elif key == 127 and self.cursor > 0:  # press backspace
+        elif keybindings.backspace(key) and self.cursor > 0:  # press backspace
             self.value = self.value[:self.cursor - 1] + self.value[self.cursor:]
             self.cursor = max(self.cursor - 1, 0)
         elif key == curses.KEY_LEFT:

@@ -1,5 +1,6 @@
 import curses
 import curses.ascii
+from . import keybindings
 
 import rsa
 
@@ -25,7 +26,9 @@ class Menu(Controller):
             self.cursor = max(0, self.cursor - 1)
         elif key == curses.KEY_DOWN:
             self.cursor = min(len(self.widgets) - 1, self.cursor + 1)
-        elif key == ord('\n'):      # enter key
+        elif key == curses.ascii.TAB:
+            self.cursor = (self.cursor + 1) % len(self.widgets)
+        elif keybindings.enter(key):
             self.widgets[self.cursor].select()
         elif curses.ascii.isprint(key):
             if isinstance(self.widgets[self.cursor], TextField):
