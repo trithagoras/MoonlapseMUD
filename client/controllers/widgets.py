@@ -111,8 +111,9 @@ class TextField(Widget):
             self.cursor = max(self.cursor - 1, 0)
         elif key == curses.KEY_RIGHT:
             self.cursor = min(self.cursor + 1, len(self.value))
-        elif key in [curses.KEY_UP, curses.KEY_DOWN]:
+        elif key in [curses.KEY_UP, curses.KEY_DOWN, curses.ascii.TAB]:
             self.process_exit()
+            self.controller.process_input(key)
 
     def process_exit(self):
         # if escape is pressed
