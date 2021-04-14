@@ -65,15 +65,15 @@ class MainMenu(Menu):
         self.stop()
         self.cs.running = False
 
-    # def process_packet(self, p) -> bool:
-    #     if super().process_packet(p):
-    #         return True
-    #     if isinstance(p, packet.OkPacket):
-    #         pass
-    #     else:
-    #         return False
-    #
-    #     return True
+    def process_packet(self, p) -> bool:
+        if super().process_packet(p):
+            return True
+        elif isinstance(p, packet.WelcomePacket):
+            self.view.title = p.payloads[0].value
+        else:
+            return False
+
+        return True
 
 
 class LoginMenu(Menu):

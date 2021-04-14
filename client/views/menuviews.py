@@ -12,7 +12,10 @@ class MenuView(View):
         super().draw()
 
         if self.title:
-            self.addstr(2, (100 - len(self.title)) // 2, self.title, curses.COLOR_CYAN)
+            lines = self.title.split('\n')
+            cx: int = 100 - max(len(line) for line in lines) // 2
+            for dy, line in enumerate(lines):
+                self.addstr(2 + dy, cx, line, curses.COLOR_CYAN)
 
         for w in self.controller.widgets:
             w.draw()

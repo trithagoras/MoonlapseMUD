@@ -1,9 +1,5 @@
-import json
-import os
 import random
 
-import rsa
-from Crypto.Cipher import AES
 from django.core.exceptions import ObjectDoesNotExist
 from django.forms import model_to_dict
 from twisted.internet import reactor, task
@@ -72,36 +68,18 @@ class MoonlapseProtocol(NetstringReceiver):
 
         self.visible_instances: Set[models.InstancedEntity] = set()
 
-        serverdir = os.path.dirname(os.path.realpath(__file__))
-        with open(os.path.join(serverdir, "rsa_keys.json"), 'r') as f:
-            d = json.load(f)
-            self.public_key = rsa.key.PublicKey(d['PublicKey']['n'], d['PublicKey']['e'])
-            self.private_key = rsa.key.PrivateKey(d['PrivateKey']['n'], d['PrivateKey']['e'], d['PrivateKey']['d'],
-                                                  d['PrivateKey']['p'], d['PrivateKey']['q'])
-
     def connectionMade(self):
+        self.send_packet(packet.WelcomePacket("""Welcome to MoonlapseMUD\n ,-,-.\n/.( +.\\\n\ {. */\n `-`-'\n     Enjoy your stay ~"""))
         self.server.connected_protocols.add(self)
-        self.send_packet(packet.ClientKeyPacket(self.public_key.n, self.public_key.e))
+        self.send_packet(packet.ClientKeyPacket(self.server.public_key.n, self.server.public_key.e))
 
     def connectionLost(self, reason=connectionDone):
         self.logout(packet.LogoutPacket(self.username))
         self.server.connected_protocols.remove(self)
 
-    def decrypt_string(self, string: bytes):
-        # first 64 bytes is the RSA encrypted AES key; remainder is AES encrypted message
-        encrypted_key = string[:64]
-        encrypted_message = string[64:]
-
-        IV = b'1111111111111111'
-
-        key = rsa.decrypt(encrypted_key, self.private_key)
-        cipher = AES.new(key, AES.MODE_CFB, IV=IV)
-        message = cipher.decrypt(encrypted_message)
-        return message
-
     def stringReceived(self, string):
         # attempt to decrypt packet
-        string = self.decrypt_string(string)
+        string = self.server.decrypt_string(string)
 
         p: packet.Packet = packet.frombytes(string)
         self.debug(f"Received packet from my client {p}")
@@ -162,6 +140,7 @@ class MoonlapseProtocol(NetstringReceiver):
         # Create and save a new instance
         initial_room = models.Room.objects.first()
         if not initial_room:
+            self.send_packet(packet.DenyPacket("Error. Please try again later."))
             raise ObjectDoesNotExist("Initial room not loaded. Did you run manage.py loaddata data.json?")
         instance = models.InstancedEntity(entity=entity, room=initial_room, y=0, x=0)
         instance.save()
