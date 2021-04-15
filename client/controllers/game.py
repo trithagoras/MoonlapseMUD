@@ -1,4 +1,5 @@
 import curses
+import curses.ascii
 
 import maps
 from client.controllers.controller import Controller
@@ -6,6 +7,7 @@ from client.views.gameview import GameView
 from networking import packet
 from networking.logger import Log
 from client.controllers.widgets import TextField
+from client.controllers import keybindings
 
 
 class Model:
@@ -164,13 +166,13 @@ class Game(Controller):
 
     def process_global_input(self, key: int) -> bool:
         if self.chatbox.selected:
-            if key == ord('\n'):
+            if keybindings.enter(key):
                 self.send_chat(self.chatbox.value)
                 self.chatbox.value = ""
                 self.chatbox.cursor = 0
             self.chatbox.process_input(key)
             return True
-        elif key == ord('\n'):
+        elif keybindings.enter(key):
             self.chatbox.select()
         elif key == ord('q'):
             self.cs.ns.send_packet(packet.LogoutPacket(self.cs.ns.username))

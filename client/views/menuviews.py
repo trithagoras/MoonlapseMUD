@@ -21,7 +21,7 @@ class MenuView(View):
             w.draw()
 
         hover = self.controller.widgets[self.controller.cursor]
-        self.addstr(hover.y, hover.x - 1, "*")
+        self.addstr(hover.y, hover.x - 2, "*")
 
 
 class MainMenuView(MenuView):

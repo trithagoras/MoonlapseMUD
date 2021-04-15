@@ -1,9 +1,13 @@
 import curses
 import curses.ascii
+import os
+import pathlib
+import configparser
 from . import keybindings
 
 import rsa
 
+from client import config
 from client.controllers.controller import Controller
 from client.controllers.widgets import Button, CheckBox, TextField
 from client.views.menuviews import MainMenuView, LoginView, RegisterView
@@ -87,6 +91,12 @@ class LoginMenu(Menu):
         self.widgets.append(Button(self, "Login", self.login))
 
         self.view.place_widget(self.widgets[0], 10, 10)
+
+        # Fill saved username and remember preference
+        self.widgets[0].value = config.get_config_option(config.SAVED_USERNAME)
+        if self.widgets[0].value:
+            self.widgets[2].checked = True
+
         self.view.place_widget(self.widgets[1], 14, 10)
         self.view.place_widget(self.widgets[2], 18, 10)
         self.view.place_widget(self.widgets[3], 22, 10)
@@ -98,6 +108,12 @@ class LoginMenu(Menu):
         if "" in (username, password):
             self.view.title = "Username or password must not be blank"
             return
+
+        # Remember or forget username
+        if self.widgets[2].checked:
+            config.set_config_option(config.SAVED_USERNAME, username)
+        else:
+            config.remove_config_option(config.SAVED_USERNAME)
 
         self.cs.ns.send_packet(packet.LoginPacket(username, password))
 

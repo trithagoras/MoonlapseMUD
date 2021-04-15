@@ -9,3 +9,5 @@ server/rsa_keys.json
 venv/*
 /.idea/dictionaries/*
 /.idea/misc.xml
+server/migrations/*
+client/user_settings.ini
