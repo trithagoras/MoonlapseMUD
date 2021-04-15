@@ -2,7 +2,7 @@ import configparser
 import os
 
 _CLIENT_DIR = os.path.dirname(os.path.realpath(__file__))
-_CFG_FNAME = os.path.join(_CLIENT_DIR, 'user_settings.ini')
+_CFG_FNAME = os.path.join(_CLIENT_DIR, 'user_settings.conf')
 _config = configparser.ConfigParser()
 _config.read(_CFG_FNAME)
 
