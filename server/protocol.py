@@ -2,7 +2,6 @@ import random
 
 from django.core.exceptions import ObjectDoesNotExist
 from django.forms import model_to_dict
-from twisted.internet import reactor, task
 from twisted.internet.protocol import connectionDone
 from twisted.protocols.basic import NetstringReceiver
 
@@ -64,14 +63,16 @@ class MoonlapseProtocol(NetstringReceiver):
         self.state = self.GET_ENTRY
         self.actionloop = None
 
+        self.outgoing: List[packet.Packet] = []
+
         self.logger = Log()
 
         self.visible_instances: Set[models.InstancedEntity] = set()
 
     def connectionMade(self):
-        self.send_packet(packet.WelcomePacket("""Welcome to MoonlapseMUD\n ,-,-.\n/.( +.\\\n\ {. */\n `-`-'\n     Enjoy your stay ~"""))
+        self.outgoing.append(packet.WelcomePacket("""Welcome to MoonlapseMUD\n ,-,-.\n/.( +.\\\n\ {. */\n `-`-'\n     Enjoy your stay ~"""))
         self.server.connected_protocols.add(self)
-        self.send_packet(packet.ClientKeyPacket(self.server.public_key.n, self.server.public_key.e))
+        self.outgoing.append(packet.ClientKeyPacket(self.server.public_key.n, self.server.public_key.e))
 
     def connectionLost(self, reason=connectionDone):
         self.logout(packet.LogoutPacket(self.username))
@@ -97,18 +98,18 @@ class MoonlapseProtocol(NetstringReceiver):
     def login_user(self, p: packet.LoginPacket):
         username, password = p.payloads[0].value, p.payloads[1].value
         if not models.User.objects.filter(username=username):
-            self.send_packet(packet.DenyPacket("I don't know anybody by that name"))
+            self.outgoing.append(packet.DenyPacket("I don't know anybody by that name"))
             return
 
         user = models.User.objects.get(username=username)
         player = models.Player.objects.get(user=user)
 
         if self.server.is_logged_in(player.pk):
-            self.send_packet(packet.DenyPacket(f"{username} is already inhabiting this realm."))
+            self.outgoing.append(packet.DenyPacket(f"{username} is already inhabiting this realm."))
             return
 
         if not pbkdf2.verify_password(user.password, password):
-            self.send_packet(packet.DenyPacket("Incorrect password"))
+            self.outgoing.append(packet.DenyPacket("Incorrect password"))
             return
 
         # The user exists in the database so retrieve the player and entity objects
@@ -117,14 +118,14 @@ class MoonlapseProtocol(NetstringReceiver):
         self.player_instance = models.InstancedEntity.objects.get(entity=self.player_info.entity)
         self.player_instance = self.server.instances[self.player_instance.pk]
 
-        self.send_packet(packet.OkPacket())
+        self.outgoing.append(packet.OkPacket())
         self.move_rooms(self.player_instance.room.id)
 
     def register_user(self, p: packet.RegisterPacket):
         username, password = p.payloads[0].value, p.payloads[1].value
 
         if models.User.objects.filter(username=username):
-            self.send_packet(packet.DenyPacket("Somebody else already goes by that name"))
+            self.outgoing.append(packet.DenyPacket("Somebody else already goes by that name"))
             return
 
         password = pbkdf2.hash_password(password)
@@ -140,7 +141,7 @@ class MoonlapseProtocol(NetstringReceiver):
         # Create and save a new instance
         initial_room = models.Room.objects.first()
         if not initial_room:
-            self.send_packet(packet.DenyPacket("Error. Please try again later."))
+            self.outgoing.append(packet.DenyPacket("Error. Please try again later."))
             raise ObjectDoesNotExist("Initial room not loaded. Did you run manage.py loaddata data.json?")
         instance = models.InstancedEntity(entity=entity, room=initial_room, y=0, x=0)
         instance.save()
@@ -156,13 +157,13 @@ class MoonlapseProtocol(NetstringReceiver):
         # adding instance to server
         self.server.instances[instance.pk] = instance
 
-        self.send_packet(packet.OkPacket())
+        self.outgoing.append(packet.OkPacket())
 
     def logout(self, p: packet.LogoutPacket):
         username = p.payloads[0].value
         if username == self.username:
             # Tell our client it's OK to log out
-            self.send_packet(packet.OkPacket())
+            self.outgoing.append(packet.OkPacket())
 
             # tell everyone we're leaving
             if self.player_instance:
@@ -186,13 +187,13 @@ class MoonlapseProtocol(NetstringReceiver):
         elif isinstance(p, packet.GoodbyePacket):
             self.depart_other(p)
         elif isinstance(p, packet.ServerLogPacket):
-            self.send_packet(p)
+            self.outgoing.append(p)
         elif isinstance(p, packet.MoveRoomsPacket):
             self.move_rooms(p.payloads[0].value)
         elif isinstance(p, packet.GrabItemPacket):
             self.grab_item_here()
         elif isinstance(p, packet.WeatherChangePacket):
-            self.send_packet(p)
+            self.outgoing.append(p)
 
     def chat(self, p: packet.ChatPacket):
         """
@@ -216,7 +217,7 @@ class MoonlapseProtocol(NetstringReceiver):
             ci.save()
 
         # send client ContainerItem packet
-        self.send_packet(packet.ServerModelPacket('ContainerItem', create_dict('ContainerItem', ci)))
+        self.outgoing.append(packet.ServerModelPacket('ContainerItem', create_dict('ContainerItem', ci)))
 
     def kill_instance(self, instance):
         """
@@ -226,8 +227,7 @@ class MoonlapseProtocol(NetstringReceiver):
 
         # a respawning instance isn't deleted, just temporarily displaced OOB
         instance.y = OOB
-        reactor.callLater(instance.respawn_time, self.server.respawn_instance, instance.pk)
-        pass
+        self.server.add_deferred(self.server.respawn_instance, instance.respawn_time * self.server.tickrate, False, instance.pk)
 
     def grab_item_here(self):
         # Check if we're standing on an item
@@ -241,7 +241,7 @@ class MoonlapseProtocol(NetstringReceiver):
                 self.add_item_to_inventory(di, i.amount)
                 return
 
-        self.send_packet(packet.DenyPacket("There is no item here."))
+        self.outgoing.append(packet.DenyPacket("There is no item here."))
 
     def depart_other(self, p: packet.GoodbyePacket):
         other_instanceid: int = p.payloads[0].value
@@ -252,9 +252,9 @@ class MoonlapseProtocol(NetstringReceiver):
             self.visible_instances.remove(other_instance)
 
         if other_instance.entity.typename == 'Player':
-            self.send_packet(packet.ServerLogPacket(f"{other_instance.entity.name} has departed."))
+            self.outgoing.append(packet.ServerLogPacket(f"{other_instance.entity.name} has departed."))
 
-        self.send_packet(p)
+        self.outgoing.append(p)
 
     def can_gather(self, node: models.ResourceNode) -> bool:
         requirements = {
@@ -265,7 +265,7 @@ class MoonlapseProtocol(NetstringReceiver):
         cis = models.ContainerItem.objects.filter(container=self.player_info.inventory,
                                                   item__entity__typename=requirements[node.entity.typename])
         if not cis:
-            self.send_packet(packet.ServerLogPacket(f"You do not have a {requirements[node.entity.typename]}."))
+            self.outgoing.append(packet.ServerLogPacket(f"You do not have a {requirements[node.entity.typename]}."))
             return False
 
         return True
@@ -278,21 +278,21 @@ class MoonlapseProtocol(NetstringReceiver):
             return
 
         if node.entity.typename == "OreNode":
-            self.send_packet(packet.ServerLogPacket("You begin to mine at the rocks."))
+            self.outgoing.append(packet.ServerLogPacket("You begin to mine at the rocks."))
         elif node.entity.typename == "TreeNode":
-            self.send_packet(packet.ServerLogPacket("You begin to chop at the tree."))
+            self.outgoing.append(packet.ServerLogPacket("You begin to chop at the tree."))
 
         if self.actionloop:
-            self.actionloop.stop()
+            self.server.remove_deferred(self.actionloop)
             self.actionloop = None
-        self.actionloop = task.LoopingCall(self.attempt_gather, instance, node)
-        self.actionloop.start(1, False)
+        self.actionloop = self.server.add_deferred(self.attempt_gather, self.server.tickrate, True, instance, node)
 
     def attempt_gather(self, instance: models.InstancedEntity, node: models.ResourceNode):
         # if node has already been killed (by other player)
         if instance.y == OOB:
-            self.actionloop.stop()
-            self.actionloop = None
+            if self.actionloop:
+                self.server.remove_deferred(self.actionloop)
+                self.actionloop = None
             return
 
         if not self.can_gather(node):
@@ -301,8 +301,9 @@ class MoonlapseProtocol(NetstringReceiver):
         # change change based on difficulty
         if random.randint(0, 5) == 0:
             # success
-            self.actionloop.stop()
-            self.actionloop = None
+            if self.actionloop:
+                self.server.remove_deferred(self.actionloop)
+                self.actionloop = None
 
             dropitems = set(models.DropTableItem.objects.filter(droptable=node.droptable))
             for itm in dropitems:
@@ -310,12 +311,12 @@ class MoonlapseProtocol(NetstringReceiver):
                     amt = random.randint(itm.min_amt, itm.max_amt)
                     item = itm.item
                     self.add_item_to_inventory(item, amt)
-                    self.send_packet(packet.ServerLogPacket(f"You acquire {amt} {item.entity.name}."))
+                    self.outgoing.append(packet.ServerLogPacket(f"You acquire {amt} {item.entity.name}."))
 
             self.kill_instance(instance)
         else:
             # fail
-            self.send_packet(packet.ServerLogPacket(f"You continue gathering."))
+            self.outgoing.append(packet.ServerLogPacket(f"You continue gathering."))
             pass
         pass
 
@@ -324,8 +325,9 @@ class MoonlapseProtocol(NetstringReceiver):
         Updates this protocol's player's position and sends the player back to all
         clients connected to the server.
         """
+
         if self.actionloop:
-            self.actionloop.stop()
+            self.server.remove_deferred(self.actionloop)
             self.actionloop = None
 
         # Calculate the desired destination
@@ -364,7 +366,7 @@ class MoonlapseProtocol(NetstringReceiver):
             for proto in self.server.protocols_in_room(self.player_instance.room_id):
                 proto.process_visible_instances()
         else:
-            self.send_packet(packet.DenyPacket("Can't move there"))
+            self.outgoing.append(packet.DenyPacket("Can't move there"))
 
     def move_rooms(self, dest_roomid: Optional[int]):
         print(f"\nmove_rooms(dest_roomid={dest_roomid})\n")
@@ -379,7 +381,7 @@ class MoonlapseProtocol(NetstringReceiver):
         self.logged_in = True
 
         # Tell our client we're ready to switch rooms so it can reinitialise itself and wait for data again.
-        self.send_packet(packet.MoveRoomsPacket(dest_roomid))
+        self.outgoing.append(packet.MoveRoomsPacket(dest_roomid))
 
         # Move db instance to the new room
         self.player_instance.room_id = dest_roomid
@@ -387,23 +389,23 @@ class MoonlapseProtocol(NetstringReceiver):
         room = self.player_instance.room
         self.roommap = maps.Room(room.pk, room.name, room.file_name)
 
-        self.send_packet(packet.OkPacket())
+        self.outgoing.append(packet.OkPacket())
         self.establish_player_in_room()
 
     def establish_player_in_room(self):
-        self.send_packet(packet.ServerModelPacket('Room', model_to_dict(self.player_instance.room)))
-        self.send_packet(packet.ServerModelPacket('Instance', create_dict('Instance', self.player_instance)))
+        self.outgoing.append(packet.ServerModelPacket('Room', model_to_dict(self.player_instance.room)))
+        self.outgoing.append(packet.ServerModelPacket('Instance', create_dict('Instance', self.player_instance)))
 
         playerdict = model_to_dict(self.player_info)
         playerdict["entity"] = model_to_dict(self.player_info.entity)
-        self.send_packet(packet.ServerModelPacket('Player', playerdict))
+        self.outgoing.append(packet.ServerModelPacket('Player', playerdict))
 
-        self.send_packet(packet.WeatherChangePacket(self.server.weather))
+        self.outgoing.append(packet.WeatherChangePacket(self.server.weather))
 
         # send inventory to player
         items = models.ContainerItem.objects.filter(container=self.player_info.inventory)
         for ci in items:
-            self.send_packet(packet.ServerModelPacket('ContainerItem', create_dict('ContainerItem', ci)))
+            self.outgoing.append(packet.ServerModelPacket('ContainerItem', create_dict('ContainerItem', ci)))
 
         self.state = self.PLAY
         self.broadcast(packet.ServerLogPacket(f"{self.username} has arrived."))
@@ -438,28 +440,36 @@ class MoonlapseProtocol(NetstringReceiver):
         # just left view
         for instance in prev_in_view:
             if instance not in self.visible_instances:
-                self.send_packet(packet.GoodbyePacket(instance.pk))
+                self.outgoing.append(packet.GoodbyePacket(instance.pk))
 
         for instance in self.visible_instances:
             # new to view
             if instance not in prev_in_view:
-                self.send_packet(packet.ServerModelPacket('Instance', create_dict('Instance', instance)))
+                self.outgoing.append(packet.ServerModelPacket('Instance', create_dict('Instance', instance)))
                 continue
 
-            self.send_packet(packet.ServerModelPacket('Instance', create_dict('Instance', instance)))
+            self.outgoing.append(packet.ServerModelPacket('Instance', create_dict('Instance', instance)))
 
             # dict delta for those still in view
             # after = instance
             # for before in prev_in_view:
             #     if before.pk == after.pk:
             #         delta = get_dict_delta(create_dict('Instance', before), create_dict('Instance', after))
-            #         self.send_packet(packet.ServerModelPacket('Instance', delta))
+            #         self.outgoing.append(packet.ServerModelPacket('Instance', delta))
+
+    def tick(self):
+        # send all packets in queue back to client in order
+        for p in list(self.outgoing):
+            self.send_packet(p)
+            self.outgoing.remove(p)
 
     def send_packet(self, p: packet.Packet):
         """
         Sends a packet to this protocol's client.
         Call this to communicate information back to the game client application.
         """
+
+        # todo: add this packet to the outgoing queue for next tick instead of sending here
         self.sendString(p.tobytes())
         self.debug(f"Sent data to my client: {p.tobytes()}")
 

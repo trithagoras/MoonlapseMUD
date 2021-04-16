@@ -13,6 +13,25 @@ from networking import packet
 import maps
 
 
+class Deferred:
+    def __init__(self, f: callable, ticks: int, total_ticks: int, loops: bool, *args):
+        """
+        This should not be created directly. It should only be created with server.add_deferred()
+        :param f: function to fire
+        :param ticks: how many ticks until fired
+        :param total_ticks: the server's current total ticks
+        :param loops: if this deferred loops
+        """
+        self._f = f
+        self.args = args
+        self.ticks = ticks
+        self.expected_tick = total_ticks + ticks
+        self.loops = loops
+
+    def fire(self):
+        self._f(*self.args)
+
+
 class MoonlapseServer(Factory):
     def __init__(self):
         # all protocols connected to server
@@ -23,14 +42,21 @@ class MoonlapseServer(Factory):
         for instance in models.InstancedEntity.objects.all():
             self.instances[instance.pk] = instance
 
+        # set up game tick
+        self.tickrate = 20      # hertz (ticks per second)
+        tickloop = task.LoopingCall(self.tick)
+        tickloop.start(1/self.tickrate, False)
+        self.total_ticks = 0
+
+        self.deferreds: List[Deferred] = []
+
         self.weather = 'Clear'
         # weather change check
-        rainloop = task.LoopingCall(self.rain_check)
-        rainloop.start(30, False)
+        self.add_deferred(self.rain_check, 10*self.tickrate, True)
 
         # save all instances to DB after loop
-        dbsaveloop = task.LoopingCall(self.save_all_instances)
-        dbsaveloop.start(20, False)     # todo: 20s for testing; obvs should be less often
+        # todo: 20s for testing; obvs should be less often
+        self.add_deferred(self.save_all_instances, 20*self.tickrate, True)
 
         # get encryption keys for sending
         serverdir = os.path.dirname(os.path.realpath(__file__))
@@ -44,6 +70,36 @@ class MoonlapseServer(Factory):
             raise FileNotFoundError("RSA keys not configured on the server. Did you set up rsa_keys.json?")
         except json.JSONDecodeError:
             raise KeyError("RSA keys not properly configured on the server. Check the rsa_keys.json file.")
+
+    def tick(self):
+        """
+        Where all updates happen. Tick rate is how many updates per second.
+        """
+        for deferred in list(self.deferreds):
+            if deferred.expected_tick == self.total_ticks:
+                deferred.fire()
+                if deferred.loops:
+                    deferred.expected_tick = self.total_ticks + deferred.ticks
+                else:
+                    self.remove_deferred(deferred)
+
+        for proto in self.connected_protocols:
+            proto.tick()
+
+        self.total_ticks += 1
+
+    def add_deferred(self, f: callable, ticks: int, loops: bool, *args) -> Deferred:
+        """
+        @param f the function to be fired
+        @param ticks how many ticks in the future until f is fired
+        @param loops if this deferred loops
+        """
+        d = Deferred(f, ticks, self.total_ticks, loops, *args)
+        self.deferreds.append(d)
+        return d
+
+    def remove_deferred(self, d: Deferred):
+        self.deferreds.remove(d)
 
     def decrypt_string(self, string: bytes):
         # first 64 bytes is the RSA encrypted AES key; remainder is AES encrypted message
