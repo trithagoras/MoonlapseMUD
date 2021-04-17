@@ -22,6 +22,7 @@ class NetworkState:
         self.socket = None
         self.public_key = None
         self.username = ""
+        self.tickrate = 20
 
     def send_packet(self, p: packet.Packet):
         """

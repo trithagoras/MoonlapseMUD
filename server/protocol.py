@@ -5,6 +5,8 @@ from django.forms import model_to_dict
 from twisted.internet.protocol import connectionDone
 from twisted.protocols.basic import NetstringReceiver
 
+from collections import deque
+
 from typing import *
 
 from networking import packet
@@ -63,7 +65,8 @@ class MoonlapseProtocol(NetstringReceiver):
         self.state = self.GET_ENTRY
         self.actionloop = None
 
-        self.outgoing: List[packet.Packet] = []
+        self.outgoing = deque()
+        self.next_packet: Optional[packet.Packet] = None     # most recent packet from client to process next tick
 
         self.logger = Log()
 
@@ -73,6 +76,7 @@ class MoonlapseProtocol(NetstringReceiver):
         self.outgoing.append(packet.WelcomePacket("""Welcome to MoonlapseMUD\n ,-,-.\n/.( +.\\\n\ {. */\n `-`-'\n     Enjoy your stay ~"""))
         self.server.connected_protocols.add(self)
         self.outgoing.append(packet.ClientKeyPacket(self.server.public_key.n, self.server.public_key.e))
+        self.outgoing.append(packet.ServerTickRatePacket(self.server.tickrate))
 
     def connectionLost(self, reason=connectionDone):
         self.logout(packet.LogoutPacket(self.username))
@@ -84,7 +88,7 @@ class MoonlapseProtocol(NetstringReceiver):
 
         p: packet.Packet = packet.frombytes(string)
         self.debug(f"Received packet from my client {p}")
-        self.process_packet(p)
+        self.next_packet = p
 
     def process_packet(self, p: packet.Packet):
         self.state(p)
@@ -458,10 +462,15 @@ class MoonlapseProtocol(NetstringReceiver):
             #         self.outgoing.append(packet.ServerModelPacket('Instance', delta))
 
     def tick(self):
+        if self.next_packet:
+            self.process_packet(self.next_packet)
+            print("-----------------------PROCESSED------------------")
+            self.next_packet = None
+
         # send all packets in queue back to client in order
         for p in list(self.outgoing):
             self.send_packet(p)
-            self.outgoing.remove(p)
+            self.outgoing.popleft()
 
     def send_packet(self, p: packet.Packet):
         """
@@ -469,7 +478,6 @@ class MoonlapseProtocol(NetstringReceiver):
         Call this to communicate information back to the game client application.
         """
 
-        # todo: add this packet to the outgoing queue for next tick instead of sending here
         self.sendString(p.tobytes())
         self.debug(f"Sent data to my client: {p.tobytes()}")
 

@@ -13,25 +13,6 @@ from networking import packet
 import maps
 
 
-class Deferred:
-    def __init__(self, f: callable, ticks: int, total_ticks: int, loops: bool, *args):
-        """
-        This should not be created directly. It should only be created with server.add_deferred()
-        :param f: function to fire
-        :param ticks: how many ticks until fired
-        :param total_ticks: the server's current total ticks
-        :param loops: if this deferred loops
-        """
-        self._f = f
-        self.args = args
-        self.ticks = ticks
-        self.expected_tick = total_ticks + ticks
-        self.loops = loops
-
-    def fire(self):
-        self._f(*self.args)
-
-
 class MoonlapseServer(Factory):
     def __init__(self):
         # all protocols connected to server
@@ -48,7 +29,7 @@ class MoonlapseServer(Factory):
         tickloop.start(1/self.tickrate, False)
         self.total_ticks = 0
 
-        self.deferreds: List[Deferred] = []
+        self.deferreds = []
 
         self.weather = 'Clear'
         # weather change check
@@ -88,17 +69,17 @@ class MoonlapseServer(Factory):
 
         self.total_ticks += 1
 
-    def add_deferred(self, f: callable, ticks: int, loops: bool, *args) -> Deferred:
+    def add_deferred(self, f: callable, ticks: int, loops: bool, *args) -> 'Deferred':
         """
         @param f the function to be fired
         @param ticks how many ticks in the future until f is fired
         @param loops if this deferred loops
         """
-        d = Deferred(f, ticks, self.total_ticks, loops, *args)
+        d = self.Deferred(f, ticks, self.total_ticks, loops, *args)
         self.deferreds.append(d)
         return d
 
-    def remove_deferred(self, d: Deferred):
+    def remove_deferred(self, d: 'Deferred'):
         self.deferreds.remove(d)
 
     def decrypt_string(self, string: bytes):
@@ -210,3 +191,21 @@ class MoonlapseServer(Factory):
         for proto in self.protocols_in_room(instance.room.pk):
             if proto.coord_in_view(instance.y, instance.x):
                 proto.process_visible_instances()
+
+    class Deferred:
+        def __init__(self, f: callable, ticks: int, total_ticks: int, loops: bool, *args):
+            """
+            This should not be created directly. It should only be created with server.add_deferred()
+            :param f: function to fire
+            :param ticks: how many ticks until fired
+            :param total_ticks: the server's current total ticks
+            :param loops: if this deferred loops
+            """
+            self._f = f
+            self.args = args
+            self.ticks = ticks
+            self.expected_tick = total_ticks + ticks
+            self.loops = loops
+
+        def fire(self):
+            self._f(*self.args)

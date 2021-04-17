@@ -48,6 +48,8 @@ class Menu(Controller):
             self.cs.ns.public_key = rsa.PublicKey(p.payloads[0].value, p.payloads[1].value)
         elif isinstance(p, packet.DenyPacket):
             self.view.title = p.payloads[0].value
+        elif isinstance(p, packet.ServerTickRatePacket):
+            self.cs.ns.tickrate = p.payloads[0].value
         else:
             return False
 
