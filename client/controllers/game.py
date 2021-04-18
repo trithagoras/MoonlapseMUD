@@ -46,7 +46,7 @@ class Game(Controller):
         self.visible_instances = set()
         self.player_info = None  # id, entity, inventory
         self.player_instance = None  # id, entity, room_id, y, x
-        self.inventory = {}     # item.id : {id, item, amount}
+        self.inventory = {}     # inv_item.id : {item_id, item, amount}
         self.room = None
 
         self.context = Context.NORMAL
@@ -67,7 +67,7 @@ class Game(Controller):
 
     def process_packet(self, p) -> bool:
         if isinstance(p, packet.ServerModelPacket):
-            if p.payloads[0].value == 'ContainerItem':
+            if p.payloads[0].value == 'InventoryItem':
                 self.process_model(p.payloads[0].value, p.payloads[1].value)
             elif not self.ready():
                 self.initialise_my_models(p.payloads[0].value, p.payloads[1].value)
@@ -130,19 +130,16 @@ class Game(Controller):
             else:  # If not visible already, add to visible list (it is only ever sent to us if it's in view)
                 self.visible_instances.add(instance)
 
-        elif mtype == 'ContainerItem':
-            ci = Model(data)
-            itemid = ci['item']['id']
+        elif mtype == 'InventoryItem':
+            inv_item = Model(data)
+            inv_item_id = inv_item['id']
+            amt = inv_item['amount']
 
-            amt = ci['amount']
-            if itemid in self.inventory:
-                amt -= self.inventory[itemid]['amount']
+            self.inventory[inv_item_id] = inv_item
 
             if self.state == State.GRABBING_ITEM:
-                self.quicklog = f"You pick up {amt} {ci['item']['entity']['name']}."
+                self.quicklog = f"You pick up {amt} {inv_item['item']['entity']['name']}."
                 self.state = State.NORMAL
-
-            self.inventory[itemid] = ci
 
     def update(self):
         if self.state == State.LOOKING:
