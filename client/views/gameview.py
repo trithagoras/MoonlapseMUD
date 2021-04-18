@@ -145,9 +145,6 @@ class GameView(View):
         for key, val in self.controller.inventory.items():
             inv.append((key, val))
 
-        if len(inv) <= 15:
-            self.inventory_page = 0
-
         line = 3
         if self.inventory_page == 0:
             rng = range(0, min(15, len(inv)))
