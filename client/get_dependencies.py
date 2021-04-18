@@ -11,7 +11,7 @@ import venv
 
 clientdir = os.path.dirname(os.path.realpath(__file__))
 vdir = os.path.join(clientdir, 'venv')
-vbin = os.path.join(vdir, 'bin')
+vbin = os.path.join(vdir, 'Scripts' if os.name == 'nt' else 'bin')
 vpy = os.path.join(vbin, 'python')
 
 with open(os.path.join(clientdir, 'requirements.txt'), 'r') as f:
@@ -19,7 +19,7 @@ with open(os.path.join(clientdir, 'requirements.txt'), 'r') as f:
 dependencies = [d.strip() for d in dependencies]  # Get rid of newlines from file
 
 # If running Windows, we will also need curses
-if os.name == 'NT':
+if os.name == 'nt':
     dependencies.append('windows-curses')
 
 

@@ -5,10 +5,14 @@ import os
 
 # Ensure from now on, we are running in a virtual environment with all dependencies installed
 clientdir = os.path.dirname(os.path.realpath(__file__))
-vbin = os.path.join(clientdir, 'venv', 'bin')
+vbin = os.path.join(clientdir, 'venv', 'Scripts' if os.name == 'nt' else 'bin')
 vpy = os.path.join(vbin, 'python')
+if os.name == 'nt':
+    vpy += '.exe'
+
 if sys.executable != vpy:
     import subprocess
+    print(vpy)
     subprocess.run([vpy, clientdir] + sys.argv[1:])
     exit()
 
