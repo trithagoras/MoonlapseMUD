@@ -12,7 +12,6 @@ if os.name == 'nt':
 
 if sys.executable != vpy:
     import subprocess
-    print(vpy)
     subprocess.run([vpy, clientdir] + sys.argv[1:])
     exit()
 
