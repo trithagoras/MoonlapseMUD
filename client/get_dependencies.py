@@ -12,7 +12,7 @@ import venv
 
 clientdir = os.path.dirname(os.path.realpath(__file__))
 vdir = os.path.join(clientdir, 'venv')
-vbin = os.path.join(vdir, 'bin')
+vbin = os.path.join(vdir, 'Scripts' if os.name == 'nt' else 'bin')
 vpy = os.path.join(vbin, 'python')
 
 with open(os.path.join(clientdir, 'requirements.txt'), 'r') as f:
