@@ -61,6 +61,7 @@ def handle_arguments() -> Tuple[str, int]:
 
     return hostname, port
 
+
 def main() -> None:
     """
     The main entry point of the game. Starts a MainMenu object to connect to the specified remote server (specified in

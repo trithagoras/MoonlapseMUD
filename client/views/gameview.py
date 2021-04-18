@@ -135,8 +135,8 @@ class GameView(View):
         win.title("Inventory")
 
         win.addstr(1, 2, "Name")
-        win.addstr(1, 12, "Value")
-        win.addstr(1, 22, "Amount")
+        win.addstr(1, 32, "Value")
+        win.addstr(1, 42, "Amount")
 
         line = 3
         for key, val in self.controller.inventory.items():
@@ -144,9 +144,14 @@ class GameView(View):
             amount = val['amount']
             value = val['item']['value']
             win.addstr(line, 2, f"{name}")
-            win.addstr(line, 12, f"{value}")
-            win.addstr(line, 22, f"{amount}")
+            win.addstr(line, 32, f"{value}")
+            win.addstr(line, 42, f"{amount}")
             line += 1
+
+        # todo: remove this
+        win.addstr(15, 2, "Painting Guardian Sword")
+        win.addstr(15, 32, "98,877")
+        win.addstr(15, 42, "2,147M")
 
     def draw_log(self):
         self.win3.title("Log")

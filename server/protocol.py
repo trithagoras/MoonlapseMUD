@@ -214,11 +214,21 @@ class MoonlapseProtocol(NetstringReceiver):
             self.broadcast(packet.ServerLogPacket(message), include_self=True)
             self.logger.log(message)
 
-    def add_item_to_inventory(self, item: models.Item, amt: int):
+    def add_item_to_inventory(self, item: models.Item, amt: int) -> int:
+        """
+        adds this item to inventory
+        todo: should make this a generic add_item_to_container
+        :param item: to add
+        :param amt: to add
+        :requires: amt <= item.max_stack_amt
+        :return: if max capacity was reached, return the amount leftover
+        """
         # create ContainerItem from item and add to player.inventory
         ci = models.ContainerItem.objects.filter(item=item, container=self.player_info.inventory).first()
+        leftover = 0
         if ci:
-            ci.amount += amt
+            leftover = max((ci.amount+amt) - item.max_stack_amt, 0)
+            ci.amount = min(ci.amount+amt, item.max_stack_amt)
             ci.save()
         else:
             ci = models.ContainerItem(item=item, amount=amt, container=self.player_info.inventory)
@@ -226,6 +236,8 @@ class MoonlapseProtocol(NetstringReceiver):
 
         # send client ContainerItem packet
         self.outgoing.append(packet.ServerModelPacket('ContainerItem', create_dict('ContainerItem', ci)))
+
+        return leftover
 
     def kill_instance(self, instance):
         """
@@ -242,11 +254,15 @@ class MoonlapseProtocol(NetstringReceiver):
         for i in self.visible_instances:
             if i.entity.typename in ("Item", "Pickaxe", "Axe") \
                     and i.y == self.player_instance.y and i.x == self.player_instance.x:
-                # remove instanced item from visible instances
-                self.kill_instance(i)
 
                 di = models.Item.objects.get(entity=i.entity)
-                self.add_item_to_inventory(di, i.amount)
+                leftover = self.add_item_to_inventory(di, i.amount)
+
+                if leftover:
+                    i.amount = leftover
+                else:
+                    # remove instanced item from visible instances
+                    self.kill_instance(i)
                 return
 
         self.outgoing.append(packet.DenyPacket("There is no item here."))

@@ -7,6 +7,7 @@ from threading import Thread
 from urllib.parse import urlparse
 from urllib.request import urlretrieve
 import venv
+from typing import *
 
 
 clientdir = os.path.dirname(os.path.realpath(__file__))
@@ -142,7 +143,7 @@ class ExtendedEnvBuilder(venv.EnvBuilder):
         self.install_script(context, 'pip', url)
 
 
-def missing_dependencies() -> list[str]:
+def missing_dependencies() -> List[str]:
     modules = subprocess.check_output([vpy, '-m', 'pip', 'freeze']).splitlines()
     modules = [m.decode('utf-8') for m in modules]
     missing = []

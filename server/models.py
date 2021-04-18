@@ -19,6 +19,7 @@ class Entity(models.Model):
 class Item(models.Model):
     entity = models.ForeignKey(Entity, on_delete=models.RESTRICT)
     value = models.IntegerField(null=True, default=1)
+    max_stack_amt = models.IntegerField(null=True, default=2147483647)
 
 
 class DropTable(models.Model):
