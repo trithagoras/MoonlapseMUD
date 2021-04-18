@@ -1,6 +1,7 @@
 import os
 import os.path
 import subprocess
+import time
 from subprocess import Popen, PIPE
 import sys
 from threading import Thread
@@ -19,7 +20,7 @@ with open(os.path.join(clientdir, 'requirements.txt'), 'r') as f:
 dependencies = [d.strip() for d in dependencies]  # Get rid of newlines from file
 
 # If running Windows, we will also need curses
-if os.name == 'NT':
+if os.name == 'nt':
     dependencies.append('windows-curses')
 
 
@@ -40,12 +41,12 @@ class ExtendedEnvBuilder(venv.EnvBuilder):
                      which is used to install the app.
 
                      If a callable is not specified, default progress
-                     information is output to sys.stderr.
+                     information is printed out.
     """
 
     def __init__(self, *args, **kwargs):
         self.progress = kwargs.pop('progress', None)
-        self.verbose = kwargs.pop('verbose', False)
+        self.done = False
         super().__init__(*args, **kwargs)
 
     def post_setup(self, context):
@@ -60,25 +61,24 @@ class ExtendedEnvBuilder(venv.EnvBuilder):
         self.install_setuptools(context)
         # Can't install pip without setuptools
         self.install_pip(context)
+        self.done = True
 
     def reader(self, stream, context):
-        """
-        Read lines from a subprocess' output stream and either pass to a progress
-        callable (if specified) or write progress information to sys.stderr.
-        """
+        def animate():
+            frame = 0
+            while not self.done:
+                print('\\|/-'[frame], end='\r')
+                frame = (frame + 1) % 4
+                time.sleep(0.1)
         progress = self.progress
+        Thread(target=animate, daemon=True).start()
         while True:
             s = stream.readline()
             if not s:
+                self.done = False
                 break
             if progress is not None:
                 progress(s, context)
-            else:
-                if not self.verbose:
-                    sys.stderr.write('.')
-                else:
-                    sys.stderr.write(s.decode('utf-8'))
-                sys.stderr.flush()
         stream.close()
 
     def install_script(self, context, name, url):
@@ -89,29 +89,19 @@ class ExtendedEnvBuilder(venv.EnvBuilder):
         # Download script into the env's binaries folder
         urlretrieve(url, distpath)
         progress = self.progress
-        if self.verbose:
-            term = '\n'
-        else:
-            term = ''
         if progress is not None:
-            progress('Installing %s ...%s' % (name, term), 'main')
+            progress('', 'main')
         else:
-            sys.stderr.write('Installing %s ...%s' % (name, term))
-            sys.stderr.flush()
+            print(f'  Installing {name}', end=' '*100+'\r')
         # Install in the env
         args = [context.env_exe, fn]
         p = Popen(args, stdout=PIPE, stderr=PIPE, cwd=binpath)
         t1 = Thread(target=self.reader, args=(p.stdout, 'stdout'))
         t1.start()
-        t2 = Thread(target=self.reader, args=(p.stderr, 'stderr'))
-        t2.start()
         p.wait()
         t1.join()
-        t2.join()
         if progress is not None:
-            progress('done.', 'main')
-        else:
-            sys.stderr.write('done.\n')
+            progress('', 'main')
         # Clean up - no longer needed
         os.unlink(distpath)
 
