@@ -85,4 +85,14 @@ ent_iron_ore_node = models.Entity(name="Iron Ore", typename="OreNode"); ent_iron
 inst_iron_ore_node = models.InstancedEntity(entity=ent_iron_ore_node, room=rm_garden, y=3, x=4, respawn_time=10); inst_iron_ore_node.save()
 rsnode_iron_ore = models.ResourceNode(entity=ent_iron_ore_node, droptable=dtable_iron_ore, req_lvl=1, xp_given=5); rsnode_iron_ore.save()
 
+# gold coin spawn in tavern
+ent_gold_coin = models.Entity(name="Gold Coin", typename="Item"); ent_gold_coin.save()
+item_gold_coin=models.Item(entity=ent_gold_coin, value=1); item_gold_coin.save()
+inst_gold_coin = models.InstancedEntity(entity=ent_gold_coin, room=rm_tavern, y=3, x=4, respawn_time=10, amount=8); inst_gold_coin.save()
+
+# banana spawn in forest
+ent_banana = models.Entity(name="Banana", typename="Item"); ent_banana.save()
+item_banana = models.Item(entity=ent_banana, value=1, max_stack_amt=4); item_banana.save()
+inst_banana = models.InstancedEntity(entity=ent_banana, room=rm_forest, y=5, x=5, respawn_time=3, amount=3); inst_banana.save()
+
 print("Done")

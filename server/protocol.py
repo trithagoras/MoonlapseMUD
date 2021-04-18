@@ -214,31 +214,6 @@ class MoonlapseProtocol(NetstringReceiver):
             self.broadcast(packet.ServerLogPacket(message), include_self=True)
             self.logger.log(message)
 
-    # def add_item_to_inventory(self, item: models.Item, amt: int) -> int:
-    #     """
-    #     adds this item to inventory
-    #     todo: should make this a generic add_item_to_container
-    #     :param item: to add
-    #     :param amt: to add
-    #     :requires: amt <= item.max_stack_amt
-    #     :return: if max capacity was reached, return the amount leftover
-    #     """
-    #     # create InventoryItem from item and add to player.inventory
-    #     ci = models.InventoryItem.objects.filter(item=item, player=self.player_info).first()
-    #     leftover = 0
-    #     if ci:
-    #         leftover = max((ci.amount+amt) - item.max_stack_amt, 0)
-    #         ci.amount = min(ci.amount+amt, item.max_stack_amt)
-    #         ci.save()
-    #     else:
-    #         ci = models.InventoryItem(item=item, amount=amt, player=self.player_info)
-    #         ci.save()
-    #
-    #     # send client InventoryItem packet
-    #     self.outgoing.append(packet.ServerModelPacket('InventoryItem', create_dict('InventoryItem', ci)))
-    #
-    #     return leftover
-
     def add_item_to_inventory(self, item: models.Item, amt: int) -> int:
         """
         adds this item to inventory
@@ -255,10 +230,12 @@ class MoonlapseProtocol(NetstringReceiver):
             else:
                 leftover = max((inv_item.amount + amt) - item.max_stack_amt, 0)
                 inv_item.amount = min(item.max_stack_amt, inv_item.amount + amt)
+                inv_item.save()
                 self.outgoing.append(packet.ServerModelPacket('InventoryItem', create_dict('InventoryItem', inv_item)))
 
                 # if inventory is full
                 if len(models.InventoryItem.objects.filter(item=item, player=self.player_info)) == 30:
+                    self.outgoing.append(packet.DenyPacket("Your inventory is full"))
                     return leftover
 
                 while leftover > 0:
