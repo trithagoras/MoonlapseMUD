@@ -233,18 +233,23 @@ class MoonlapseProtocol(NetstringReceiver):
                 inv_item.save()
                 self.outgoing.append(packet.ServerModelPacket('InventoryItem', create_dict('InventoryItem', inv_item)))
 
-                # if inventory is full
-                if len(models.InventoryItem.objects.filter(item=item, player=self.player_info)) == 30:
-                    self.outgoing.append(packet.DenyPacket("Your inventory is full"))
-                    return leftover
-
                 while leftover > 0:
+                    # if inventory is full
+                    if len(models.InventoryItem.objects.filter(player=self.player_info)) == 30:
+                        self.outgoing.append(packet.DenyPacket("Your inventory is full"))
+                        return leftover
+
                     new_amt = min(item.max_stack_amt, leftover)
                     new_inv_item = models.InventoryItem(item=item, amount=new_amt, player=self.player_info)
                     new_inv_item.save()
                     self.outgoing.append(packet.ServerModelPacket('InventoryItem', create_dict('InventoryItem', new_inv_item)))
                     leftover -= new_amt
                 return 0
+
+        # if inventory is full
+        if len(models.InventoryItem.objects.filter(player=self.player_info)) == 30:
+            self.outgoing.append(packet.DenyPacket("Your inventory is full"))
+            return amt
 
         new_inv_item = models.InventoryItem(item=item, amount=amt, player=self.player_info)
         new_inv_item.save()
@@ -441,7 +446,6 @@ class MoonlapseProtocol(NetstringReceiver):
         # send inventory to player
         items = models.InventoryItem.objects.filter(player=self.player_info)
         for ci in items:
-            print(ci)
             self.outgoing.append(packet.ServerModelPacket('InventoryItem', create_dict('InventoryItem', ci)))
 
         self.state = self.PLAY

@@ -47,6 +47,7 @@ class Game(Controller):
         self.player_info = None  # id, entity, inventory
         self.player_instance = None  # id, entity, room_id, y, x
         self.inventory = {}     # inv_item.id : {item_id, item, amount}
+        self.inventory_index = 0    # cursor position in inventory
         self.room = None
 
         self.context = Context.NORMAL
@@ -99,9 +100,8 @@ class Game(Controller):
             else:
                 pass
         elif isinstance(p, packet.DenyPacket):
-            if self.state == State.GRABBING_ITEM:
-                self.quicklog = p.payloads[0].value
-                self.state = State.NORMAL
+            self.quicklog = p.payloads[0].value
+            self.state = State.NORMAL
         elif isinstance(p, packet.ServerTickRatePacket):
             pass
 
@@ -134,6 +134,9 @@ class Game(Controller):
             inv_item = Model(data)
             inv_item_id = inv_item['id']
             amt = inv_item['amount']
+
+            if inv_item_id in self.inventory:
+                amt -= self.inventory[inv_item_id]['amount']
 
             self.inventory[inv_item_id] = inv_item
 
@@ -183,6 +186,23 @@ class Game(Controller):
                 self.look_cursor_x = self.player_instance['x']
             else:
                 self.state = State.NORMAL
+        elif key == ord('<'):
+            self.view.inventory_page = 0
+            self.inventory_index = 0
+        elif key == ord('>'):
+            if len(self.inventory) >= 15:
+                self.view.inventory_page = 1
+                self.inventory_index = 15
+        elif key == ord('['):
+            if self.view.inventory_page == 0:
+                self.inventory_index = max(self.inventory_index - 1, 0)
+            else:
+                self.inventory_index = max(self.inventory_index - 1, 15)
+        elif key == ord(']'):
+            if self.view.inventory_page == 0:
+                self.inventory_index = min(self.inventory_index + 1, min(14, len(self.inventory)-1))
+            else:
+                self.inventory_index = min(self.inventory_index + 1, min(29, len(self.inventory)-1))
         else:
             return False
         return True
