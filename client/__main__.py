@@ -1,7 +1,24 @@
-import curses
-import os
-import socket
+import get_dependencies  # This will create a virtual environment all dependencies on it
+
 import sys
+import os
+
+# Ensure from now on, we are running in a virtual environment with all dependencies installed
+clientdir = os.path.dirname(os.path.realpath(__file__))
+vbin = os.path.join(clientdir, 'venv', 'Scripts' if os.name == 'nt' else 'bin')
+vpy = os.path.join(vbin, 'python')
+if os.name == 'nt':
+    vpy += '.exe'
+
+if sys.executable != vpy:
+    import subprocess
+    print(vpy)
+    subprocess.run([vpy, clientdir] + sys.argv[1:])
+    exit()
+
+# From here on out, we have all the dependencies
+import curses
+import socket
 from typing import *
 
 # Required to import top level modules
@@ -43,7 +60,6 @@ def handle_arguments() -> Tuple[str, int]:
             port = int(sys.argv[2])
 
     return hostname, port
-
 
 def main() -> None:
     """
