@@ -11,3 +11,4 @@ venv/*
 /.idea/misc.xml
 server/migrations/*
 client/user_settings.conf
+client/venv/*
