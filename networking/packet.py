@@ -267,6 +267,15 @@ class GrabItemPacket(Packet):
         super().__init__()
 
 
+class DropItemPacket(Packet):
+    """
+    A packet send from a client to its protocol to drop an item to the ground
+    """
+
+    def __init__(self, inv_item_id: int):
+        super().__init__(Payload(inv_item_id))
+
+
 class WeatherChangePacket(Packet):
     """
     A packet send from a protocol to its client to indicate change in weather

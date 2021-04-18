@@ -200,6 +200,8 @@ class MoonlapseProtocol(NetstringReceiver):
             self.move_rooms(p.payloads[0].value)
         elif isinstance(p, packet.GrabItemPacket):
             self.grab_item_here()
+        elif isinstance(p, packet.DropItemPacket):
+            self.drop_item(p)
         elif isinstance(p, packet.WeatherChangePacket):
             self.outgoing.append(p)
 
@@ -263,8 +265,12 @@ class MoonlapseProtocol(NetstringReceiver):
         self.broadcast(packet.GoodbyePacket(instance.pk), include_self=True)
 
         # a respawning instance isn't deleted, just temporarily displaced OOB
-        instance.y = OOB
-        self.server.add_deferred(self.server.respawn_instance, instance.respawn_time * self.server.tickrate, False, instance.pk)
+        if instance.respawn_time:
+            instance.y = OOB
+            self.server.add_deferred(self.server.respawn_instance, instance.respawn_time * self.server.tickrate, False, instance.pk)
+        else:
+            self.server.instances.pop(instance.pk)
+            instance.delete()
 
     def grab_item_here(self):
         # Check if we're standing on an item
@@ -283,6 +289,19 @@ class MoonlapseProtocol(NetstringReceiver):
                 return
 
         self.outgoing.append(packet.DenyPacket("There is no item here."))
+
+    def drop_item(self, p: packet.DropItemPacket):
+        inv_item = models.InventoryItem.objects.get(id=p.payloads[0].value)
+
+        # create instance and place here
+        inst = models.InstancedEntity(entity=inv_item.item.entity,
+                                      room=self.player_instance.room, y=self.player_instance.y,
+                                      x=self.player_instance.x, amount=inv_item.amount)
+        inst.save()
+        self.server.instances[inst.pk] = inst
+
+        # remove from player inventory
+        inv_item.delete()
 
     def depart_other(self, p: packet.GoodbyePacket):
         other_instanceid: int = p.payloads[0].value
