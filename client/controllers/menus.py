@@ -88,8 +88,8 @@ class LoginMenu(Menu):
         super().__init__(cs)
         self.view = LoginView(self)
 
-        self.widgets.append(TextField(self, title="Username: "))
-        self.widgets.append(TextField(self, title="Password: ", censored=True))
+        self.widgets.append(TextField(self, title="Username: ", max_length=30))
+        self.widgets.append(TextField(self, title="Password: ", censored=True, max_length=200))
         self.widgets.append(CheckBox(self, text="Remember username?"))
         self.widgets.append(Button(self, "Login", self.login))
 
@@ -140,9 +140,9 @@ class RegisterMenu(Menu):
         super().__init__(cs)
         self.view = RegisterView(self)
 
-        self.widgets.append(TextField(self, title="Username: "))
-        self.widgets.append(TextField(self, title="Password: ", censored=True))
-        self.widgets.append(TextField(self, title="Confirm Password: ", censored=True))
+        self.widgets.append(TextField(self, title="Username: ", max_length=30))
+        self.widgets.append(TextField(self, title="Password: ", censored=True, max_length=200))
+        self.widgets.append(TextField(self, title="Confirm Password: ", censored=True, max_length=200))
         self.widgets.append(Button(self, "Register", self.register))
 
         self.view.place_widget(self.widgets[0], 10, 10)

@@ -1,5 +1,7 @@
 import random
 
+import django
+from django.db.utils import DataError
 import rsa
 from django.core.exceptions import ObjectDoesNotExist
 from django.forms import model_to_dict
@@ -144,7 +146,11 @@ class MoonlapseProtocol(NetstringReceiver):
 
         # Save the new user
         user = models.User(username=username, password=password)
-        user.save()
+        try:
+            user.save()
+        except DataError as e:
+            self.outgoing.append(packet.DenyPacket("Error. Value too long."))
+            return
 
         # Create and save a new entity
         entity = models.Entity(typename='Player', name=username)
