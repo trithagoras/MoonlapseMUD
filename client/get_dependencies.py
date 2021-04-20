@@ -132,7 +132,7 @@ class ExtendedEnvBuilder(venv.EnvBuilder):
         self.install_script(context, 'pip', url)
 
 
-def missing_dependencies() -> list[str]:
+def missing_dependencies():
     modules = subprocess.check_output([vpy, '-m', 'pip', 'freeze']).splitlines()
     modules = [m.decode('utf-8') for m in modules]
     missing = []
