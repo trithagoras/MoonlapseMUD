@@ -1,5 +1,4 @@
 server/connectionstrings.json
-/packetdebug.txt
 *.pyc
 *.iml
 *.log
@@ -8,4 +7,10 @@ server/connectionstrings.json
 venv/*
 /.idea/dictionaries/*
 /.idea/misc.xml
-networking/migrations/*
+server/migrations/*
+client/user_settings.conf
+client/venv/*
+client/id_rsa.pub
+client/rsa_private_key.pem
+server/id_rsa.pub
+server/rsa_private_key.pem
