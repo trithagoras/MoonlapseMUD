@@ -1,34 +1,58 @@
-import curses
-import curses.ascii
-import os
-from client.views.view import View
+import time
+
+import rsa
+
+from networking import packet
 
 
 class Controller:
-    def __init__(self):
-        self.view: View = View(self)
+    def __init__(self, cs):
+        self.cs = cs
+        self.view = None
+        self.running = False
 
-    def start(self) -> None:
-        """
-        Gets this controller to start the view and loop handling input. Can be called any time you need to bring
-        this controller / view into action after it's been initialised.
-        """
+        self.widgets = []
 
-        # Eliminate delay in the program after the ESC key is pressed
-        os.environ.setdefault('ESCDELAY', '25')
+    def start(self):
+        self.running = True
+        self.view.start()
 
-        # Start the view
-        curses.wrapper(self.view.display)
+        # begin main loop
+        while self.running:
+            self._process_packet()
+            self.update()
+            self.view._draw()
+            self.cs.stdscr.refresh()
+            self._get_input()
 
-    def stop(self) -> None:
-        """
-        Stops this controller. By default, this involves stopping the view associated with this controller. When
-        implementing this method, call super().stop() last.
-        """
+    def ready(self):
+        pass
+
+    def update(self):
+        pass
+
+    def _process_packet(self):
+        if not self.cs.packets:
+            return
+
+        p = self.cs.packets.pop(0)
+        if not self.process_packet(p):
+            self.cs.packets.insert(0, p)
+
+    def process_packet(self, p) -> bool:
+        pass
+
+    def _get_input(self):
+        key = self.cs.stdscr.getch()
+        self.process_input(key)
+
+    def process_input(self, key: int):
+        pass
+
+    def process_exit(self):
+        pass
+
+    def stop(self):
+        self.running = False
         self.view.stop()
 
-    def handle_input(self) -> int:
-        """
-        Gets input from the view's main loop (kinda gross but oh well) and returns the next keycode pressed.
-        """
-        return self.view.stdscr.getch()

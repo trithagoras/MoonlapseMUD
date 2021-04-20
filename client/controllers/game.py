@@ -1,232 +1,239 @@
 import curses
 import curses.ascii
-import os
-import socket
-import threading
-import time
-import models
+
 import maps
-from enum import Enum
-from typing import *
+from client.controllers.controller import Controller
+from client.views.gameview import GameView
 from networking import packet
 from networking.logger import Log
-from .controller import Controller
-from ..views.gameview import GameView
+from client.controllers.widgets import TextField
+from client.controllers import keybindings
 
 
-class Action(Enum):
-    MOVE_ROOMS = 1
-    LOGOUT = 2
+class Model:
+    def __init__(self, attr: dict):
+        self.id = 0
+        for k, v in attr.items():
+            setattr(self, k, v)
+
+    def update(self, delta: dict):
+        if delta['id'] != self.id:
+            raise ValueError("Cannot change model's ID")
+        for k, v in delta.items():
+            setattr(self, k, v)
+
+    def __getitem__(self, item):
+        return self.__dict__[item]
+
+
+class Context:
+    NORMAL = 0
+    LOGOUT = 1
+    MOVE_ROOMS = 2
+
+
+class State:
+    NORMAL = 0
+    LOOKING = 1
+    GRABBING_ITEM = 2
 
 
 class Game(Controller):
-    def __init__(self, s: socket.socket, username: str):
-        super().__init__()
-        self.s: socket.socket = s
-        self.action: Optional[Action] = None
+    def __init__(self, cs):
+        super().__init__(cs)
+        self.chatbox = TextField(self, title="Say: ", max_length=80)
 
-        # Game data
-        self.user: Optional[models.User] = None
-        self.room: Optional[models.Room] = None
-        self.entity: Optional[models.Entity] = None
-        self.player: Optional[models.Player] = None
+        self.visible_instances = set()
+        self.player_info = None  # id, entity, inventory
+        self.player_instance = None  # id, entity, room_id, y, x
+        self.inventory = {}     # item.id : {id, item, amount}
+        self.room = None
 
-        self.visible_entities: Set[models.Entity] = set()
-        self.tick_rate: Optional[int] = None
+        self.context = Context.NORMAL
+        self.state = State.NORMAL
 
-        self.logger: Log = Log()
+        self.look_cursor_y = 0
+        self.look_cursor_x = 0
 
-        # UI
-        self.chatbox = None
+        self.weather = "Clear"
+
+        self.logger = Log()
+        self.quicklog = ""      # line that appears above win1
+
         self.view = GameView(self)
 
-        self._logged_in = True
+    def ready(self):
+        return False not in [bool(data) for data in (self.player_info, self.player_instance, self.room)]
 
-    def start(self) -> None:
-        # Listen for game data in its own thread
-        threading.Thread(target=self.receive_data).start()
+    def process_packet(self, p) -> bool:
+        if isinstance(p, packet.ServerModelPacket):
+            if p.payloads[0].value == 'ContainerItem':
+                self.process_model(p.payloads[0].value, p.payloads[1].value)
+            elif not self.ready():
+                self.initialise_my_models(p.payloads[0].value, p.payloads[1].value)
+            else:
+                self.process_model(p.payloads[0].value, p.payloads[1].value)
 
-        # Don't draw with game data until it's been received
-        while not self.ready():
-            time.sleep(0.2)
+        elif isinstance(p, packet.GoodbyePacket):
+            # Some instance has been removed from room (item picked up, player logged out, etc.)
+            entityid: int = p.payloads[0].value
+            departed = next((e for e in self.visible_instances if e['id'] == entityid), None)
+            if departed:
+                self.visible_instances.remove(departed)
 
-        # Start the view's display loop
-        super().start()
+        elif isinstance(p, packet.WeatherChangePacket):
+            self.weather = p.payloads[0].value
 
-    def receive_data(self) -> None:
-        while self._logged_in:
-            try:
-                # Get initial room data if not already done
-                while not self.ready() and self._logged_in:
-                    p: packet.Packet = packet.receive(self.s)
-                    if isinstance(p, packet.ServerModelPacket):
-                        self.initialise_models(p.payloads[0].value, p.payloads[1].value)
-                    elif isinstance(p, packet.ServerTickRatePacket):
-                        self.tick_rate = p.payloads[0].value
+        elif isinstance(p, packet.MoveRoomsPacket):
+            self.context = Context.MOVE_ROOMS
 
-                # Get volatile data such as player positions, etc.
-                p: packet.Packet = packet.receive(self.s)
+        elif isinstance(p, packet.ServerLogPacket):
+            self.logger.log(p.payloads[0].value)
 
-                if isinstance(p, packet.ServerModelPacket):
-                    type: str = p.payloads[0].value
-                    model: dict = p.payloads[1].value
+        elif isinstance(p, packet.OkPacket):
+            if self.context == Context.LOGOUT:
+                self.cs.change_controller("MainMenu")
+            elif self.context == Context.MOVE_ROOMS:
+                self.reinitialize()
+                self.context = Context.NORMAL
+            else:
+                pass
+        elif isinstance(p, packet.DenyPacket):
+            if self.state == State.GRABBING_ITEM:
+                self.quicklog = p.payloads[0].value
+                self.state = State.NORMAL
+        elif isinstance(p, packet.ServerTickRatePacket):
+            pass
 
-                    if type == 'Entity':
-                        # If the incoming entity is our player, update it
-                        entity = models.Entity(model)
-                        if entity.id == self.entity.id:
-                            self.entity = entity
-
-                        # If the incoming entity is already visible to us, update it
-                        for e in self.visible_entities:
-                            if e.id == entity.id:
-                                self.visible_entities.remove(e)
-                                self.visible_entities.add(entity)
-
-                        # Else, add it to the visible list (it is only ever sent to us if it's in view)
-                        self.visible_entities.add(entity)
-
-                elif isinstance(p, packet.ServerLogPacket):
-                    self.logger.log(p.payloads[0].value)
-
-                # Another player has logged out, left the room, or disconnected so we remove them from the game.
-                elif isinstance(p, packet.GoodbyePacket):
-                    entityid: int = p.payloads[0].value
-                    departed: models.Entity = next((e for e in self.visible_entities if e.id == entityid), None)
-                    if departed:
-                        self.visible_entities.remove(departed)
-
-                if isinstance(p, packet.MoveRoomsPacket):
-                    self.action = Action.MOVE_ROOMS
-
-                elif isinstance(p, packet.OkPacket):
-                    if self.action == Action.MOVE_ROOMS:
-                        self.action = None
-                        self.reinitialize()
-                    elif self.action == Action.LOGOUT:
-                        self.action = None
-                        self.stop()
-                        break
-
-                elif isinstance(p, packet.DenyPacket):
-                    pass
-                    # Define custom followup behaviours here, e.g.
-                    # if self.action == Action.DO_THIS:
-                    #   self.action = None
-                    #   self.action = do_that()
-
-            except Exception as e:
-                self.logger.log(str(e))
-
-        # The loop ended?
-        self.logger.log("Seems you've stopped listening friend...")
-
-    def initialise_models(self, type: str, data: dict):
-        if type == 'User':
-            self.user = models.User(data)
-
-        elif type == 'Room':
-            if not self._client_has_map_layout(data):
-                self._add_map_layout(data)
-
-            self.room = maps.Room(data['name'])
-            if not self.room.is_unpacked():
-                self.room.unpack()
-
-        elif type == 'Entity':
-            self.entity = models.Entity(data)
-
-        elif type == 'Player':
-            self.player = models.Player(data)
-
-    def _client_has_map_layout(self, data: dict) -> bool:
-        for expected_attr in 'name', 'ground_data', 'solid_data', 'roof_data', 'height', 'width':
-            if expected_attr not in data:
-                raise KeyError("Model dict invalid for room")
-
-        roomname = data['name']
-        roompath = os.path.join(os.path.dirname(os.path.realpath(maps.__file__)), "layouts", roomname)
-
-        if not os.path.exists(roompath) or not os.path.isdir(roompath):
+        else:
             return False
-
-        for dtype in "ground", "solid", "roof":
-            dpath = os.path.join(roompath, f"{dtype}.data")
-            if not os.path.exists(dpath) or not os.path.isfile(dpath):
-                return False
 
         return True
 
-    def _add_map_layout(self, data: dict):
-        roomname: str = data['name']
-        roompath = os.path.join(os.path.dirname(os.path.realpath(maps.__file__)), "layouts", roomname)
-        try:
-            os.makedirs(roompath)
-        except FileExistsError:
-            pass
+    def initialise_my_models(self, mtype: str, data: dict):
+        if mtype == 'Room':
+            self.room = maps.Room(data['id'], data['name'], data['file_name'])
+        elif mtype == 'Instance':
+            self.player_instance = Model(data)
+        elif mtype == 'Player':
+            self.player_info = Model(data)
 
-        for dtype in "ground", "solid", "roof":
-            with open(os.path.join(roompath, f"{dtype}.data"), 'w') as f:
-                f.writelines('\n'.join(data[f"{dtype}_data"]))
+    def process_model(self, mtype: str, data: dict):
+        if mtype == 'Instance':
+            instance = Model(data)
+            visible_instance = next((e for e in self.visible_instances if e['id'] == instance['id']), None)
+            if visible_instance:  # If the incoming entity is already visible to us, update it
+                visible_instance.update(data)
+                # If the incoming entity is ours, update it
+                if instance.id == self.player_instance['id']:
+                    self.player_instance.update(data)
+            else:  # If not visible already, add to visible list (it is only ever sent to us if it's in view)
+                self.visible_instances.add(instance)
 
-    def handle_input(self) -> int:
-        key = super().handle_input()
+        elif mtype == 'ContainerItem':
+            ci = Model(data)
+            itemid = ci['item']['id']
 
-        # Movement
-        directionpacket: Optional[packet.MovePacket] = None
-        if key == curses.KEY_UP:
-            directionpacket = packet.MoveUpPacket()
-        elif key == curses.KEY_RIGHT:
-            directionpacket = packet.MoveRightPacket()
-        elif key == curses.KEY_DOWN:
-            directionpacket = packet.MoveDownPacket()
-        elif key == curses.KEY_LEFT:
-            directionpacket = packet.MoveLeftPacket()
+            amt = ci['amount']
+            if itemid in self.inventory:
+                amt -= self.inventory[itemid]['amount']
 
-        if directionpacket:
-            packet.send(directionpacket, self.s)
+            if self.state == State.GRABBING_ITEM:
+                self.quicklog = f"You pick up {amt} {ci['item']['entity']['name']}."
+                self.state = State.NORMAL
 
-        # Changing window focus
-        elif key in (ord('1'), ord('2'), ord('3')):
-            self.view.focus = int(chr(key))
+            self.inventory[itemid] = ci
 
-        # Changing window 2 focus
-        elif key == ord('?'):
-            self.view.win2_focus = GameView.Window2Focus.HELP
-        elif key == ord('k'):
-            self.view.win2_focus = GameView.Window2Focus.SKILLS
-        elif key == ord('i'):
-            self.view.win2_focus = GameView.Window2Focus.INVENTORY
-        elif key == ord('p'):
-            self.view.win2_focus = GameView.Window2Focus.SPELLBOOK
-        elif key == ord('g'):
-            self.view.win2_focus = GameView.Window2Focus.GUILD
-        elif key == ord('j'):
-            self.view.win2_focus = GameView.Window2Focus.JOURNAL
+    def update(self):
+        if self.state == State.LOOKING:
+            cpos = self.look_cursor_y, self.look_cursor_x
+            for instance in self.visible_instances:
+                pos = instance['y'], instance['x']
+                if cpos == pos:
+                    self.quicklog = instance['entity']['name']
+                    return
+            self.quicklog = ""
 
-        # Chat
-        elif key in (curses.KEY_ENTER, curses.ascii.LF, curses.ascii.CR):
-            self.view.chatbox.modal()
-            self.chat(self.view.chatbox.value)
+    def process_input(self, key: int):
+        if self.process_global_input(key):
+            return
 
-        # Quit on Windows. TODO: Figure out how to make CTRL+C or ESC work.
+        # input state machine
+        if self.state == State.NORMAL:
+            self.process_normal_input(key)
+        elif self.state == State.LOOKING:
+            self.process_look_input(key)
+
+    def process_global_input(self, key: int) -> bool:
+        if self.chatbox.selected:
+            if keybindings.enter(key):
+                self.send_chat(self.chatbox.value)
+                self.chatbox.value = ""
+                self.chatbox.cursor = 0
+            self.chatbox.process_input(key)
+            return True
+        elif keybindings.enter(key):
+            self.chatbox.select()
         elif key == ord('q'):
-            packet.send(packet.LogoutPacket(self.user.username), self.s)
-            self.action = Action.LOGOUT
+            self.cs.ns.send_packet(packet.LogoutPacket(self.cs.ns.username))
+            self.context = Context.LOGOUT
+        elif key == ord('k'):
+            self.quicklog = ""
 
-        return key
+            if self.state != State.LOOKING:
+                self.state = State.LOOKING
+                self.look_cursor_y = self.player_instance['y']
+                self.look_cursor_x = self.player_instance['x']
+            else:
+                self.state = State.NORMAL
+        else:
+            return False
+        return True
 
-    def chat(self, message: str) -> None:
-        packet.send(packet.ChatPacket(message), self.s)
+    def process_normal_input(self, key: int) -> bool:
+        if key == curses.KEY_UP:
+            self.cs.ns.send_packet(packet.MoveUpPacket())
+        elif key == curses.KEY_DOWN:
+            self.cs.ns.send_packet(packet.MoveDownPacket())
+        elif key == curses.KEY_LEFT:
+            self.cs.ns.send_packet(packet.MoveLeftPacket())
+        elif key == curses.KEY_RIGHT:
+            self.cs.ns.send_packet(packet.MoveRightPacket())
+        elif key == ord('g'):
+            self.state = State.GRABBING_ITEM
+            self.cs.ns.send_packet(packet.GrabItemPacket())
+        else:
+            return False
+        return True
 
-    def ready(self) -> bool:
-        return False not in [bool(data) for data in (self.user, self.entity, self.player, self.room, self.tick_rate)]
+    def process_look_input(self, key: int) -> bool:
+        desired_y = self.look_cursor_y
+        desired_x = self.look_cursor_x
+
+        if key == curses.KEY_UP:
+            desired_y -= 1
+            pass
+        elif key == curses.KEY_DOWN:
+            desired_y += 1
+        elif key == curses.KEY_LEFT:
+            desired_x -= 1
+        elif key == curses.KEY_RIGHT:
+            desired_x += 1
+        else:
+            return False
+
+        y, x = self.player_instance['y'], self.player_instance['x']
+        if self.view.coordinate_exists(desired_y, desired_x):
+            if abs(desired_y - y) <= 10 and abs(desired_x - x) <= 10:
+                self.look_cursor_y = desired_y
+                self.look_cursor_x = desired_x
+
+        return True
+
+    def send_chat(self, message):
+        self.cs.ns.send_packet(packet.ChatPacket(message))
 
     def reinitialize(self):
-        self.entity = None
-        self.visible_entities = set()
-        self.tick_rate = None
-
-    def stop(self) -> None:
-        self._logged_in = False
-        super().stop()
+        self.room = None
+        self.player_instance = None
+        self.visible_instances = set()
