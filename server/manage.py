@@ -18,7 +18,7 @@ root = file.parents[1]
 sys.path.append(str(root))
 
 INSTALLED_APPS = [
-    'networking'
+    'server'
 ]
 
 DATABASES = {

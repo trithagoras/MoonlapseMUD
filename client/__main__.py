@@ -1,5 +1,23 @@
-import socket
+import get_dependencies  # This will create a virtual environment all dependencies on it
+
 import sys
+import os
+
+# Ensure from now on, we are running in a virtual environment with all dependencies installed
+clientdir = os.path.dirname(os.path.realpath(__file__))
+vbin = os.path.join(clientdir, 'venv', 'Scripts' if os.name == 'nt' else 'bin')
+vpy = os.path.join(vbin, 'python')
+if os.name == 'nt':
+    vpy += '.exe'
+
+if sys.executable != vpy:
+    import subprocess
+    subprocess.run([vpy, clientdir] + sys.argv[1:])
+    exit()
+
+# From here on out, we have all the dependencies
+import curses
+import socket
 from typing import *
 
 # Required to import top level modules
@@ -8,7 +26,7 @@ file = Path(__file__).resolve()
 parent, root = file.parent, file.parents[1]
 sys.path.append(str(root))
 
-from client.controllers.mainmenu import MainMenu
+from client.utils import ClientState, NetworkState
 
 
 def handle_arguments() -> Tuple[str, int]:
@@ -26,11 +44,11 @@ def handle_arguments() -> Tuple[str, int]:
 
     :return: The hostname and/or port specified in the command line arguments, otherwise ('moonlapse.net', 8081).
     """
-    hostname: str = 'play.moonlapse.net'
-    port: int = 42523
+    hostname = 'play.moonlapse.net'
+    port = 42523
 
     # sys.argv will return something like ['client', 'localhost', 8123]
-    n_args: int = len(sys.argv)
+    n_args = len(sys.argv)
 
     if n_args not in (1, 2, 3):
         print("Usage: client [hostname=moonlapse.net] [port=42523]", file=sys.stderr)
@@ -42,24 +60,28 @@ def handle_arguments() -> Tuple[str, int]:
 
     return hostname, port
 
-
 def main() -> None:
     """
     The main entry point of the game. Starts a MainMenu object to connect to the specified remote server (specified in
     the command line arguments) to begin the game. Prints error details to stderr and exits if there was an exception.
     """
     address = handle_arguments()
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        try:
-            s.connect(address)
-        except ConnectionRefusedError:
-            print(f"Connection to {address[0]}:{address[1]} refused. Is the server up?")
-            sys.exit(-1)
-        except Exception as e:
-            print(f"Could not establish a connection to {address[0]}:{address[1]}. {e}.")
-            sys.exit(-1)
-        mainmenu = MainMenu(s)
-        mainmenu.start()
+
+    try:
+        s = socket.create_connection(address)
+    except ConnectionRefusedError:
+        print(f"Connection to {address[0]}:{address[1]} refused. Is the server up?")
+        sys.exit(-1)
+    except Exception as e:
+        print(f"Could not establish a connection to {address[0]}:{address[1]}. {e}.")
+        sys.exit(-1)
+
+    ns = NetworkState(s)
+
+    # Eliminate delay in the program after the ESC key is pressed
+    os.environ.setdefault('ESCDELAY', '25')
+
+    curses.wrapper(ClientState, ns)
 
 
 if __name__ == '__main__':
