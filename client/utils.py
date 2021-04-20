@@ -52,9 +52,11 @@ class NetworkState:
         Converts a Packet to bytes and sends it over a socket. Ensures all the data is sent and no more.
         """
         b = p.tobytes()
-        if public_key:
-            b = cryptography.encrypt(b, public_key)
-
+        if not isinstance(p, packet.ClientKeyPacket):   # Don't encrypt the sending of our public key
+            try:
+                b = cryptography.encrypt(b, public_key)
+            except Exception:   # TODO: If public key is None, request it to be sent again
+                return b''
         b = self._to_netstring(b)
 
         failure = s.sendall(b)

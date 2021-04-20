@@ -486,10 +486,11 @@ class MoonlapseProtocol(NetstringReceiver):
         Call this to communicate information back to the game client application.
         """
         message: bytes = p.tobytes()
-        if self.client_pub_key:
+        try:
             message = cryptography.encrypt(message, self.client_pub_key)
-        else:
-            self.debug(f"WARNING: Sending unencrypted packet")
+        except Exception as e:
+            self.debug(f"FATAL: Couldn't encrypt packet {p} for sending. Error was {e}. Returning.")
+            return
         self.sendString(message)
         self.debug(f"Sent data to my client: {p.tobytes()}")
 
