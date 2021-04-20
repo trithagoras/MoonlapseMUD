@@ -1,11 +1,13 @@
 import random
 
+import rsa
 from django.core.exceptions import ObjectDoesNotExist
 from django.forms import model_to_dict
 from twisted.internet.protocol import connectionDone
 from twisted.protocols.basic import NetstringReceiver
 
 from collections import deque
+from networking import cryptography
 
 from typing import *
 
@@ -61,6 +63,7 @@ class MoonlapseProtocol(NetstringReceiver):
         self.player_info: Optional[models.Player] = None
         self.roommap: Optional[maps.Room] = None
         self.logged_in = False
+        self.client_pub_key: Optional[rsa.key.PublicKey] = None
 
         self.state = self.GET_ENTRY
         self.actionloop = None
@@ -73,10 +76,10 @@ class MoonlapseProtocol(NetstringReceiver):
         self.visible_instances: Set[models.InstancedEntity] = set()
 
     def connectionMade(self):
-        self.outgoing.append(packet.WelcomePacket("""Welcome to MoonlapseMUD\n ,-,-.\n/.( +.\\\n\ {. */\n `-`-'\n     Enjoy your stay ~"""))
         self.server.connected_protocols.add(self)
         self.outgoing.append(packet.ClientKeyPacket(self.server.public_key.n, self.server.public_key.e))
         self.outgoing.append(packet.ServerTickRatePacket(self.server.tickrate))
+        self.outgoing.append(packet.WelcomePacket("""Welcome to MoonlapseMUD\n ,-,-.\n/.( +.\\\n\ {. */\n `-`-'\n     Enjoy your stay ~"""))
 
     def connectionLost(self, reason=connectionDone):
         self.logout(packet.LogoutPacket(self.username))
@@ -84,9 +87,12 @@ class MoonlapseProtocol(NetstringReceiver):
 
     def stringReceived(self, string):
         # attempt to decrypt packet
-        string = self.server.decrypt_string(string)
-
-        p: packet.Packet = packet.frombytes(string)
+        try:
+            string = cryptography.decrypt(string, self.server.private_key)
+        except Exception as e:
+            self.debug(f"WARNING: Packet came through unencrypted")
+            self.debug(str(e))
+        p = packet.frombytes(string)
         self.debug(f"Received packet from my client {p}")
         self.next_packet = p
 
@@ -94,6 +100,8 @@ class MoonlapseProtocol(NetstringReceiver):
         self.state(p)
 
     def GET_ENTRY(self, p: packet.Packet):
+        if isinstance(p, packet.ClientKeyPacket):
+            self.client_pub_key = rsa.key.PublicKey(p.payloads[0].value, p.payloads[1].value)
         if isinstance(p, packet.LoginPacket):
             self.login_user(p)
         elif isinstance(p, packet.RegisterPacket):
@@ -477,8 +485,12 @@ class MoonlapseProtocol(NetstringReceiver):
         Sends a packet to this protocol's client.
         Call this to communicate information back to the game client application.
         """
-
-        self.sendString(p.tobytes())
+        message: bytes = p.tobytes()
+        if self.client_pub_key:
+            message = cryptography.encrypt(message, self.client_pub_key)
+        else:
+            self.debug(f"WARNING: Sending unencrypted packet")
+        self.sendString(message)
         self.debug(f"Sent data to my client: {p.tobytes()}")
 
     def broadcast(self, p: packet.Packet, include_self=False):

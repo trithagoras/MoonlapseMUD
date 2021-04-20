@@ -1,10 +1,12 @@
 import curses
+import json
+import os
 import random
 import string
 import threading
 import time
 
-from Crypto.Cipher import AES
+from networking import cryptography
 import rsa
 
 from client.controllers.game import Game
@@ -18,36 +20,28 @@ class NetworkState:
     Higher level abstraction for keeping network state. Keeps public_key and socket in neat spot.
     """
 
-    def __init__(self):
-        self.socket = None
-        self.public_key = None
+    def __init__(self, socket):
+        self.socket = socket
+        self.server_public_key = None
         self.username = ""
         self.tickrate = 20
+
+        # get encryption keys for sending
+        clientdir = os.path.dirname(os.path.realpath(__file__))
+        self.my_public_key, self.my_private_key = cryptography.load_rsa_keypair(clientdir)
+
+        # Send the server our public key
+        self.send_packet(packet.ClientKeyPacket(self.my_public_key.n, self.my_public_key.e))
 
     def send_packet(self, p: packet.Packet):
         """
         Converts packet to bytes; then encrypts bytes; then converts to netstring; then send over socket
         :param p: packet to send
         """
-
-        self._send(p, self.socket, self.public_key)
+        self._send(p, self.socket, public_key=self.server_public_key)
 
     def receive_packet(self) -> packet.Packet:
         return self._receive(self.socket)
-
-    def _encrypt_message(self, b: bytes, public_key):
-        IV = b'1111111111111111'
-        key = bytes(
-            ''.join(random.choice(string.ascii_letters + string.digits + string.punctuation) for i in range(16)),
-            'utf-8')
-        aes = AES.new(key, AES.MODE_CFB, IV=IV)
-
-        msg: bytearray = aes.encrypt(b)
-
-        key = rsa.encrypt(key, public_key)
-        # key length = 512/8=64 bytes (chars)
-
-        return key + msg
 
     def _to_netstring(self, data: bytes) -> bytes:
         length = len(data)
@@ -59,13 +53,13 @@ class NetworkState:
         """
         b = p.tobytes()
         if public_key:
-            b = self._encrypt_message(b, public_key)
+            b = cryptography.encrypt(b, public_key)
 
         b = self._to_netstring(b)
 
         failure = s.sendall(b)
         if failure is not None:
-            self._send(p, s)
+            self._send(p, s, public_key=public_key)
         return b
 
     def _receive(self, s) -> packet.Packet:
@@ -108,6 +102,7 @@ class NetworkState:
 
                 # Read off the trailing comma
                 s.recv(1)
+                data = cryptography.decrypt(data, self.my_private_key)
                 return packet.frombytes(data)
 
         raise PacketParseError("Error reading packet length. Too long.")

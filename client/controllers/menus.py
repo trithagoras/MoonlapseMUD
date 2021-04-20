@@ -44,9 +44,7 @@ class Menu(Controller):
             self.process_exit()
 
     def process_packet(self, p) -> bool:
-        if isinstance(p, packet.ClientKeyPacket):
-            self.cs.ns.public_key = rsa.PublicKey(p.payloads[0].value, p.payloads[1].value)
-        elif isinstance(p, packet.DenyPacket):
+        if isinstance(p, packet.DenyPacket):
             self.view.title = p.payloads[0].value
         elif isinstance(p, packet.ServerTickRatePacket):
             self.cs.ns.tickrate = p.payloads[0].value
@@ -74,8 +72,11 @@ class MainMenu(Menu):
     def process_packet(self, p) -> bool:
         if super().process_packet(p):
             return True
+        elif isinstance(p, packet.ClientKeyPacket):
+            self.cs.ns.server_public_key = rsa.PublicKey(p.payloads[0].value, p.payloads[1].value)
         elif isinstance(p, packet.WelcomePacket):
             self.view.title = p.payloads[0].value
+            pass
         else:
             return False
 
