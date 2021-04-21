@@ -108,6 +108,9 @@ class LoginPacket(Packet):
         ppassword = Payload(password)
         super().__init__(pusername, ppassword)
 
+    def __repr__(self):
+        return f"{self.action}: ({self.payloads[0]}, (Payload: ***))"
+
 
 class LogoutPacket(Packet):
     def __init__(self, username: str):
@@ -125,6 +128,9 @@ class RegisterPacket(Packet):
         pusername = Payload(username)
         ppassword = Payload(password)
         super().__init__(pusername, ppassword)
+
+    def __repr__(self):
+        return f"{self.action}: ({self.payloads[0]}, (Payload: ***))"
 
 
 class ServerModelPacket(Packet):
