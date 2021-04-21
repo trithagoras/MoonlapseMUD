@@ -135,6 +135,13 @@ class ExtendedEnvBuilder(venv.EnvBuilder):
 def missing_dependencies():
     modules = subprocess.check_output([vpy, '-m', 'pip', 'freeze']).splitlines()
     modules = [m.decode('utf-8') for m in modules]
+
+    # We don't really care about the version of windows-curses installed
+    if os.name == 'nt':
+        win_curses_idxs = [modules.index(m) for m in modules if m.startswith('windows-curses')]
+        if win_curses_idxs:
+            modules[win_curses_idxs[0]] = 'windows-curses'
+
     missing = []
 
     for d in dependencies:
