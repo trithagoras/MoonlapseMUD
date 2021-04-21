@@ -12,7 +12,6 @@ if os.name == 'nt':
 
 if sys.executable != vpy:
     import subprocess
-    print(vpy)
     subprocess.run([vpy, clientdir] + sys.argv[1:])
     exit()
 
@@ -78,8 +77,7 @@ def main() -> None:
         print(f"Could not establish a connection to {address[0]}:{address[1]}. {e}.")
         sys.exit(-1)
 
-    ns = NetworkState()
-    ns.socket = s
+    ns = NetworkState(s)
 
     # Eliminate delay in the program after the ESC key is pressed
     os.environ.setdefault('ESCDELAY', '25')

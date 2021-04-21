@@ -37,6 +37,7 @@ jobs:
           git stash
           git pull origin master
           git stash pop
+          python3 ${{ secrets.REMOTE_GAME_DIR }}/server/manage.py makemigrations server
+          python3 ${{ secrets.REMOTE_GAME_DIR }}/server/manage.py migrate
           tmux new-session -d -s gameserver \; send-keys "python3 ${{ secrets.REMOTE_GAME_DIR }}/server" Enter
           exit
-          

@@ -9,7 +9,7 @@ from typing import *
 
 from server import manage, models
 import server.protocol as protocol
-from networking import packet
+from networking import packet, cryptography
 import maps
 
 
@@ -41,16 +41,7 @@ class MoonlapseServer(Factory):
 
         # get encryption keys for sending
         serverdir = os.path.dirname(os.path.realpath(__file__))
-        try:
-            with open(os.path.join(serverdir, "rsa_keys.json"), 'r') as f:
-                d = json.load(f)
-                self.public_key = rsa.key.PublicKey(d['PublicKey']['n'], d['PublicKey']['e'])
-                self.private_key = rsa.key.PrivateKey(d['PrivateKey']['n'], d['PrivateKey']['e'], d['PrivateKey']['d'],
-                                                      d['PrivateKey']['p'], d['PrivateKey']['q'])
-        except FileNotFoundError:
-            raise FileNotFoundError("RSA keys not configured on the server. Did you set up rsa_keys.json?")
-        except json.JSONDecodeError:
-            raise KeyError("RSA keys not properly configured on the server. Check the rsa_keys.json file.")
+        self.public_key, self.private_key = cryptography.load_rsa_keypair(serverdir)
 
     def tick(self):
         """
@@ -81,18 +72,6 @@ class MoonlapseServer(Factory):
 
     def remove_deferred(self, d: 'Deferred'):
         self.deferreds.remove(d)
-
-    def decrypt_string(self, string: bytes):
-        # first 64 bytes is the RSA encrypted AES key; remainder is AES encrypted message
-        encrypted_key = string[:64]
-        encrypted_message = string[64:]
-
-        IV = b'1111111111111111'
-
-        key = rsa.decrypt(encrypted_key, self.private_key)
-        cipher = AES.new(key, AES.MODE_CFB, IV=IV)
-        message = cipher.decrypt(encrypted_message)
-        return message
 
     def protocols_in_room(self, roomid: int) -> Set[protocol.MoonlapseProtocol]:
         s = set()
