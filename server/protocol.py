@@ -199,6 +199,10 @@ class MoonlapseProtocol(NetstringReceiver):
             self.visible_instances = set()
             self.state = self.GET_ENTRY
 
+            if self.actionloop:
+                self.server.remove_deferred(self.actionloop)
+                self.actionloop = None
+
     def PLAY(self, p: packet.Packet):
         if isinstance(p, packet.MovePacket):
             self.move(p)
