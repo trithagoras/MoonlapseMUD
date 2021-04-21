@@ -79,9 +79,6 @@ class MoonlapseProtocol(NetstringReceiver):
 
     def connectionMade(self):
         self.server.connected_protocols.add(self)
-        self.outgoing.append(packet.ClientKeyPacket(self.server.public_key.n, self.server.public_key.e))
-        self.outgoing.append(packet.ServerTickRatePacket(self.server.tickrate))
-        self.outgoing.append(packet.WelcomePacket("""Welcome to MoonlapseMUD\n ,-,-.\n/.( +.\\\n\ {. */\n `-`-'\n     Enjoy your stay ~"""))
 
     def connectionLost(self, reason=connectionDone):
         self.logout(packet.LogoutPacket(self.username))
@@ -103,7 +100,14 @@ class MoonlapseProtocol(NetstringReceiver):
 
     def GET_ENTRY(self, p: packet.Packet):
         if isinstance(p, packet.ClientKeyPacket):
+            # We have the client's public key so now we can send some initial data
             self.client_pub_key = rsa.key.PublicKey(p.payloads[0].value, p.payloads[1].value)
+            # Send the client the server's public key
+            self.outgoing.append(packet.ClientKeyPacket(self.server.public_key.n, self.server.public_key.e))
+            # Send the client some initial info it needs to know
+            self.outgoing.append(packet.ServerTickRatePacket(self.server.tickrate))
+            self.outgoing.append(packet.WelcomePacket(
+                """Welcome to MoonlapseMUD\n ,-,-.\n/.( +.\\\n\ {. */\n `-`-'\n     Enjoy your stay ~"""))
         if isinstance(p, packet.LoginPacket):
             self.login_user(p)
         elif isinstance(p, packet.RegisterPacket):
