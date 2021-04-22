@@ -12,8 +12,12 @@ class Window:
         self.width = width
         self._win = parent_win.subwin(height, width, y, x)
 
-    def border(self):
+    def border(self, color=None):
+        if color:
+            self._win.attron(curses.color_pair(color))
         self._win.border()
+        if color:
+            self._win.attroff(curses.color_pair(color))
 
     def title(self, s: str):
         self.addstr(0, 2, f"{s} ")

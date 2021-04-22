@@ -186,6 +186,24 @@ class Game(Controller):
                 self.look_cursor_x = self.player_instance['x']
             else:
                 self.state = State.NORMAL
+
+        elif key == ord('1'):
+            self.view.focused_win = self.view.win1
+        elif key == ord('2'):
+            self.view.focused_win = self.view.win2
+        elif key == ord('3'):
+            self.view.focused_win = self.view.win3
+
+        elif self.view.focused_win == self.view.win3:
+            if key == curses.KEY_DOWN:
+                self.view.chat_scroll = max(0, self.view.chat_scroll - 1)
+            elif key == curses.KEY_UP:
+                # I'm so sorry
+                self.view.chat_scroll = min(
+                    self.view.times_logged - self.view.win3.height + self.view.chatwin.height,
+                    self.view.chat_scroll + 1
+                )
+
         else:
             return False
         return True

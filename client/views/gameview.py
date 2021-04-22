@@ -11,14 +11,17 @@ import client.controllers.game as game
 class GameView(View):
     def __init__(self, controller):
         super().__init__(controller)
-        self.visible_log: Dict[float, str] = {}
+        self.gamelog: Dict[float, str] = {}
         self.times_logged: int = 0
 
         # Init windows
         self.win1 = Window(self.controller.cs.stdscr, 3, 0, 23, 53)
         self.win2 = Window(self.controller.cs.stdscr, 3, 53, 23, 53)
         self.win3 = Window(self.controller.cs.stdscr, 26, 0, 13, 106)
+        self.focused_win = None
+
         self.chatwin = Window(self.controller.cs.stdscr, self.win3.y + self.win3.height - 1, self.win3.x, 3, self.win3.width)
+        self.chat_scroll = 0
         self.place_widget(self.controller.chatbox, self.chatwin.y + 1, self.chatwin.x + 2)
 
     def draw(self):
@@ -27,13 +30,9 @@ class GameView(View):
             self.addstr(50 // 2, (100 - len(msg)) // 2, msg)
             return
 
-        self.win1 = Window(self.controller.cs.stdscr, 3, 0, 23, 53)
-        self.win2 = Window(self.controller.cs.stdscr, 3, 53, 23, 53)
-        self.win3 = Window(self.controller.cs.stdscr, 26, 0, 13, 106)
-        self.chatwin = Window(self.controller.cs.stdscr, self.win3.y + self.win3.height - 1, self.win3.x, 3, self.win3.width)
-
-        for win in [self.win1, self.win2, self.win3, self.chatwin]:
-            win.border()
+        for win in (self.win1, self.win2, self.win3, self.chatwin):
+            focused = win == self.focused_win
+            win.border(color=(curses.COLOR_CYAN if focused else None))
 
         # window 1 content
         self.draw_map()
@@ -47,7 +46,7 @@ class GameView(View):
         self.addstr(2, 1, self.controller.quicklog)
 
     def draw_map(self):
-        self.win1.title(self.controller.room.name)
+        self.win1.title(f"[1] {self.controller.room.name}")
 
         view_radius = 10
         win1_hwidth, win1_hheight = self.win1.width // 2, self.win1.height // 2
@@ -132,7 +131,7 @@ class GameView(View):
 
     def draw_inventory(self):
         win = self.win2
-        win.title("Inventory")
+        win.title("[2] Inventory")
 
         win.addstr(1, 2, "Name")
         win.addstr(1, 12, "Value")
@@ -149,26 +148,23 @@ class GameView(View):
             line += 1
 
     def draw_log(self):
-        self.win3.title("Log")
+        self.win3.title(f"[3] Log {self.chat_scroll}")
 
         # Update the log if necessary
         logsize_diff: int = self.controller.logger.size - self.times_logged
         if logsize_diff > 0:
-            self.visible_log.update(self.controller.logger.latest)
+            self.gamelog.update(self.controller.logger.latest)
             self.times_logged += logsize_diff
 
-            # Truncate the log to only the newest entries that will fit in the view
-            log_keys = list(self.visible_log.keys())
-            log_keys_to_remove = log_keys[:max(0, len(log_keys) - self.win3.height + self.chatwin.height)]
-            for key in log_keys_to_remove:
-                del self.visible_log[key]
-
-        if self.visible_log != {}:
+        if self.gamelog != {}:
             log_line: int = 2
-            for utctime, message in self.visible_log.items():
+            for utctime in list(self.gamelog.keys())[-self.chat_scroll - self.win3.height + self.chatwin.height:]:
+                message = self.gamelog[utctime]
                 timestamp: str = time.strftime('%R', time.localtime(utctime))
                 self.win3.addstr(log_line, 1, f" [{timestamp}] {message}")
                 log_line += 1
+                if log_line > self.win3.height - self.chatwin.height + 1:
+                    break
 
         # Add chat prompt
         self.controller.chatbox.draw()
