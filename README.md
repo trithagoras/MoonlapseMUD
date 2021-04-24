@@ -10,7 +10,7 @@ Ensure Python 3.4 is installed on your machine and your terminal has a resolutio
 Simply download the latest client either using the download links above or by running the following command in your terminal:
 
 ```shell
-curl -L https://github.com/trithagoras/MoonlapseMUD/releases/download/v0.3/Client.tar -o Client.tar
+curl -L https://github.com/trithagoras/MoonlapseMUD/releases/download/v0.4/Client.tar -o Client.tar
 ```
 
 Unzip the archive either using a GUI archiving tool (typically integrated with your file manager) or by running:
