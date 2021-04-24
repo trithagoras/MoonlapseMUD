@@ -204,15 +204,15 @@ class Game(Controller):
             else:
                 self.inventory_index = min(self.inventory_index + 1, min(29, len(self.inventory)-1))
         elif key == ord('D'):
-            # drop-all
-            inv = []
-            for key in self.inventory:
-                inv.append(key)
+            if len(self.inventory) > 0:
+                # drop-all
+                inv = []
+                for key in self.inventory:
+                    inv.append(key)
 
-            iid = inv[self.inventory_index]
-            self.cs.ns.send_packet(packet.DropItemPacket(iid))
-            self.inventory.pop(iid)
-
+                iid = inv[self.inventory_index]
+                self.cs.ns.send_packet(packet.DropItemPacket(iid))
+                self.inventory.pop(iid)
         else:
             return False
         return True
