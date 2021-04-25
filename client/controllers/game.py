@@ -170,6 +170,7 @@ class Game(Controller):
                 self.send_chat(self.chatbox.value)
                 self.chatbox.value = ""
                 self.chatbox.cursor = 0
+                self.view.chat_scroll = 0
             self.chatbox.process_input(key)
             return True
         elif keybindings.enter(key):
