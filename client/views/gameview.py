@@ -150,7 +150,10 @@ class GameView(View):
             line += 1
 
     def draw_log(self):
-        self.win3.title(f"[3] Log")
+        title = "[3] Log"
+        if self.chat_scroll > 0:
+            title += f" ({self.chat_scroll} more ↓)"
+        self.win3.title(title)
 
         # Update the log if necessary
         logsize_diff: int = self.controller.logger.size - self.times_logged
