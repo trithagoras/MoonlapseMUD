@@ -195,14 +195,10 @@ class Game(Controller):
             self.view.focused_win = self.view.win3
 
         elif self.view.focused_win == self.view.win3:
-            if key == curses.KEY_DOWN:
-                self.view.chat_scroll = max(0, self.view.chat_scroll - 1)
-            elif key == curses.KEY_UP:
-                # I'm so sorry
-                self.view.chat_scroll = min(
-                    self.view.times_logged - self.view.win3.height + self.view.chatwin.height,
-                    self.view.chat_scroll + 1
-                )
+            if key == curses.KEY_DOWN and self.view.chat_scroll > 0:
+                self.view.chat_scroll -= 1
+            elif key == curses.KEY_UP and self.view.chat_scroll < self.view.times_logged - self.view.win3.height + self.view.chatwin.height:
+                self.view.chat_scroll += 1
 
         else:
             return False

@@ -1,7 +1,7 @@
 import curses
 import random
 import time
-from typing import Dict
+from typing import *
 
 import maps
 from client.views.view import View, Window
@@ -21,7 +21,9 @@ class GameView(View):
         self.focused_win = None
 
         self.chatwin = Window(self.controller.cs.stdscr, self.win3.y + self.win3.height - 1, self.win3.x, 3, self.win3.width)
-        self.chat_scroll = 0
+
+        self.chat_scroll: int = 0   # How many lines up from the most recent logged?
+
         self.place_widget(self.controller.chatbox, self.chatwin.y + 1, self.chatwin.x + 2)
 
     def draw(self):
@@ -148,7 +150,7 @@ class GameView(View):
             line += 1
 
     def draw_log(self):
-        self.win3.title(f"[3] Log {self.chat_scroll}")
+        self.win3.title(f"[3] Log")
 
         # Update the log if necessary
         logsize_diff: int = self.controller.logger.size - self.times_logged
@@ -158,13 +160,17 @@ class GameView(View):
 
         if self.gamelog != {}:
             log_line: int = 2
-            for utctime in list(self.gamelog.keys())[-self.chat_scroll - self.win3.height + self.chatwin.height:]:
-                message = self.gamelog[utctime]
+            gamelog_ordered: List[Tuple[float, str]] = list(self.gamelog.items())
+
+            if self.times_logged >= self.win3.height - self.chatwin.height:
+                # There is overflow to worry about so we need to truncate
+                gamelog_start_idx = (self.times_logged - self.win3.height + self.chatwin.height) - self.chat_scroll
+                gamelog_end_idx = gamelog_start_idx + self.win3.height - self.chatwin.height
+                gamelog_ordered = gamelog_ordered[gamelog_start_idx: gamelog_end_idx]
+
+            for idx, (utctime, message) in enumerate(gamelog_ordered):
                 timestamp: str = time.strftime('%R', time.localtime(utctime))
-                self.win3.addstr(log_line, 1, f" [{timestamp}] {message}")
-                log_line += 1
-                if log_line > self.win3.height - self.chatwin.height + 1:
-                    break
+                self.win3.addstr(idx + 2, 1, f" [{timestamp}] {message}")
 
         # Add chat prompt
         self.controller.chatbox.draw()
