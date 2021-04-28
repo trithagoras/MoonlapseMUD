@@ -1,5 +1,4 @@
 import curses
-import time
 
 from client.controllers.widgets import Widget
 
@@ -51,6 +50,7 @@ class View:
 
             self.controller.cs.stdscr.erase()
             self.draw()
+            self.controller.debug.draw()
             self.controller.cs.stdscr.refresh()
         except Exception as e:
             error: str = f"Error: {e}"
@@ -63,7 +63,7 @@ class View:
                 msg: str = f"Trying again in {ttl}"
                 self.addstr(hh + 1, (width - len(msg)) // 2, msg)
                 stdscr.refresh()
-                time.sleep(1)
+                curses.napms(1000)
             self._draw()
 
     def draw(self):

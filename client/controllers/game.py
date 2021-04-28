@@ -102,9 +102,6 @@ class Game(Controller):
             if self.state == State.GRABBING_ITEM:
                 self.quicklog = p.payloads[0].value
                 self.state = State.NORMAL
-        elif isinstance(p, packet.ServerTickRatePacket):
-            pass
-
         else:
             return False
 
@@ -155,6 +152,8 @@ class Game(Controller):
             self.quicklog = ""
 
     def process_input(self, key: int):
+        super().process_input(key)
+
         if self.process_global_input(key):
             return
 
