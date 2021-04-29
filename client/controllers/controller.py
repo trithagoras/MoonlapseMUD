@@ -1,8 +1,4 @@
-import time
-
-import rsa
-
-from networking import packet
+import curses
 
 
 class Controller:
