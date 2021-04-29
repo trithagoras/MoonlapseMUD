@@ -20,6 +20,7 @@ class Menu(Controller):
         self.cursor = 0
 
     def process_input(self, key: int):
+        super().process_input(key)
         for widget in self.widgets:
             if widget.selected:
                 widget.process_input(key)
