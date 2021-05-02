@@ -1,8 +1,8 @@
 from typing import *
 import os
 
-M: int = 8191  # Large enough prime (2^13 - 1)
-A: int = 17    # Primitive modulo M
+M: int = 127  # Large enough prime (2^13 - 1)
+A: int = 3    # Primitive modulo M
 
 
 class Randomish:
@@ -10,22 +10,25 @@ class Randomish:
         Random-ish integer generator. Intended for use ONLY for aesthetic reasons. Quality of random numbers are
         acceptable to the naked eye and the generation algorithm is computationally cheap.
     """
-    def __init__(self, y: Optional[int] = None, x: Optional[int] = None):
-        self._y = y
-        self._x = x
-        self._next: int = 0  # To be initialised in the first seed
-        self.seed(self._y, self._x)
+    def __init__(self, s: Optional[int] = None):
+        self._hash_table = [122, 25, 27, 48, 115, 10, 12, 87, 65, 41, 54, 102, 89, 4, 34, 82, 36, 14, 116, 56, 72, 35, 44, 6, 105, 30, 29, 92, 67, 23, 94, 0, 59, 98, 70, 101, 17, 69, 110, 11, 111, 47, 40, 85, 64, 71, 95, 126, 117, 125, 75, 21, 62, 61, 32, 120, 90, 106, 1, 5, 7, 81, 86, 79, 57, 9, 107, 19, 93, 77, 38, 31, 26, 42, 97, 52, 76, 103, 74, 49, 100, 78, 112, 43, 3, 20, 39, 84, 66, 50, 88, 83, 124, 13, 108, 109, 33, 123, 91, 60, 15, 127, 119, 28, 58, 8, 51, 46, 2, 55, 114, 113, 45, 80, 73, 104, 118, 22, 53, 37, 63, 99, 121, 68, 16, 96, 24, 18]
 
-    def seed(self, y: Optional[int] = None, x: Optional[int] = None):
-        if y and x:
-            self._y = y
-            self._x = x
-        else:
-            self._y = int.from_bytes(os.urandom(13), 'big')
-            self._x = int.from_bytes(os.urandom(13), 'big')
+        self._next = 0
+        self.seed(s)
 
-        # The first random integer should be co-prime to M and not 1 or 0
-        self._next = max(pow(self._y, self._x, M), 2)
+    def seed(self, s: Optional[int] = None):
+        if s is None:
+            s = int.from_bytes(os.urandom(16), 'big')
+        self._next = s % M
+
+    def fast_hash(self, y: int, x: int) -> int:
+        """Pearson hashing."""
+        message: str = f"{x}{y}"
+        hash = len(message) % 128
+        for i in message:
+            hash = self._hash_table[hash ^ ord(i)]
+
+        return hash
 
     def __iter__(self):
         return self
@@ -54,15 +57,7 @@ class Randomish:
 
 _inst = Randomish()
 seed = _inst.seed
+fast_hash = _inst.fast_hash
 random = _inst.random
 randrange = _inst.randrange
 choice = _inst.choice
-
-if __name__ == '__main__':
-    rs = []
-    for y in range(0, 10):
-        for x in range(0, 10):
-            seed(y, x)
-            r = randrange(0, 10)
-            print(r, end='')
-        print('\n', end='')

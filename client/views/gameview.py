@@ -57,8 +57,7 @@ class GameView(View):
         for row in range(-view_radius, view_radius + 1):
             for col in range(-view_radius, view_radius + 1):
                 pos = (self.controller.player_instance['y'] + row, self.controller.player_instance['x'] + col)
-                # random.seed(hash(pos))
-                randomish.seed(*pos)
+                randomish.seed(randomish.fast_hash(*pos))
 
                 if self.coordinate_exists(*pos):
                     cy, cx = win1_hheight + row, win1_hwidth + col * 2
@@ -68,14 +67,12 @@ class GameView(View):
                         if c == maps.STONE:
                             self.win1.addstr(cy, cx, '·', 0)
                         elif c == maps.GRASS:
-                            # self.win1.addstr(cy, cx, random.choice([',', '`']), curses.COLOR_GREEN)
                             self.win1.addstr(cy, cx, randomish.choice([',', '`']), curses.COLOR_GREEN)
                         elif c == maps.SAND:
                             self.win1.addstr(cy, cx, '~', curses.COLOR_YELLOW)
                         elif c == maps.WATER:
                             self.win1.addstr(cy, cx, '#', curses.COLOR_BLUE)
                         elif c == maps.LEAF:
-                            # self.win1.addstr(cy, cx, random.choice(['╭', '╮', '╯', '╰']), curses.COLOR_GREEN)
                             self.win1.addstr(cy, cx, randomish.choice(['╭', '╮', '╯', '╰']), curses.COLOR_GREEN)
                         elif c == maps.COBBLESTONE:
                             self.win1.addstr(cy, cx, '░', 0)
@@ -84,12 +81,9 @@ class GameView(View):
 
                     # rain splashes
                     if self.controller.weather == "Rain":
-                        # random.seed()
                         randomish.seed()
                         if room.at('ground', pos[0], pos[1]) and room.at('ceiling', pos[0], pos[1]) == maps.NOTHING:
-                            # if random.randrange(0, 8) == 0:
                             if randomish.randrange(0, 8) == 0:
-                                # self.win1.addstr(cy, cx, random.choice([',', '.', '`']), curses.COLOR_BLUE)
                                 self.win1.addstr(cy, cx, randomish.choice([',', '.', '`']), curses.COLOR_BLUE)
 
                     # Overrides: Enter in here if solid must look different from ground, for example
