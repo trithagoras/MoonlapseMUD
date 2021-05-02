@@ -59,7 +59,7 @@ class GameView(View):
                 pos = (self.controller.player_instance['y'] + row, self.controller.player_instance['x'] + col)
                 randomish.seed(randomish.fast_hash(*pos))
 
-                if self.coordinate_exists(*pos):
+                if self.controller.room.coordinate_exists(*pos):
                     cy, cx = win1_hheight + row, win1_hwidth + col * 2
                     for what in ('ground', 'solid'):
                         c = room.at(what, *pos)
@@ -127,9 +127,6 @@ class GameView(View):
             y = win1_hheight + (cy - self.controller.player_instance.y)
             x = win1_hwidth + (cx - self.controller.player_instance.x) * 2
             self.win1.addstr(y, x, 'X', 0)
-
-    def coordinate_exists(self, y: int, x: int) -> bool:
-        return 0 <= y < self.controller.room.height and 0 <= x < self.controller.room.width
 
     def draw_inventory(self):
         win = self.win2

@@ -206,12 +206,16 @@ class Game(Controller):
 
     def process_normal_input(self, key: int) -> bool:
         if key == curses.KEY_UP:
+            self.move(-1, 0)
             self.cs.ns.send_packet(packet.MoveUpPacket())
         elif key == curses.KEY_DOWN:
+            self.move(1, 0)
             self.cs.ns.send_packet(packet.MoveDownPacket())
         elif key == curses.KEY_LEFT:
+            self.move(0, -1)
             self.cs.ns.send_packet(packet.MoveLeftPacket())
         elif key == curses.KEY_RIGHT:
+            self.move(0, 1)
             self.cs.ns.send_packet(packet.MoveRightPacket())
         elif key == ord('g'):
             self.state = State.GRABBING_ITEM
@@ -219,6 +223,19 @@ class Game(Controller):
         else:
             return False
         return True
+
+    def move(self, dy, dx):
+        y: int = self.player_instance['y']
+        x: int = self.player_instance['x']
+        dest_y: int = y + dy
+        dest_x: int = x + dx
+
+        if self.room.coordinate_exists(dest_y, dest_x) and not self.room.at('solid', dest_y, dest_x):
+            self.player_instance.update({
+                'id': self.player_instance['id'],
+                'y': dest_y,
+                'x': dest_x
+            })
 
     def process_look_input(self, key: int) -> bool:
         desired_y = self.look_cursor_y
