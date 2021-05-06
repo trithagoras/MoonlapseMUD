@@ -476,9 +476,21 @@ class MoonlapseProtocol(NetstringReceiver):
 
         # Now send deltas for instances which were already in the view but have changed in some way
         already_in_view: Set[models.InstancedEntity] = self.visible_instances.intersection(prev_in_view)
-        for instance in already_in_view:
-            # Pretend we determine it's changed
-            self.outgoing.append(packet.ServerModelPacket('Instance', create_dict('Instance', instance)))
+        for current_inst in already_in_view:
+            c_inst_dict = create_dict('Instance', current_inst)
+
+            # p_inst_dict = {}
+            # for prev_inst in prev_in_view:
+            #     if prev_inst.id == current_inst.id:
+            #         p_inst_dict = create_dict('Instance', prev_inst)
+            #
+            # self.debug(f"Old: {p_inst_dict}")
+            # self.debug(f"New: {c_inst_dict}")
+            # delta_dict = get_dict_delta(p_inst_dict, c_inst_dict)
+            # # self.debug(str(delta_dict))
+            # if len(delta_dict) > 1: # If more than just the IDs differ
+            if True:    # TODO: The above delta check isn't working for some reason...
+                self.outgoing.append(packet.ServerModelPacket('Instance', c_inst_dict))
 
     def tick(self):
         if self.next_packet:
