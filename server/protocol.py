@@ -452,7 +452,7 @@ class MoonlapseProtocol(NetstringReceiver):
                 instances_in_view.add(instance)
 
         # removing logged out players from view
-        for instance in instances_in_view:
+        for instance in list(instances_in_view):  # Convert to list to avoid "Set changed size during iteration"
             if instance.entity.typename == 'Player':
                 proto = self.server.get_proto_by_id(instance.entity.pk)
                 if not proto or not proto.logged_in:
