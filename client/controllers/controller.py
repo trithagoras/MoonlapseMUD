@@ -1,7 +1,6 @@
 import curses
 import time
 
-
 class Debug:
     def __init__(self, controller):
         self.controller = controller
@@ -36,9 +35,11 @@ class Controller:
 
         self.widgets = []
 
+
     def start(self):
         self.running = True
         self.view.start()
+
 
         # begin main loop
         while self.running:

@@ -225,6 +225,9 @@ class Game(Controller):
         return True
 
     def move(self, dy, dx):
+        if not self.player_instance:
+            # We are most likely loading the room, OK to ignore
+            return
         y: int = self.player_instance['y']
         x: int = self.player_instance['x']
         dest_y: int = y + dy

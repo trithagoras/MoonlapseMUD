@@ -445,17 +445,14 @@ class MoonlapseProtocol(NetstringReceiver):
         Say goodbye to old entities no longer in view and process the new and still-existing entities in view
         """
         prev_in_view = self.visible_instances
-        instances_in_view = set()
 
+        instances_in_view = set()
         for key, instance in self.server.instances_in_room(self.player_instance.room_id).items():
             if self.coord_in_view(instance.y, instance.x):
                 instances_in_view.add(instance)
 
         # removing logged out players from view
-        for instance in set(instances_in_view):
-            if instance == self.player_instance:
-                continue
-
+        for instance in instances_in_view:
             if instance.entity.typename == 'Player':
                 proto = self.server.get_proto_by_id(instance.entity.pk)
                 if not proto or not proto.logged_in:
@@ -463,25 +460,15 @@ class MoonlapseProtocol(NetstringReceiver):
 
         self.visible_instances = instances_in_view
 
-        # just left view
-        for instance in prev_in_view:
-            if instance not in self.visible_instances:
-                self.outgoing.append(packet.GoodbyePacket(instance.pk))
+        just_left_view: Set[models.InstancedEntity] = prev_in_view.difference(self.visible_instances)
+        for instance in just_left_view:
+            self.outgoing.append(packet.GoodbyePacket(instance.pk))
 
-        for instance in self.visible_instances:
-            # new to view
-            if instance not in prev_in_view:
-                self.outgoing.append(packet.ServerModelPacket('Instance', create_dict('Instance', instance)))
-                continue
-
+        new_to_view: Set[models.InstancedEntity] = self.visible_instances.difference(prev_in_view)
+        for instance in new_to_view:
             self.outgoing.append(packet.ServerModelPacket('Instance', create_dict('Instance', instance)))
 
-            # dict delta for those still in view
-            # after = instance
-            # for before in prev_in_view:
-            #     if before.pk == after.pk:
-            #         delta = get_dict_delta(create_dict('Instance', before), create_dict('Instance', after))
-            #         self.outgoing.append(packet.ServerModelPacket('Instance', delta))
+        self.outgoing.append(packet.ServerModelPacket('Instance', create_dict('Instance', self.player_instance)))
 
     def tick(self):
         if self.next_packet:
@@ -493,6 +480,9 @@ class MoonlapseProtocol(NetstringReceiver):
         for p in list(self.outgoing):
             self.send_packet(p)
             self.outgoing.popleft()
+
+    def sync_player_instance(self):
+        self.outgoing.append(packet.ServerModelPacket('Instance', create_dict('Instance', self.player_instance)))
 
     def send_packet(self, p: packet.Packet):
         """
