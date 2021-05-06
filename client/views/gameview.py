@@ -48,7 +48,7 @@ class GameView(View):
         self.addstr(2, 1, self.controller.quicklog)
 
     def draw_map(self):
-        self.win1.title(f"[1] ({self.controller.player_instance['y']}, {self.controller.player_instance['x']}) @ {self.controller.room.name}")
+        self.win1.title(f"[1] {self.controller.room.name}")
 
         view_radius = 10
         win1_hwidth, win1_hheight = self.win1.width // 2, self.win1.height // 2
