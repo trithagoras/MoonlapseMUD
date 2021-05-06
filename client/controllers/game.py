@@ -233,7 +233,7 @@ class Game(Controller):
         dest_y: int = y + dy
         dest_x: int = x + dx
 
-        if self.room.coordinate_exists(dest_y, dest_x) and not self.room.at('solid', dest_y, dest_x):
+        if self.room.coordinate_exists(dest_y, dest_x) and self.room.at('solid', dest_y, dest_x) == maps.NOTHING:
             self.player_instance.update({
                 'id': self.player_instance['id'],
                 'y': dest_y,

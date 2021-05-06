@@ -468,8 +468,6 @@ class MoonlapseProtocol(NetstringReceiver):
         for instance in new_to_view:
             self.outgoing.append(packet.ServerModelPacket('Instance', create_dict('Instance', instance)))
 
-        self.outgoing.append(packet.ServerModelPacket('Instance', create_dict('Instance', self.player_instance)))
-
     def tick(self):
         if self.next_packet:
             self.process_packet(self.next_packet)
