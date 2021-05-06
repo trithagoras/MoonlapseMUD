@@ -449,7 +449,11 @@ class MoonlapseProtocol(NetstringReceiver):
         instances_in_view = set()
         for key, instance in self.server.instances_in_room(self.player_instance.room_id).items():
             if self.coord_in_view(instance.y, instance.x):
-                instances_in_view.add(instance)
+
+                # We don't need to process ourselves. This is done on a less frequent server tick
+                # See mlserver.py sync_player_instances
+                if instance != self.player_instance:
+                    instances_in_view.add(instance)
 
         # removing logged out players from view
         for instance in list(instances_in_view):  # Convert to list to avoid "Set changed size during iteration"
@@ -460,12 +464,20 @@ class MoonlapseProtocol(NetstringReceiver):
 
         self.visible_instances = instances_in_view
 
+        # Say goodbye to the instances which are no longer in our view
         just_left_view: Set[models.InstancedEntity] = prev_in_view.difference(self.visible_instances)
         for instance in just_left_view:
             self.outgoing.append(packet.GoodbyePacket(instance.pk))
 
+        # Send models for all instances brand new to the view
         new_to_view: Set[models.InstancedEntity] = self.visible_instances.difference(prev_in_view)
         for instance in new_to_view:
+            self.outgoing.append(packet.ServerModelPacket('Instance', create_dict('Instance', instance)))
+
+        # Now send deltas for instances which were already in the view but have changed in some way
+        already_in_view: Set[models.InstancedEntity] = self.visible_instances.intersection(prev_in_view)
+        for instance in already_in_view:
+            # Pretend we determine it's changed
             self.outgoing.append(packet.ServerModelPacket('Instance', create_dict('Instance', instance)))
 
     def tick(self):
