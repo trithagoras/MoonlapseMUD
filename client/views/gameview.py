@@ -1,5 +1,5 @@
 import curses
-import random
+import randomish
 import time
 from typing import *
 
@@ -57,9 +57,9 @@ class GameView(View):
         for row in range(-view_radius, view_radius + 1):
             for col in range(-view_radius, view_radius + 1):
                 pos = (self.controller.player_instance['y'] + row, self.controller.player_instance['x'] + col)
-                random.seed(hash(pos))
+                randomish.seed(randomish.fast_hash(*pos))
 
-                if self.coordinate_exists(*pos):
+                if self.controller.room.coordinate_exists(*pos):
                     cy, cx = win1_hheight + row, win1_hwidth + col * 2
                     for what in ('ground', 'solid'):
                         c = room.at(what, *pos)
@@ -67,13 +67,13 @@ class GameView(View):
                         if c == maps.STONE:
                             self.win1.addstr(cy, cx, '·', 0)
                         elif c == maps.GRASS:
-                            self.win1.addstr(cy, cx, random.choice([',', '`']), curses.COLOR_GREEN)
+                            self.win1.addstr(cy, cx, randomish.choice([',', '`']), curses.COLOR_GREEN)
                         elif c == maps.SAND:
                             self.win1.addstr(cy, cx, '~', curses.COLOR_YELLOW)
                         elif c == maps.WATER:
                             self.win1.addstr(cy, cx, '#', curses.COLOR_BLUE)
                         elif c == maps.LEAF:
-                            self.win1.addstr(cy, cx, random.choice(['╭', '╮', '╯', '╰']), curses.COLOR_GREEN)
+                            self.win1.addstr(cy, cx, randomish.choice(['╭', '╮', '╯', '╰']), curses.COLOR_GREEN)
                         elif c == maps.COBBLESTONE:
                             self.win1.addstr(cy, cx, '░', 0)
                         elif c == maps.WOOD:
@@ -81,10 +81,10 @@ class GameView(View):
 
                     # rain splashes
                     if self.controller.weather == "Rain":
-                        random.seed()
+                        randomish.seed()
                         if room.at('ground', pos[0], pos[1]) and room.at('ceiling', pos[0], pos[1]) == maps.NOTHING:
-                            if random.randrange(0, 8) == 0:
-                                self.win1.addstr(cy, cx, random.choice([',', '.', '`']), curses.COLOR_BLUE)
+                            if randomish.randrange(0, 8) == 0:
+                                self.win1.addstr(cy, cx, randomish.choice([',', '.', '`']), curses.COLOR_BLUE)
 
                     # Overrides: Enter in here if solid must look different from ground, for example
                     c = room.at('solid', *pos)
@@ -127,9 +127,6 @@ class GameView(View):
             y = win1_hheight + (cy - self.controller.player_instance.y)
             x = win1_hwidth + (cx - self.controller.player_instance.x) * 2
             self.win1.addstr(y, x, 'X', 0)
-
-    def coordinate_exists(self, y: int, x: int) -> bool:
-        return 0 <= y < self.controller.room.height and 0 <= x < self.controller.room.width
 
     def draw_inventory(self):
         win = self.win2

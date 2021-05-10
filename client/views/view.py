@@ -1,5 +1,4 @@
 import curses
-import time
 
 from client.controllers.widgets import Widget
 
@@ -51,6 +50,7 @@ class View:
         try:
             self.controller.cs.stdscr.erase()
             self.draw()
+            self.controller.debug.draw()
             if (term_height, term_width) < (min_height, min_width):
                 raise Exception(f"Screen dimensions must be {min_height} rows x {min_width} cols (detected {term_height} x {term_width})")
             self.controller.cs.stdscr.refresh()
@@ -71,7 +71,7 @@ class View:
                 msg: str = f"Trying again in {ttl}"
                 self.addstr(hh + 1, (term_width - len(msg)) // 2, msg)
                 stdscr.refresh()
-                time.sleep(1)
+                curses.napms(1000)
 
             self._draw()
 

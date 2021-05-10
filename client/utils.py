@@ -5,6 +5,8 @@ import random
 import string
 import threading
 import time
+from typing import *
+import math
 
 from networking import cryptography
 import rsa
@@ -174,3 +176,4 @@ class ClientState:
                 self.packets.append(p)
             except Exception as e:
                 pass
+

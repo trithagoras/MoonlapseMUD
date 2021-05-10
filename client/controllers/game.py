@@ -102,9 +102,6 @@ class Game(Controller):
             if self.state == State.GRABBING_ITEM:
                 self.quicklog = p.payloads[0].value
                 self.state = State.NORMAL
-        elif isinstance(p, packet.ServerTickRatePacket):
-            pass
-
         else:
             return False
 
@@ -156,6 +153,7 @@ class Game(Controller):
 
     def process_input(self, key: int):
         super().process_input(key)
+        
         if self.process_global_input(key):
             return
 
@@ -208,12 +206,16 @@ class Game(Controller):
 
     def process_normal_input(self, key: int) -> bool:
         if key == curses.KEY_UP:
+            self.move(-1, 0)
             self.cs.ns.send_packet(packet.MoveUpPacket())
         elif key == curses.KEY_DOWN:
+            self.move(1, 0)
             self.cs.ns.send_packet(packet.MoveDownPacket())
         elif key == curses.KEY_LEFT:
+            self.move(0, -1)
             self.cs.ns.send_packet(packet.MoveLeftPacket())
         elif key == curses.KEY_RIGHT:
+            self.move(0, 1)
             self.cs.ns.send_packet(packet.MoveRightPacket())
         elif key == ord('g'):
             self.state = State.GRABBING_ITEM
@@ -221,6 +223,22 @@ class Game(Controller):
         else:
             return False
         return True
+
+    def move(self, dy, dx):
+        if not self.player_instance:
+            # We are most likely loading the room, OK to ignore
+            return
+        y: int = self.player_instance['y']
+        x: int = self.player_instance['x']
+        dest_y: int = y + dy
+        dest_x: int = x + dx
+
+        if self.room.coordinate_exists(dest_y, dest_x) and self.room.at('solid', dest_y, dest_x) == maps.NOTHING:
+            self.player_instance.update({
+                'id': self.player_instance['id'],
+                'y': dest_y,
+                'x': dest_x
+            })
 
     def process_look_input(self, key: int) -> bool:
         desired_y = self.look_cursor_y

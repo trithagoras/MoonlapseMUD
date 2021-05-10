@@ -141,3 +141,5 @@ class Room:
         rgba = map_data[x, y]
         return rgba[0], rgba[1], rgba[2]
 
+    def coordinate_exists(self, y: int, x: int) -> bool:
+        return 0 <= y < self.height and 0 <= x < self.width

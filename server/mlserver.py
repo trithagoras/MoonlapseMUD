@@ -35,6 +35,9 @@ class MoonlapseServer(Factory):
         # weather change check
         self.add_deferred(self.rain_check, 10*self.tickrate, True)
 
+        # send each player their own model regularly to keep server and client in sync
+        self.add_deferred(self.sync_player_instances, 5*self.tickrate, True)
+
         # save all instances to DB after loop
         # todo: 20s for testing; obvs should be less often
         self.add_deferred(self.save_all_instances, 20*self.tickrate, True)
@@ -154,6 +157,11 @@ class MoonlapseServer(Factory):
 
         elif self.weather == "Rain":
             self.change_weather("Clear")
+
+    def sync_player_instances(self):
+        for proto in self.connected_protocols:
+            if proto.logged_in:
+                proto.sync_player_instance()
 
     def save_all_instances(self):
         for key, instance in self.instances.items():
