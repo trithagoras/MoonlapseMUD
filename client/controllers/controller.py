@@ -24,7 +24,7 @@ class Debug:
         if self.show:
             self.controller.cs.stdscr.addstr(0, 0, f"FPS: {self._fps}")
 
-
+            
 class Controller:
     def __init__(self, cs):
         self.cs = cs

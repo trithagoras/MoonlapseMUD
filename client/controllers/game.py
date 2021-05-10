@@ -153,7 +153,7 @@ class Game(Controller):
 
     def process_input(self, key: int):
         super().process_input(key)
-
+        
         if self.process_global_input(key):
             return
 
