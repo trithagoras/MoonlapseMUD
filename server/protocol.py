@@ -429,9 +429,10 @@ class MoonlapseProtocol(NetstringReceiver):
         self.outgoing.append(packet.WeatherChangePacket(self.server.weather))
 
         # send inventory to player
-        items = models.ContainerItem.objects.filter(container=self.player_info.inventory)
-        for ci in items:
-            self.outgoing.append(packet.ServerModelPacket('ContainerItem', create_dict('ContainerItem', ci)))
+        if self.state == self.GET_ENTRY:    # Only send on initial login
+            items = models.ContainerItem.objects.filter(container=self.player_info.inventory)
+            for ci in items:
+                self.outgoing.append(packet.ServerModelPacket('ContainerItem', create_dict('ContainerItem', ci)))
 
         self.state = self.PLAY
         self.broadcast(packet.ServerLogPacket(f"{self.username} has arrived."))
