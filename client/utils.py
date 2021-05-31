@@ -5,6 +5,8 @@ import random
 import string
 import threading
 import time
+from typing import *
+import math
 
 from networking import cryptography
 import rsa
@@ -121,7 +123,11 @@ class ClientState:
         self.stdscr = stdscr
         self.running = True
 
-        self.window = Window(self.stdscr, 0, 0, 40, 106)
+        win_height, win_width = 40, 106
+        term_height, term_width = stdscr.getmaxyx()
+        if (term_height, term_width) < (win_height, win_width):
+            raise curses.error(f"Screen dimensions must be {win_height} rows x {win_width} cols (detected {term_height} x {term_width})")
+        self.window = Window(self.stdscr, 0, 0, win_height, win_width)
 
         self.packets = []
 
@@ -170,3 +176,4 @@ class ClientState:
                 self.packets.append(p)
             except Exception as e:
                 pass
+

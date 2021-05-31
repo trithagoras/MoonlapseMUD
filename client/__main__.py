@@ -82,7 +82,10 @@ def main() -> None:
     # Eliminate delay in the program after the ESC key is pressed
     os.environ.setdefault('ESCDELAY', '25')
 
-    curses.wrapper(ClientState, ns)
+    try:
+        curses.wrapper(ClientState, ns)
+    except curses.error as e:
+        print(f"Display error: {e}")
 
 
 if __name__ == '__main__':
