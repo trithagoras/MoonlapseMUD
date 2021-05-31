@@ -214,8 +214,6 @@ class MoonlapseProtocol(NetstringReceiver):
             self.depart_other(p)
         elif isinstance(p, packet.ServerLogPacket):
             self.outgoing.append(p)
-        elif isinstance(p, packet.MoveRoomsPacket):
-            self.move_rooms(p.payloads[0].value)
         elif isinstance(p, packet.GrabItemPacket):
             self.grab_item_here()
         elif isinstance(p, packet.DropItemPacket):
