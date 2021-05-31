@@ -253,7 +253,7 @@ class MoonlapseProtocol(NetstringReceiver):
 
                 while leftover > 0:
                     # if inventory is full
-                    if len(models.InventoryItem.objects.filter(player=self.player_info)) == 30:
+                    if self.inventory_full():
                         self.outgoing.append(packet.DenyPacket("Your inventory is full"))
                         return leftover
 
@@ -265,7 +265,7 @@ class MoonlapseProtocol(NetstringReceiver):
                 return 0
 
         # if inventory is full
-        if len(models.InventoryItem.objects.filter(player=self.player_info)) == 30:
+        if self.inventory_full():
             self.outgoing.append(packet.DenyPacket("Your inventory is full"))
             return amt
 
@@ -273,6 +273,9 @@ class MoonlapseProtocol(NetstringReceiver):
         new_inv_item.save()
         self.outgoing.append(packet.ServerModelPacket('InventoryItem', create_dict('InventoryItem', new_inv_item)))
         return 0
+
+    def inventory_full(self) -> bool:
+        return len(models.InventoryItem.objects.filter(player=self.player_info)) == 30
 
     def kill_instance(self, instance):
         """
@@ -349,6 +352,10 @@ class MoonlapseProtocol(NetstringReceiver):
             self.outgoing.append(packet.ServerLogPacket(f"You do not have a {requirements[node.entity.typename]}."))
             return False
 
+        if self.inventory_full():
+            self.outgoing.append(packet.DenyPacket(f"Your inventory is full."))
+            return False
+
         return True
 
     def start_gather(self, instance: models.InstancedEntity):
@@ -391,8 +398,9 @@ class MoonlapseProtocol(NetstringReceiver):
                 if random.randint(1, itm.chance) == 1:
                     amt = random.randint(itm.min_amt, itm.max_amt)
                     item = itm.item
-                    self.add_item_to_inventory(item, amt)
-                    self.outgoing.append(packet.ServerLogPacket(f"You acquire {amt} {item.entity.name}."))
+                    fail = self.add_item_to_inventory(item, amt)
+                    if fail == 0:
+                        self.outgoing.append(packet.ServerLogPacket(f"You acquire {amt} {item.entity.name}."))
 
             self.kill_instance(instance)
         else:

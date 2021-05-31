@@ -100,8 +100,8 @@ class Game(Controller):
             else:
                 pass
         elif isinstance(p, packet.DenyPacket):
+            self.quicklog = p.payloads[0].value
             if self.state == State.GRABBING_ITEM:
-                self.quicklog = p.payloads[0].value
                 self.state = State.NORMAL
         else:
             return False
