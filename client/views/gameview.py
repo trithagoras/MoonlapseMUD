@@ -105,7 +105,7 @@ class GameView(View):
 
                 if typename == 'Portal':
                     self.win1.addstr(y, x, 'O', curses.COLOR_CYAN)
-                elif typename in ('Item', 'Pickaxe', 'Axe'):
+                elif typename in ('Item', 'Pickaxe', 'Axe', 'Ore', 'Logs'):
                     self.win1.addstr(y, x, '$', curses.COLOR_MAGENTA)
                 elif typename == "OreNode":
                     # different ores should mean different colors. perhaps by name?

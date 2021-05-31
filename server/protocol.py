@@ -291,7 +291,7 @@ class MoonlapseProtocol(NetstringReceiver):
     def grab_item_here(self):
         # Check if we're standing on an item
         for i in self.visible_instances:
-            if i.entity.typename in ("Item", "Pickaxe", "Axe") \
+            if i.entity.typename in ("Item", "Pickaxe", "Axe", "Ore", "Logs") \
                     and i.y == self.player_instance.y and i.x == self.player_instance.x:
 
                 di = models.Item.objects.get(entity=i.entity)
