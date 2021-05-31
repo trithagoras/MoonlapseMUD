@@ -190,7 +190,7 @@ class Game(Controller):
             self.view.inventory_page = 0
             self.inventory_index = 0
         elif key == ord('>'):
-            if len(self.inventory) >= 15:
+            if len(self.inventory) >= 16:
                 self.view.inventory_page = 1
                 self.inventory_index = 15
         elif key == ord('['):
@@ -213,6 +213,14 @@ class Game(Controller):
                 iid = inv[self.inventory_index]
                 self.cs.ns.send_packet(packet.DropItemPacket(iid))
                 self.inventory.pop(iid)
+
+                # need to account for both pages. index past the last item in list ==> index == last item in list
+                if self.inventory_index >= len(inv) - 1:
+                    self.inventory_index = max(0, len(inv) - 2)
+
+                # set page to 1 if list size < 16
+                if len(inv) - 1 < 16:
+                    self.view.inventory_page = 0
         else:
             return False
         return True
