@@ -14,6 +14,8 @@ class GameView(View):
         self.gamelog: Dict[float, str] = {}
         self.times_logged: int = 0
 
+        self.inventory_page = 0     # either page 0 or page 1
+
         # Init windows
         self.win1 = Window(self.controller.cs.stdscr, 3, 0, 23, 53)
         self.win2 = Window(self.controller.cs.stdscr, 3, 53, 23, 53)
@@ -133,18 +135,35 @@ class GameView(View):
         win.title("[2] Inventory")
 
         win.addstr(1, 2, "Name")
-        win.addstr(1, 12, "Value")
-        win.addstr(1, 22, "Amount")
+        win.addstr(1, 32, "Value")
+        win.addstr(1, 42, "Amount")
+
+        # creating list of inventory items (to keep track of position)
+        inv = []
+        for key, val in self.controller.inventory.items():
+            inv.append((key, val))
 
         line = 3
-        for key, val in self.controller.inventory.items():
+        if self.inventory_page == 0:
+            rng = range(0, min(15, len(inv)))
+        else:
+            rng = range(15, min(30, len(inv)))
+
+        for i in rng:
+            key, val = inv[i]
             name = val['item']['entity']['name']
             amount = val['amount']
             value = val['item']['value']
             win.addstr(line, 2, f"{name}")
-            win.addstr(line, 12, f"{value}")
-            win.addstr(line, 22, f"{amount}")
+            win.addstr(line, 32, f"{value}")
+            win.addstr(line, 42, f"{amount}")
             line += 1
+
+        # selected item
+        win.addstr(3 + (self.controller.inventory_index % 15), 1, "*")
+
+        win.addstr(19, 2, "[ or ] to choose item")      # todo: change keybind and implement this
+        win.addstr(20, 2, "[<] or [>] to flip page")
 
     def draw_log(self):
         title = "[3] Log"

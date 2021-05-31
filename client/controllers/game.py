@@ -46,7 +46,8 @@ class Game(Controller):
         self.visible_instances = set()
         self.player_info = None  # id, entity, inventory
         self.player_instance = None  # id, entity, room_id, y, x
-        self.inventory = {}     # item.id : {id, item, amount}
+        self.inventory = {}     # inv_item.id : {item_id, item, amount}
+        self.inventory_index = 0    # cursor position in inventory
         self.room = None
 
         self.context = Context.NORMAL
@@ -67,7 +68,7 @@ class Game(Controller):
 
     def process_packet(self, p) -> bool:
         if isinstance(p, packet.ServerModelPacket):
-            if p.payloads[0].value == 'ContainerItem':
+            if p.payloads[0].value == 'InventoryItem':
                 self.process_model(p.payloads[0].value, p.payloads[1].value)
             elif not self.ready():
                 self.initialise_my_models(p.payloads[0].value, p.payloads[1].value)
@@ -127,19 +128,19 @@ class Game(Controller):
             else:  # If not visible already, add to visible list (it is only ever sent to us if it's in view)
                 self.visible_instances.add(instance)
 
-        elif mtype == 'ContainerItem':
-            ci = Model(data)
-            itemid = ci['item']['id']
+        elif mtype == 'InventoryItem':
+            inv_item = Model(data)
+            inv_item_id = inv_item['id']
+            amt = inv_item['amount']
 
-            amt = ci['amount']
-            if itemid in self.inventory:
-                amt -= self.inventory[itemid]['amount']
+            if inv_item_id in self.inventory:
+                amt -= self.inventory[inv_item_id]['amount']
+
+            self.inventory[inv_item_id] = inv_item
 
             if self.state == State.GRABBING_ITEM:
-                self.quicklog = f"You pick up {amt} {ci['item']['entity']['name']}."
+                self.quicklog = f"You pick up {amt} {inv_item['item']['entity']['name']}."
                 self.state = State.NORMAL
-
-            self.inventory[itemid] = ci
 
     def update(self):
         if self.state == State.LOOKING:
@@ -186,7 +187,41 @@ class Game(Controller):
                 self.look_cursor_x = self.player_instance['x']
             else:
                 self.state = State.NORMAL
+        elif key == ord('<'):
+            self.view.inventory_page = 0
+            self.inventory_index = 0
+        elif key == ord('>'):
+            if len(self.inventory) >= 16:
+                self.view.inventory_page = 1
+                self.inventory_index = 15
+        elif key == ord('['):
+            if self.view.inventory_page == 0:
+                self.inventory_index = max(self.inventory_index - 1, 0)
+            else:
+                self.inventory_index = max(self.inventory_index - 1, 15)
+        elif key == ord(']'):
+            if self.view.inventory_page == 0:
+                self.inventory_index = min(self.inventory_index + 1, min(14, len(self.inventory)-1))
+            else:
+                self.inventory_index = min(self.inventory_index + 1, min(29, len(self.inventory)-1))
+        elif key == ord('D'):
+            if len(self.inventory) > 0:
+                # drop-all
+                inv = []
+                for key in self.inventory:
+                    inv.append(key)
 
+                iid = inv[self.inventory_index]
+                self.cs.ns.send_packet(packet.DropItemPacket(iid))
+                self.inventory.pop(iid)
+
+                # need to account for both pages. index past the last item in list ==> index == last item in list
+                if self.inventory_index >= len(inv) - 1:
+                    self.inventory_index = max(0, len(inv) - 2)
+
+                # set page to 1 if list size < 16
+                if len(inv) - 1 < 16:
+                    self.view.inventory_page = 0
         elif key == ord('1'):
             self.view.focused_win = self.view.win1
         elif key == ord('2'):
@@ -199,7 +234,6 @@ class Game(Controller):
                 self.view.chat_scroll -= 1
             elif key == curses.KEY_UP and self.view.chat_scroll < self.view.times_logged - self.view.win3.height + self.view.chatwin.height:
                 self.view.chat_scroll += 1
-
         else:
             return False
         return True

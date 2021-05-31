@@ -179,6 +179,19 @@ class MoonlapseServer(Factory):
             if proto.coord_in_view(instance.y, instance.x):
                 proto.process_visible_instances()
 
+    def despawn_instance(self, ipk: int):
+        """
+        Removes an instance from server.instances if exists
+        :param ipk: primary-key of instance to remove
+        """
+        if ipk in self.instances:
+            inst = self.instances[ipk]
+            # must broadcast to room because self.broadcast relies on player.room, which may be unloaded
+            # (as this is deferred)
+            self.broadcast_to_room(packet.GoodbyePacket(ipk), inst.room.pk)
+            self.instances.pop(ipk)
+            inst.delete()
+
     class Deferred:
         def __init__(self, f: callable, ticks: int, total_ticks: int, loops: bool, *args):
             """

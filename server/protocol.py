@@ -36,7 +36,7 @@ def get_dict_delta(before: dict, after: dict) -> dict:
 def create_dict(model_type: str, model) -> dict:
     """
     Creates recursive dict to replace model_to_dict
-    :param model_type: one of ('Instance', 'ContainerItem')
+    :param model_type: one of ('Instance', 'InventoryItem')
     :param model: a django.model
     :return:
     """
@@ -46,7 +46,7 @@ def create_dict(model_type: str, model) -> dict:
         instancedict["entity"] = entdict
         return instancedict
 
-    elif model_type == 'ContainerItem':
+    elif model_type == 'InventoryItem':
         cidict = model_to_dict(model)
         itemdict = model_to_dict(model.item)
         entdict = model_to_dict(model.item.entity)
@@ -168,13 +168,13 @@ class MoonlapseProtocol(NetstringReceiver):
         instance = models.InstancedEntity(entity=entity, room=initial_room, y=0, x=0)
         instance.save()
 
-        # Create and save a new container (inventory)
-        container = models.Container()
-        container.save()
-
         # Create and save a new player
-        player = models.Player(user=user, entity=entity, inventory=container)
+        player = models.Player(user=user, entity=entity)
         player.save()
+
+        # Create and save a new bank for the player
+        bank = models.Bank(player=player)
+        bank.save()
 
         # adding instance to server
         self.server.instances[instance.pk] = instance
@@ -218,6 +218,8 @@ class MoonlapseProtocol(NetstringReceiver):
             self.move_rooms(p.payloads[0].value)
         elif isinstance(p, packet.GrabItemPacket):
             self.grab_item_here()
+        elif isinstance(p, packet.DropItemPacket):
+            self.drop_item(p)
         elif isinstance(p, packet.WeatherChangePacket):
             self.outgoing.append(p)
 
@@ -232,18 +234,47 @@ class MoonlapseProtocol(NetstringReceiver):
             self.broadcast(packet.ServerLogPacket(message), include_self=True)
             self.logger.log(message)
 
-    def add_item_to_inventory(self, item: models.Item, amt: int):
-        # create ContainerItem from item and add to player.inventory
-        ci = models.ContainerItem.objects.filter(item=item, container=self.player_info.inventory).first()
-        if ci:
-            ci.amount += amt
-            ci.save()
-        else:
-            ci = models.ContainerItem(item=item, amount=amt, container=self.player_info.inventory)
-            ci.save()
+    def add_item_to_inventory(self, item: models.Item, amt: int) -> int:
+        """
+        adds this item to inventory
+        :param item:
+        :param amt:
+        :require: amt <= item.max_stack_amt
+        :return: leftover (if inventory is full)
+        """
 
-        # send client ContainerItem packet
-        self.outgoing.append(packet.ServerModelPacket('ContainerItem', create_dict('ContainerItem', ci)))
+        inv_items = models.InventoryItem.objects.filter(item=item, player=self.player_info)
+        for inv_item in inv_items:
+            if inv_item.amount == item.max_stack_amt:
+                continue
+            else:
+                leftover = max((inv_item.amount + amt) - item.max_stack_amt, 0)
+                inv_item.amount = min(item.max_stack_amt, inv_item.amount + amt)
+                inv_item.save()
+                self.outgoing.append(packet.ServerModelPacket('InventoryItem', create_dict('InventoryItem', inv_item)))
+
+                while leftover > 0:
+                    # if inventory is full
+                    if len(models.InventoryItem.objects.filter(player=self.player_info)) == 30:
+                        self.outgoing.append(packet.DenyPacket("Your inventory is full"))
+                        return leftover
+
+                    new_amt = min(item.max_stack_amt, leftover)
+                    new_inv_item = models.InventoryItem(item=item, amount=new_amt, player=self.player_info)
+                    new_inv_item.save()
+                    self.outgoing.append(packet.ServerModelPacket('InventoryItem', create_dict('InventoryItem', new_inv_item)))
+                    leftover -= new_amt
+                return 0
+
+        # if inventory is full
+        if len(models.InventoryItem.objects.filter(player=self.player_info)) == 30:
+            self.outgoing.append(packet.DenyPacket("Your inventory is full"))
+            return amt
+
+        new_inv_item = models.InventoryItem(item=item, amount=amt, player=self.player_info)
+        new_inv_item.save()
+        self.outgoing.append(packet.ServerModelPacket('InventoryItem', create_dict('InventoryItem', new_inv_item)))
+        return 0
 
     def kill_instance(self, instance):
         """
@@ -252,33 +283,59 @@ class MoonlapseProtocol(NetstringReceiver):
         self.broadcast(packet.GoodbyePacket(instance.pk), include_self=True)
 
         # a respawning instance isn't deleted, just temporarily displaced OOB
-        instance.y = OOB
-        self.server.add_deferred(self.server.respawn_instance, instance.respawn_time * self.server.tickrate, False, instance.pk)
+        if instance.respawn_time:
+            instance.y = OOB
+            self.server.add_deferred(self.server.respawn_instance, instance.respawn_time * self.server.tickrate, False, instance.pk)
+        else:
+            self.server.instances.pop(instance.pk)
+            instance.delete()
 
     def grab_item_here(self):
         # Check if we're standing on an item
         for i in self.visible_instances:
             if i.entity.typename in ("Item", "Pickaxe", "Axe") \
                     and i.y == self.player_instance.y and i.x == self.player_instance.x:
-                # remove instanced item from visible instances
-                self.kill_instance(i)
 
                 di = models.Item.objects.get(entity=i.entity)
-                self.add_item_to_inventory(di, i.amount)
+                leftover = self.add_item_to_inventory(di, i.amount)
+
+                if leftover:
+                    i.amount = leftover
+                else:
+                    # remove instanced item from visible instances
+                    self.kill_instance(i)
                 return
 
         self.outgoing.append(packet.DenyPacket("There is no item here."))
 
+    def drop_item(self, p: packet.DropItemPacket):
+        inv_item = models.InventoryItem.objects.get(id=p.payloads[0].value)
+
+        # create instance and place here
+        inst = models.InstancedEntity(entity=inv_item.item.entity,
+                                      room=self.player_instance.room, y=self.player_instance.y,
+                                      x=self.player_instance.x, amount=inv_item.amount)
+        inst.pk = id(inst)      # guarantees unique id for lifetime of inst
+        self.server.instances[inst.pk] = inst
+
+        # remove from player inventory
+        inv_item.delete()
+
+        # set despawn countdown (2 mins - 120s)
+        self.server.add_deferred(self.server.despawn_instance, self.server.tickrate * 120, False, inst.pk)
+
     def depart_other(self, p: packet.GoodbyePacket):
-        other_instanceid: int = p.payloads[0].value
-        # other_instance: models.InstancedEntity = models.InstancedEntity.objects.get(id=other_instanceid)
-        other_instance = self.server.instances[other_instanceid]
+        ipk: int = p.payloads[0].value
+        if ipk not in self.server.instances:
+            return
 
-        if other_instance in self.visible_instances:
-            self.visible_instances.remove(other_instance)
+        inst = self.server.instances[ipk]
 
-        if other_instance.entity.typename == 'Player':
-            self.outgoing.append(packet.ServerLogPacket(f"{other_instance.entity.name} has departed."))
+        if inst in self.visible_instances:
+            self.visible_instances.remove(inst)
+
+        if inst.entity.typename == 'Player':
+            self.outgoing.append(packet.ServerLogPacket(f"{inst.entity.name} has departed."))
 
         self.outgoing.append(p)
 
@@ -288,7 +345,7 @@ class MoonlapseProtocol(NetstringReceiver):
             'TreeNode': 'Axe'
         }
 
-        cis = models.ContainerItem.objects.filter(container=self.player_info.inventory,
+        cis = models.InventoryItem.objects.filter(player=self.player_info,
                                                   item__entity__typename=requirements[node.entity.typename])
         if not cis:
             self.outgoing.append(packet.ServerLogPacket(f"You do not have a {requirements[node.entity.typename]}."))
@@ -430,9 +487,9 @@ class MoonlapseProtocol(NetstringReceiver):
 
         # send inventory to player
         if self.state == self.GET_ENTRY:    # Only send on initial login
-            items = models.ContainerItem.objects.filter(container=self.player_info.inventory)
+            items = models.InventoryItem.objects.filter(player=self.player_info)
             for ci in items:
-                self.outgoing.append(packet.ServerModelPacket('ContainerItem', create_dict('ContainerItem', ci)))
+                self.outgoing.append(packet.ServerModelPacket('InventoryItem', create_dict('InventoryItem', ci)))
 
         self.state = self.PLAY
         self.broadcast(packet.ServerLogPacket(f"{self.username} has arrived."))
@@ -496,7 +553,6 @@ class MoonlapseProtocol(NetstringReceiver):
     def tick(self):
         if self.next_packet:
             self.process_packet(self.next_packet)
-            print("-----------------------PROCESSED------------------")
             self.next_packet = None
 
         # send all packets in queue back to client in order

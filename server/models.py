@@ -19,6 +19,7 @@ class Entity(models.Model):
 class Item(models.Model):
     entity = models.ForeignKey(Entity, on_delete=models.RESTRICT)
     value = models.IntegerField(null=True, default=1)
+    max_stack_amt = models.IntegerField(null=True, default=2147483647)
 
 
 class DropTable(models.Model):
@@ -40,20 +41,25 @@ class ResourceNode(models.Model):
     xp_given = models.IntegerField(null=True, default=5)
 
 
-class Container(models.Model):
-    pass
+class Player(models.Model):
+    user = models.ForeignKey(User, on_delete=models.RESTRICT)
+    entity = models.ForeignKey(Entity, on_delete=models.RESTRICT)
 
 
-class ContainerItem(models.Model):
-    container = models.ForeignKey(Container, on_delete=models.RESTRICT)
+class Bank(models.Model):
+    player = models.ForeignKey(Player, on_delete=models.RESTRICT)
+
+
+class BankItem(models.Model):
+    bank = models.ForeignKey(Bank, on_delete=models.RESTRICT)
     item = models.ForeignKey(Item, on_delete=models.RESTRICT)
     amount = models.IntegerField(null=True, default=1)
 
 
-class Player(models.Model):
-    user = models.ForeignKey(User, on_delete=models.RESTRICT)
-    entity = models.ForeignKey(Entity, on_delete=models.RESTRICT)
-    inventory = models.ForeignKey(Container, on_delete=models.RESTRICT)
+class InventoryItem(models.Model):
+    player = models.ForeignKey(Player, on_delete=models.RESTRICT)
+    item = models.ForeignKey(Item, on_delete=models.RESTRICT)
+    amount = models.IntegerField(null=True, default=1)
 
 
 class Portal(models.Model):
