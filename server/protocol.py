@@ -315,22 +315,27 @@ class MoonlapseProtocol(NetstringReceiver):
         inst = models.InstancedEntity(entity=inv_item.item.entity,
                                       room=self.player_instance.room, y=self.player_instance.y,
                                       x=self.player_instance.x, amount=inv_item.amount)
-        inst.save()
+        inst.pk = id(inst)      # guarantees unique id for lifetime of inst
         self.server.instances[inst.pk] = inst
 
         # remove from player inventory
         inv_item.delete()
 
+        # set despawn countdown (2 mins - 120s)
+        self.server.add_deferred(self.server.despawn_instance, self.server.tickrate * 120, False, inst.pk)
+
     def depart_other(self, p: packet.GoodbyePacket):
-        other_instanceid: int = p.payloads[0].value
-        # other_instance: models.InstancedEntity = models.InstancedEntity.objects.get(id=other_instanceid)
-        other_instance = self.server.instances[other_instanceid]
+        ipk: int = p.payloads[0].value
+        if ipk not in self.server.instances:
+            return
 
-        if other_instance in self.visible_instances:
-            self.visible_instances.remove(other_instance)
+        inst = self.server.instances[ipk]
 
-        if other_instance.entity.typename == 'Player':
-            self.outgoing.append(packet.ServerLogPacket(f"{other_instance.entity.name} has departed."))
+        if inst in self.visible_instances:
+            self.visible_instances.remove(inst)
+
+        if inst.entity.typename == 'Player':
+            self.outgoing.append(packet.ServerLogPacket(f"{inst.entity.name} has departed."))
 
         self.outgoing.append(p)
 
