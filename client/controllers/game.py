@@ -257,7 +257,7 @@ class Game(Controller):
             return False
 
         y, x = self.player_instance['y'], self.player_instance['x']
-        if self.view.coordinate_exists(desired_y, desired_x):
+        if self.room.coordinate_exists(desired_y, desired_x):
             if abs(desired_y - y) <= 10 and abs(desired_x - x) <= 10:
                 self.look_cursor_y = desired_y
                 self.look_cursor_x = desired_x
