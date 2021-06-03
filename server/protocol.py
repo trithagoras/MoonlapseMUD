@@ -1,4 +1,5 @@
 import random
+import math
 
 import django
 from django.db.utils import DataError
@@ -17,7 +18,6 @@ from networking import packet
 from networking.logger import Log
 from server import models, pbkdf2
 import maps
-
 
 OOB = -32       # Out Of Bounds. All instances with y == OOB are awaiting to be respawned.
 
@@ -262,6 +262,7 @@ class MoonlapseProtocol(NetstringReceiver):
                     new_inv_item.save()
                     self.outgoing.append(packet.ServerModelPacket('InventoryItem', create_dict('InventoryItem', new_inv_item)))
                     leftover -= new_amt
+                self.balance_inventory()
                 return 0
 
         # if inventory is full
@@ -271,6 +272,7 @@ class MoonlapseProtocol(NetstringReceiver):
 
         new_inv_item = models.InventoryItem(item=item, amount=amt, player=self.player_info)
         new_inv_item.save()
+        self.balance_inventory()
         self.outgoing.append(packet.ServerModelPacket('InventoryItem', create_dict('InventoryItem', new_inv_item)))
         return 0
 
@@ -309,18 +311,97 @@ class MoonlapseProtocol(NetstringReceiver):
 
         self.outgoing.append(packet.DenyPacket("There is no item here."))
 
+    def balance_inventory(self):
+        inventory = models.InventoryItem.objects.filter(player=self.player_info)
+        uniqueItems = []
+        for invItem in inventory:
+            to_add = True
+            for uniqueItem in uniqueItems:
+                if uniqueItem.item.pk == invItem.item.pk:
+                    to_add = False
+                    break
+            if to_add:
+                uniqueItems.append(invItem)
+
+        for invItem in uniqueItems:
+            stacks = [ itm for itm in inventory if itm.item.pk == invItem.item.pk and itm.amount < invItem.item.max_stack_amt ]
+            if not stacks:
+                continue
+            sum = 0
+            for itm in stacks:
+                sum += itm.amount
+            residue = sum % invItem.item.max_stack_amt
+            total_stacks = math.ceil(sum / invItem.item.max_stack_amt)
+            stacks_to_remove = len(stacks) - total_stacks
+            for i in range(stacks_to_remove):
+                stacks[0].delete()
+                stacks.pop(0)
+            for stack in stacks:
+                stack.amount = stack.item.max_stack_amt
+
+            if residue:
+                stacks[0].amount = residue
+
+            for stack in stacks:
+                stack.save()
+
+        # send player their inventory back
+
+
     def drop_item(self, p: packet.DropItemPacket):
-        inv_item = models.InventoryItem.objects.get(id=p.payloads[0].value)
+        try:
+            inv_item = models.InventoryItem.objects.get(id=p.payloads[0].value)
+        except:
+            return
+        amt = p.payloads[1].value
+
+        inv_item.amount -= amt
+
+        # if an instance already exists at this coordinate
+        d = self.server.get_instances_at(self.player_instance.room.pk, self.player_instance.y, self.player_instance.x)
+        existing_item: Optional[models.InstancedEntity] = None
+        for key, inst in d.items():
+            if inst.entity.pk == inv_item.item.entity.pk and inst.amount < inv_item.item.max_stack_amt:
+                existing_item = inst
+
+        # at this point, there should be either nothing in items, or 1 entry with amount < max_stack_amt
+        leftover = amt
+
+        # if there exists a duplicate item on floor already here
+        if existing_item is not None:
+            leftover = existing_item.amount + amt
+            if leftover <= inv_item.item.max_stack_amt:
+                existing_item.amount = leftover
+
+                if inv_item.amount <= 0:
+                    inv_item.delete()
+                else:
+                    inv_item.save()
+                self.balance_inventory()
+                # todo: cancel old deferred to despawn and add new one
+                return
+            else:
+                existing_item.amount = inv_item.item.max_stack_amt
+                leftover %= inv_item.item.max_stack_amt
 
         # create instance and place here
         inst = models.InstancedEntity(entity=inv_item.item.entity,
                                       room=self.player_instance.room, y=self.player_instance.y,
-                                      x=self.player_instance.x, amount=inv_item.amount)
-        inst.pk = id(inst)      # guarantees unique id for lifetime of inst
+                                      x=self.player_instance.x, amount=leftover)
+        pk = random.randint(0, (2**31 - 1))
+        while pk in self.server.instances:
+            pk = random.randint(0, (2 ** 31 - 1))
+
+        inst.pk = pk     # guaranteed unique due to above check
         self.server.instances[inst.pk] = inst
 
-        # remove from player inventory
-        inv_item.delete()
+        # update player inventory item or delete if dropped all
+        if inv_item.amount <= 0:
+            inv_item.delete()
+        else:
+            inv_item.save()
+
+        self.balance_inventory()
 
         # set despawn countdown (2 mins - 120s)
         self.server.add_deferred(self.server.despawn_instance, self.server.tickrate * 120, False, inst.pk)
