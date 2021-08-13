@@ -316,7 +316,12 @@ class MoonlapseProtocol(NetstringReceiver):
         inst = models.InstancedEntity(entity=inv_item.item.entity,
                                       room=self.player_instance.room, y=self.player_instance.y,
                                       x=self.player_instance.x, amount=inv_item.amount)
-        inst.pk = id(inst)      # guarantees unique id for lifetime of inst
+
+        # guarantees unique id for instance
+        pk = random.randint(0, 2 ** 31 - 1)
+        while pk in self.server.instances:
+            pk = random.randint(0, 2 ** 31 - 1)
+        inst.pk = pk
         self.server.instances[inst.pk] = inst
 
         # remove from player inventory
