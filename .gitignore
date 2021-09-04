@@ -2,11 +2,11 @@ server/connectionstrings.json
 *.pyc
 *.iml
 *.log
-*/.vs/*
-*/venv/*
+.vs/
+venv/
 *.pyproj
-*/__pycache__/*
-*/.idea/*
+__pycache__/
+.idea/
 server/migrations/*
 client/user_settings.conf
 *.pub
