@@ -65,7 +65,7 @@ class MoonlapseProtocol(NetstringReceiver):
         self.player_info: Optional[models.Player] = None
         self.roommap: Optional[maps.Room] = None
         self.logged_in = False
-        self.client_pub_key: Optional[rsa.key.PublicKey] = None
+        self.client_aes_key: Optional[bytes] = None
 
         self.state = self.GET_ENTRY
         self.actionloop = None
@@ -80,18 +80,41 @@ class MoonlapseProtocol(NetstringReceiver):
     def connectionMade(self):
         self.server.connected_protocols.add(self)
 
+        # Send the client the server's public key
+        self.outgoing.append(packet.ServerKeyPacket(self.server.public_key.n, self.server.public_key.e))
+
     def connectionLost(self, reason=connectionDone):
         self.logout(packet.LogoutPacket(self.username))
         self.server.connected_protocols.remove(self)
 
     def stringReceived(self, string):
         # attempt to decrypt packet
+        if self.client_aes_key:
+            try:
+                string = cryptography.decrypt_aes(string, self.client_aes_key)
+            except Exception as e:
+                self.debug(f"WARNING: String could not be decrypted with aes, dropping")
+                self.debug(str(e))
+                return
+        else:
+            # If we don't have the client's AES key yet, this string must be it (encrypted with RSA)
+            try:
+                string = cryptography.decrypt_rsa(string, self.server.private_key)
+            except Exception as e:
+                self.debug(f"WARNING: String could not be decrypted with rsa, dropping")
+                self.debug(str(e))
+                self.debug(f"String was: {string}")
+                return
+
+            self.debug(f"Successfully received string from my client: {string}")
         try:
-            string = cryptography.decrypt(string, self.server.private_key)
+            p = packet.frombytes(string)
         except Exception as e:
-            self.debug(f"WARNING: Packet came through unencrypted")
+            self.debug(f"WARNING: Packet could not be formed from string, dropping")
             self.debug(str(e))
-        p = packet.frombytes(string)
+            self.debug(f"String was: {string}")
+            return
+
         self.debug(f"Received packet from my client {p}")
         self.next_packet = p
 
@@ -100,10 +123,9 @@ class MoonlapseProtocol(NetstringReceiver):
 
     def GET_ENTRY(self, p: packet.Packet):
         if isinstance(p, packet.ClientKeyPacket):
-            # We have the client's public key so now we can send some initial data
-            self.client_pub_key = rsa.key.PublicKey(p.payloads[0].value, p.payloads[1].value)
-            # Send the client the server's public key
-            self.outgoing.append(packet.ClientKeyPacket(self.server.public_key.n, self.server.public_key.e))
+            # We have the client's AES key so now we can send some initial data
+            self.client_aes_key = str.encode(p.payloads[0].value, 'latin1')  # Refer to docstring for ClientKeyPacket
+
             # Send the client some initial info it needs to know
             self.outgoing.append(packet.ServerTickRatePacket(self.server.tickrate))
             self.outgoing.append(packet.WelcomePacket(
@@ -580,13 +602,18 @@ class MoonlapseProtocol(NetstringReceiver):
         Call this to communicate information back to the game client application.
         """
         message: bytes = p.tobytes()
-        try:
-            message = cryptography.encrypt(message, self.client_pub_key)
-        except Exception as e:
-            self.debug(f"FATAL: Couldn't encrypt packet {p} for sending. Error was {e}. Returning.")
-            return
-        self.sendString(message)
-        self.debug(f"Sent data to my client: {p.tobytes()}")
+
+        if isinstance(p, packet.ServerKeyPacket):  # Don't encrypt the server's public key
+            self.sendString(message)
+            self.debug(f"Sent the server's public key to my client")
+
+        elif self.client_aes_key:
+            try:
+                message = cryptography.encrypt_aes(message, self.client_aes_key)
+                self.sendString(message)
+                self.debug(f"Sent data to my client: {p.tobytes()}")
+            except Exception as e:
+                self.debug(f"FATAL: Couldn't encrypt packet {p} for sending. Error was {e}. Returning.")
 
     def broadcast(self, p: packet.Packet, include_self=False):
         excluding = []
