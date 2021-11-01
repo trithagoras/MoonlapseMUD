@@ -9,21 +9,6 @@ from urllib.parse import urlparse
 from urllib.request import urlretrieve
 import venv
 
-
-clientdir = os.path.dirname(os.path.realpath(__file__))
-vdir = os.path.join(clientdir, 'venv')
-vbin = os.path.join(vdir, 'Scripts' if os.name == 'nt' else 'bin')
-vpy = os.path.join(vbin, 'python')
-
-with open(os.path.join(clientdir, 'requirements.txt'), 'r') as f:
-    dependencies = f.readlines()
-dependencies = [d.strip() for d in dependencies]  # Get rid of newlines from file
-
-# If running Windows, we will also need curses
-if os.name == 'nt':
-    dependencies.append('windows-curses')
-
-
 class ExtendedEnvBuilder(venv.EnvBuilder):
     """
     This builder installs setuptools and pip so that you can pip or
@@ -132,8 +117,8 @@ class ExtendedEnvBuilder(venv.EnvBuilder):
         self.install_script(context, 'pip', url)
 
 
-def missing_dependencies():
-    modules = subprocess.check_output([vpy, '-m', 'pip', 'freeze']).splitlines()
+def missing_dependencies(rootdir, dependencies):
+    modules = subprocess.check_output([get_vpy_from_root_dir(rootdir), '-m', 'pip', 'freeze']).splitlines()
     modules = [m.decode('utf-8') for m in modules]
 
     # We don't really care about the version of windows-curses installed
@@ -151,7 +136,7 @@ def missing_dependencies():
     return missing
 
 
-def venv_exists() -> bool:
+def venv_exists(vpy) -> bool:
     try:
         subprocess.run([vpy, "-c" '"exit()"'])
         return True
@@ -159,12 +144,26 @@ def venv_exists() -> bool:
         return False
 
 
-def pip_installed() -> bool:
+def pip_installed(vpy) -> bool:
     r = subprocess.run([vpy, '-m', 'pip'], stdout=subprocess.DEVNULL)
     return r.returncode == 0
 
 
-def configure_venv():
+def get_vdir_from_root_dir(rootdir):
+    vdir = os.path.join(rootdir, 'venv')
+    return vdir
+
+
+def get_vpy_from_root_dir(rootdir):
+    vdir = get_vdir_from_root_dir(rootdir)
+    vbin = os.path.join(vdir, 'Scripts' if os.name == 'nt' else 'bin')
+    vpy = os.path.join(vbin, 'python')
+    if os.name == 'nt':
+        vpy += '.exe'
+    return vpy
+
+
+def configure_venv(rootdir):
     # Install a virtual environment with pip installed on it
     compatible = True
     if sys.version_info < (3, 3):
@@ -176,24 +175,38 @@ def configure_venv():
                          'Python 3.3 or later')
     else:
         builder = ExtendedEnvBuilder(symlinks=os.name != 'nt')
-        builder.create(vdir)
+        builder.create(get_vdir_from_root_dir(rootdir))
 
     # Re-run with the new environment now that pip is installed
-    subprocess.run([vpy, clientdir] + sys.argv[1:])
+    subprocess.run([get_vpy_from_root_dir(rootdir), rootdir] + sys.argv[1:])
     exit()
 
 
-if not venv_exists():
-    configure_venv()
-elif not pip_installed():
-    # A virtual environment is configured but it doesn't have pip.
-    # Getting rid of it and re-installing is the easiest way to deal.
-    import shutil
-    shutil.rmtree(vdir)
-    configure_venv()
+def install_requirements(module_path):
+    rootdir = module_path
+    requirements_txt_filepath = os.path.join(rootdir, 'requirements.txt')
+    vdir = get_vdir_from_root_dir(rootdir)
+    vpy = get_vpy_from_root_dir(rootdir)
 
-for d in missing_dependencies():
-    r = subprocess.run([vpy, '-m', 'pip', 'install', d])
+    with open(os.path.join(requirements_txt_filepath), 'r') as f:
+        dependencies = f.readlines()
+    dependencies = [d.strip() for d in dependencies]  # Get rid of newlines from file
+
+    # If running Windows, we will also need curses
+    if os.name != 'nt':
+        dependencies.remove('windows-curses')
+
+    if not venv_exists(vpy):
+        configure_venv(rootdir)
+    elif not pip_installed(vpy):
+        # A virtual environment is configured but it doesn't have pip.
+        # Getting rid of it and re-installing is the easiest way to deal.
+        import shutil
+        shutil.rmtree(vdir)
+        configure_venv(rootdir)
+
+    for d in missing_dependencies(rootdir, dependencies):
+        r = subprocess.run([vpy, '-m', 'pip', 'install', d])
 
 
 
