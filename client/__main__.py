@@ -1,31 +1,26 @@
-import get_dependencies  # This will create a virtual environment all dependencies on it
-
+# Required to import from shared modules
 import sys
 import os
+from pathlib import Path
+
+file = Path(__file__).resolve()
+parent, root = file.parent, file.parents[1]
+sys.path.append(str(root))
+
+import get_dependencies  # This will create a virtual environment all dependencies on it
+get_dependencies.install_requirements(parent)
 
 # Ensure from now on, we are running in a virtual environment with all dependencies installed
-clientdir = os.path.dirname(os.path.realpath(__file__))
-vbin = os.path.join(clientdir, 'venv', 'Scripts' if os.name == 'nt' else 'bin')
-vpy = os.path.join(vbin, 'python')
-if os.name == 'nt':
-    vpy += '.exe'
-
+vpy = get_dependencies.get_vpy_from_root_dir(parent)
 if sys.executable != vpy:
     import subprocess
-    subprocess.run([vpy, clientdir] + sys.argv[1:])
+    subprocess.run([vpy, parent] + sys.argv[1:])
     exit()
 
 # From here on out, we have all the dependencies
 import curses
 import socket
 from typing import *
-
-# Required to import top level modules
-from pathlib import Path
-file = Path(__file__).resolve()
-parent, root = file.parent, file.parents[1]
-sys.path.append(str(root))
-
 from client.utils import ClientState, NetworkState
 
 
