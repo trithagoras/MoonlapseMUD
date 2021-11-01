@@ -75,6 +75,8 @@ class MainMenu(Menu):
             return True
         elif isinstance(p, packet.ClientKeyPacket):
             self.cs.ns.server_public_key = rsa.PublicKey(p.payloads[0].value, p.payloads[1].value)
+        elif isinstance(p, packet.OkPacket):
+            pass
         elif isinstance(p, packet.WelcomePacket):
             self.view.title = p.payloads[0].value
             pass
