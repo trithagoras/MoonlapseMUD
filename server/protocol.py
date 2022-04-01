@@ -18,6 +18,7 @@ from networking import packet
 from networking.logger import Log
 from server import models, pbkdf2
 import maps
+import copy
 
 OOB = -32       # Out Of Bounds. All instances with y == OOB are awaiting to be respawned.
 
@@ -70,8 +71,9 @@ class MoonlapseProtocol(NetstringReceiver):
         self.state = self.GET_ENTRY
         self.actionloop = None
 
+        self.waiting_to_sync = False
         self.outgoing = deque()
-        self.next_packet: Optional[packet.Packet] = None     # most recent packet from client to process next tick
+        self.incoming = deque()
 
         self.logger = Log()
 
@@ -116,7 +118,7 @@ class MoonlapseProtocol(NetstringReceiver):
             return
 
         self.debug(f"Received packet from my client {p}")
-        self.next_packet = p
+        self.incoming.append(p)
 
     def process_packet(self, p: packet.Packet):
         self.state(p)
@@ -587,7 +589,7 @@ class MoonlapseProtocol(NetstringReceiver):
 
     def establish_player_in_room(self):
         self.outgoing.append(packet.ServerModelPacket('Room', model_to_dict(self.player_instance.room)))
-        self.outgoing.append(packet.ServerModelPacket('Instance', create_dict('Instance', self.player_instance)))
+        self.sync_player_instance()
 
         playerdict = model_to_dict(self.player_info)
         playerdict["entity"] = model_to_dict(self.player_info.entity)
@@ -612,10 +614,10 @@ class MoonlapseProtocol(NetstringReceiver):
         """
         Say goodbye to old entities no longer in view and process the new and still-existing entities in view
         """
-        prev_in_view = self.visible_instances
+        prev_in_view = copy.deepcopy(self.visible_instances)
 
         instances_in_view = set()
-        for key, instance in self.server.instances_in_room(self.player_instance.room_id).items():
+        for instance in self.server.instances_in_room(self.player_instance.room_id).values():
             if self.coord_in_view(instance.y, instance.x):
 
                 # We don't need to process ourselves. This is done on a less frequent server tick
@@ -630,7 +632,7 @@ class MoonlapseProtocol(NetstringReceiver):
                 if not proto or not proto.logged_in:
                     instances_in_view.remove(instance)
 
-        self.visible_instances = instances_in_view
+        self.visible_instances = copy.deepcopy(instances_in_view)
 
         # Say goodbye to the instances which are no longer in our view
         just_left_view: Set[models.InstancedEntity] = prev_in_view.difference(self.visible_instances)
@@ -643,35 +645,44 @@ class MoonlapseProtocol(NetstringReceiver):
             self.outgoing.append(packet.ServerModelPacket('Instance', create_dict('Instance', instance)))
 
         # Now send deltas for instances which were already in the view but have changed in some way
-        already_in_view: Set[models.InstancedEntity] = self.visible_instances.intersection(prev_in_view)
+        already_in_view: Set[models.InstancedEntity] = prev_in_view & instances_in_view
         for current_inst in already_in_view:
             c_inst_dict = create_dict('Instance', current_inst)
 
-            # p_inst_dict = {}
-            # for prev_inst in prev_in_view:
-            #     if prev_inst.id == current_inst.id:
-            #         p_inst_dict = create_dict('Instance', prev_inst)
-            #
-            # self.debug(f"Old: {p_inst_dict}")
-            # self.debug(f"New: {c_inst_dict}")
-            # delta_dict = get_dict_delta(p_inst_dict, c_inst_dict)
-            # # self.debug(str(delta_dict))
-            # if len(delta_dict) > 1: # If more than just the IDs differ
-            if True:    # TODO: The above delta check isn't working for some reason...
-                self.outgoing.append(packet.ServerModelPacket('Instance', c_inst_dict))
+            p_inst_dict = {}
+            for prev_inst in prev_in_view:
+                if prev_inst.id == current_inst.id:
+                    p_inst_dict = create_dict('Instance', prev_inst)
+            
+            delta_dict = get_dict_delta(p_inst_dict, c_inst_dict)
+            if len(delta_dict) > 1: # If more than just the IDs differ
+                self.outgoing.append(packet.ServerModelPacket('Instance', delta_dict))
 
     def tick(self):
-        if self.next_packet:
-            self.process_packet(self.next_packet)
-            self.next_packet = None
+        # process the next packet in the incoming queue
+        if len(self.incoming) > 0:
+            self.process_packet(self.incoming.popleft())
+            self.debug(f"{len(self.incoming)} more packets in the queue to be processed in future ticks")
+
+        # Sync if we were waiting for the incoming queue to empty before syncing
+        if self.waiting_to_sync and len(self.incoming) <= 0:
+            self.sync_player_instance()
+            self.waiting_to_sync = False
+            self.debug(f"Just completed an outstanding sync request")
 
         # send all packets in queue back to client in order
-        for p in list(self.outgoing):
-            self.send_packet(p)
-            self.outgoing.popleft()
+        while len(self.outgoing) > 0:
+            self.send_packet(self.outgoing.popleft())
 
     def sync_player_instance(self):
-        self.outgoing.append(packet.ServerModelPacket('Instance', create_dict('Instance', self.player_instance)))
+        # Don't sync the player until we have processed all incoming packets
+        if len(self.incoming) > 0:
+            # TODO: Instead of this way, perhaps insert a special SyncRequest packet into the incoming queue which can be processed.
+            # Otherwise, if the player keeps spamming keys, the sync might have to wait a really long time as the incoming queue keeps getting bigger
+            self.waiting_to_sync = True
+            self.debug(f"Wanted to sync, but need to empty incoming queue first. Need to wait for {len(self.incoming)} packets to be processed first.")
+        else:
+            self.outgoing.append(packet.ServerModelPacket('Instance', create_dict('Instance', self.player_instance)))
 
     def send_packet(self, p: packet.Packet):
         """
