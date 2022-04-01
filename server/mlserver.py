@@ -179,6 +179,13 @@ class MoonlapseServer(Factory):
             if proto.coord_in_view(instance.y, instance.x):
                 proto.process_visible_instances()
 
+    def get_instances_at(self, roomid: int, y: int, x: int) -> Dict[int, models.InstancedEntity]:
+        d = self.instances_in_room(roomid)
+        for iid, inst in self.instances_in_room(roomid).items():
+            if inst.y != y or inst.x != x:
+                d.pop(iid)
+        return d
+
     def despawn_instance(self, ipk: int):
         """
         Removes an instance from server.instances if exists

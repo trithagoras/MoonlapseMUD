@@ -1,5 +1,7 @@
 import curses
 import curses.ascii
+import math
+from typing import *
 
 import maps
 from client.controllers.controller import Controller
@@ -10,6 +12,8 @@ from client.controllers.widgets import TextField
 from client.controllers import keybindings
 
 
+# InventoryItem = {'id': 194, 'player': 2, 'item': {'id': 7, 'entity': {'id': 13, 'typename': 'Item', 'name': 'Banana'},
+#                       'value': 1, 'max_stack_amt': 4}, 'amount': 4}
 class Model:
     def __init__(self, attr: dict):
         self.id = 0
@@ -21,6 +25,9 @@ class Model:
             raise ValueError("Cannot change model's ID")
         for k, v in delta.items():
             setattr(self, k, v)
+
+    def haskey(self, key: str) -> bool:
+        return key in self.__dict__
 
     def __getitem__(self, item):
         return self.__dict__[item]
@@ -46,7 +53,7 @@ class Game(Controller):
         self.visible_instances = set()
         self.player_info = None  # id, entity, inventory
         self.player_instance = None  # id, entity, room_id, y, x
-        self.inventory = {}     # inv_item.id : {item_id, item, amount}
+        self.inventory = {}     # inv_item.id : {inv_item_id, item, amount}
         self.inventory_index = 0    # cursor position in inventory
         self.room = None
 
@@ -142,15 +149,53 @@ class Game(Controller):
                 self.quicklog = f"You pick up {amt} {inv_item['item']['entity']['name']}."
                 self.state = State.NORMAL
 
+            self.balance_inventory()
+
+    # InventoryItem = {'id': 194, 'player': 2, 'item': {'id': 7, 'entity': {'id': 13, 'typename': 'Item', 'name': 'Banana'},
+    #                       'value': 1, 'max_stack_amt': 4}, 'amount': 4}
+
+    def balance_inventory(self):
+        unique_inv_items = []
+        for invItem in self.inventory.values():
+            to_add = True
+            for unique_inv_item in unique_inv_items:
+                if unique_inv_item['item']['id'] == invItem['item']['id']:
+                    to_add = False
+                    break
+            if to_add:
+                unique_inv_items.append(invItem)
+
+        for invItem in unique_inv_items:
+            stacks = [ itm for itm in self.inventory.values() if itm['item']['id'] == invItem['item']['id'] and itm['amount'] < invItem['item']['max_stack_amt'] ]
+            if not stacks:
+                continue
+            sum = 0
+            for itm in stacks:
+                sum += itm['amount']
+            residue = sum % invItem['item']['max_stack_amt']
+            total_stacks = math.ceil(sum / invItem['item']['max_stack_amt'])
+            stacks_to_remove = len(stacks) - total_stacks
+            for i in range(stacks_to_remove):
+                self.inventory.pop(stacks[0]['id'])
+                stacks.pop(0)
+            for stack in stacks:
+                setattr(stack, 'amount', stack['item']['max_stack_amt'])
+
+            if residue:
+                setattr(stacks[0], 'amount', residue)
+
     def update(self):
         if self.state == State.LOOKING:
+            self.quicklog = ""
             cpos = self.look_cursor_y, self.look_cursor_x
             for instance in self.visible_instances:
                 pos = instance['y'], instance['x']
                 if cpos == pos:
-                    self.quicklog = instance['entity']['name']
+                    if instance.haskey('amount') and instance['amount'] > 1:
+                        self.quicklog += f"{instance['amount']}x "
+                    self.quicklog += f"{instance['entity']['name']}"
                     return
-            self.quicklog = ""
+            
 
     def process_input(self, key: int):
         super().process_input(key)
@@ -212,7 +257,8 @@ class Game(Controller):
                     inv.append(key)
 
                 iid = inv[self.inventory_index]
-                self.cs.ns.send_packet(packet.DropItemPacket(iid))
+                amt = self.inventory[iid]['amount']
+                self.cs.ns.send_packet(packet.DropItemPacket(iid, amt))
                 self.inventory.pop(iid)
 
                 # need to account for both pages. index past the last item in list ==> index == last item in list
@@ -222,6 +268,32 @@ class Game(Controller):
                 # set page to 1 if list size < 16
                 if len(inv) - 1 < 16:
                     self.view.inventory_page = 0
+
+                self.balance_inventory()
+        elif key == ord('d'):
+            if len(self.inventory) > 0:
+                # drop single
+                inv = []
+                for key in self.inventory:
+                    inv.append(key)
+
+                iid = inv[self.inventory_index]
+                amt = self.inventory[iid]['amount']
+                self.cs.ns.send_packet(packet.DropItemPacket(iid, 1))
+                if amt == 1:
+                    self.inventory.pop(iid)
+
+                    # need to account for both pages. index past the last item in list ==> index == last item in list
+                    if self.inventory_index >= len(inv) - 1:
+                        self.inventory_index = max(0, len(inv) - 2)
+
+                    # set page to 1 if list size < 16
+                    if len(inv) - 1 < 16:
+                        self.view.inventory_page = 0
+                else:
+                    setattr(self.inventory[iid], 'amount', self.inventory[iid]['amount'] - 1)
+
+                self.balance_inventory()
         elif key == ord('1'):
             self.view.focused_win = self.view.win1
         elif key == ord('2'):

@@ -292,8 +292,8 @@ class DropItemPacket(Packet):
     A packet send from a client to its protocol to drop an item to the ground
     """
 
-    def __init__(self, inv_item_id: int):
-        super().__init__(Payload(inv_item_id))
+    def __init__(self, inv_item_id: int, amt: int):
+        super().__init__(Payload(inv_item_id), Payload(amt))
 
 
 class WeatherChangePacket(Packet):
