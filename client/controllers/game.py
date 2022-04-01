@@ -26,6 +26,9 @@ class Model:
         for k, v in delta.items():
             setattr(self, k, v)
 
+    def haskey(self, key: str) -> bool:
+        return key in self.__dict__
+
     def __getitem__(self, item):
         return self.__dict__[item]
 
@@ -183,13 +186,16 @@ class Game(Controller):
 
     def update(self):
         if self.state == State.LOOKING:
+            self.quicklog = ""
             cpos = self.look_cursor_y, self.look_cursor_x
             for instance in self.visible_instances:
                 pos = instance['y'], instance['x']
                 if cpos == pos:
-                    self.quicklog = instance['entity']['name']
+                    if instance.haskey('amount') and instance['amount'] > 1:
+                        self.quicklog += f"{instance['amount']}x "
+                    self.quicklog += f"{instance['entity']['name']}"
                     return
-            self.quicklog = ""
+            
 
     def process_input(self, key: int):
         super().process_input(key)
