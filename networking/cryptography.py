@@ -1,14 +1,39 @@
+import base64
 import os
-import random
-import string
-import rsa
+from Crypto import Random
 from Crypto.Cipher import AES
 from typing import *
 
-IV = b'1111111111111111'
+from Crypto.PublicKey import RSA
+from Crypto.Cipher import PKCS1_OAEP
 
 
-def load_rsa_keypair(directory: str) -> Tuple[rsa.key.PublicKey, rsa.key.PrivateKey]:
+BS: int = AES.block_size
+
+
+def encrypt_aes(raw: bytes, key: bytes) -> bytes:
+    raw = _pad(raw.decode('utf-8'))
+    iv = Random.new().read(AES.block_size)
+    cipher = AES.new(key, AES.MODE_CBC, iv)
+    return base64.b64encode(iv + cipher.encrypt(raw.encode()))
+
+
+def decrypt_aes(enc, key: bytes) -> bytes:
+    enc = base64.b64decode(enc)
+    iv = enc[:AES.block_size]
+    cipher = AES.new(key, AES.MODE_CBC, iv)
+    return _unpad(cipher.decrypt(enc))[AES.block_size:]
+
+
+def _pad(s: str) -> str:
+    return s + (BS - len(s) % BS) * chr(BS - len(s) % BS)
+
+
+def _unpad(s: bytes) -> bytes:
+    return s[0:-ord(s[-1:])]
+
+
+def load_rsa_keypair(directory: str) -> Tuple[RSA.RsaKey, RSA.RsaKey]:
     """
     Returns a pair of public, private RSA keys. If files named id_rsa.pub and rsa_private_key.pem
     already exist in the supplied directory, the returned key-pair will be those keys. If not,
@@ -17,42 +42,42 @@ def load_rsa_keypair(directory: str) -> Tuple[rsa.key.PublicKey, rsa.key.Private
     """
     public_key_filename = os.path.join(directory, "id_rsa.pub")
     private_key_filename = os.path.join(directory, "rsa_private_key.pem")
-    bit_length: int = 512   # Only 512 works
 
     try:
         with open(public_key_filename, 'rb') as f:
-            public_key = rsa.key.PublicKey.load_pkcs1(f.read())
+            public_key: RSA.RsaKey = load_rsa_key_from_bytes(f.read())
         with open(private_key_filename, "rb") as f:
-            private_key = rsa.key.PrivateKey.load_pkcs1(f.read())
+            private_key: RSA.RsaKey = load_rsa_key_from_bytes(f.read())
 
-        if public_key.n.bit_length() != bit_length or private_key.n.bit_length() != bit_length:
-            raise ValueError(f"Bit length must be {bit_length}")
+        return public_key, private_key
 
     except (FileNotFoundError, ValueError):
         # RSA keys haven't been configured yet, or were configured incorrectly. Generate and save new keys.
-        public_key, private_key = rsa.key.newkeys(bit_length)
+        key: RSA.RsaKey = RSA.generate(2048)
 
         with open(public_key_filename, 'wb') as f:
-            f.write(public_key.save_pkcs1())
+            f.write(key.publickey().export_key('PEM'))
         with open(private_key_filename, 'wb') as f:
-            f.write(private_key.save_pkcs1())
+            f.write(key.export_key('PEM'))
 
-    return public_key, private_key
-
-
-def encrypt(message: bytes, public_key: rsa.key.PublicKey):
-    aes_key = ''.join(random.choice(string.ascii_letters + string.digits + string.punctuation) for _ in range(16))
-    aes_key = bytes(aes_key, 'utf-8')
-    aes = AES.new(aes_key, AES.MODE_CFB, IV=IV)
-    msg: bytes = aes.encrypt(message)
-    key = rsa.encrypt(aes_key, public_key)
-    return key + msg
+        return load_rsa_keypair(directory)
 
 
-def decrypt(message: bytes, private_key: rsa.PrivateKey):
-    # first 64 bytes is the RSA encrypted AES key; remainder is AES encrypted message
-    encrypted_key = message[:64]
-    encrypted_message = message[64:]
-    key = rsa.decrypt(encrypted_key, private_key)
-    cipher = AES.new(key, AES.MODE_CFB, IV=IV)
-    return cipher.decrypt(encrypted_message)
+def encrypt_rsa(message: bytes, public_key: RSA.RsaKey) -> bytes:
+    cipher = PKCS1_OAEP.new(public_key)
+    return cipher.encrypt(message)
+
+
+def decrypt_rsa(ciphertext: bytes, private_key: RSA.RsaKey) -> bytes:
+    cipher = PKCS1_OAEP.new(private_key)
+    return cipher.decrypt(ciphertext)
+
+
+def load_rsa_key_from_bytes(key_bytes: bytes) -> RSA.RsaKey:
+    key: RSA.RsaKey = RSA.import_key(key_bytes)
+    return key
+
+
+def load_rsa_key_from_parts(n: int, e: int) -> RSA.RsaKey:
+    key: RSA.RsaKey = RSA.construct(rsa_components=(n, e))
+    return key

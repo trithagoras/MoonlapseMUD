@@ -25,22 +25,16 @@ class NetworkState:
     def __init__(self, socket):
         self.socket = socket
         self.server_public_key = None
+        self.aes_key: bytes = os.urandom(32)
         self.username = ""
         self.tickrate = 20
-
-        # get encryption keys for sending
-        clientdir = os.path.dirname(os.path.realpath(__file__))
-        self.my_public_key, self.my_private_key = cryptography.load_rsa_keypair(clientdir)
-
-        # Send the server our public key
-        self.send_packet(packet.ClientKeyPacket(self.my_public_key.n, self.my_public_key.e))
 
     def send_packet(self, p: packet.Packet):
         """
         Converts packet to bytes; then encrypts bytes; then converts to netstring; then send over socket
         :param p: packet to send
         """
-        self._send(p, self.socket, public_key=self.server_public_key)
+        self._send(p, self.socket)
 
     def receive_packet(self) -> packet.Packet:
         return self._receive(self.socket)
@@ -49,21 +43,20 @@ class NetworkState:
         length = len(data)
         return str(length).encode('ascii') + b':' + data + b','
 
-    def _send(self, p: packet.Packet, s, public_key=None) -> bytes:
+    def _send(self, p: packet.Packet, s) -> bytes:
         """
         Converts a Packet to bytes and sends it over a socket. Ensures all the data is sent and no more.
         """
         b = p.tobytes()
-        if not isinstance(p, packet.ClientKeyPacket):   # Don't encrypt the sending of our public key
-            try:
-                b = cryptography.encrypt(b, public_key)
-            except Exception:   # TODO: If public key is None, request it to be sent again
-                return b''
+        if isinstance(p, packet.ClientKeyPacket):  # Must encrypt our key with the server's public key
+            b = cryptography.encrypt_rsa(b, self.server_public_key)
+        else:  # Everything else we encrypt with AES
+            b = cryptography.encrypt_aes(b, self.aes_key)
         b = self._to_netstring(b)
 
         failure = s.sendall(b)
         if failure is not None:
-            self._send(p, s, public_key=public_key)
+            self._send(p, s)
         return b
 
     def _receive(self, s) -> packet.Packet:
@@ -106,8 +99,22 @@ class NetworkState:
 
                 # Read off the trailing comma
                 s.recv(1)
-                data = cryptography.decrypt(data, self.my_private_key)
-                return packet.frombytes(data)
+
+                try:
+                    # If the data is AES encrypted, decrypt with AES
+                    data = cryptography.decrypt_aes(data, self.aes_key)
+                    return packet.frombytes(data)
+                except Exception:
+                    # If the packet came through unencrypted it must be the server's public key
+                    server_key_packet = packet.frombytes(data)
+                    server_key_n = server_key_packet.payloads[0].value
+                    server_key_e = server_key_packet.payloads[1].value
+                    self.server_public_key = cryptography.load_rsa_key_from_parts(server_key_n, server_key_e)
+
+                    # Now we have the server's public key, use it to send off our private AES key
+                    client_key_packet = packet.ClientKeyPacket(self.aes_key.decode('latin1'))
+                    self.send_packet(client_key_packet)
+                    return packet.OkPacket()
 
         raise PacketParseError("Error reading packet length. Too long.")
 

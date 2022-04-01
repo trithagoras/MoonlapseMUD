@@ -257,11 +257,25 @@ class ServerTickRatePacket(Packet):
 
 class ClientKeyPacket(Packet):
     """
-    A packet sent from a protocol to its client with the client's public key used in encrypting traffic.
+    A packet sent from a client to its protocol with the client's private AES-256 key used for encrypting traffic.
+
+    The payload is 32 random bytes decoded with the 'latin1' encoding because it is a 1-1 map of bytes to characters to
+    serialise and send over the network.
+
+    When you receive this packet, be sure to get the bytes back with str.encode(my_payload, 'latin1')
     """
 
-    def __init__(self, n: int, e: int):
-        super().__init__(Payload(n), Payload(e))
+    def __init__(self, aes_key: str):
+        super().__init__(Payload(aes_key))
+
+
+class ServerKeyPacket(Packet):
+    """
+    A packet sent from a protocol to its client with the server's public key.
+    """
+
+    def __init__(self, rsa_pub_n: int, rsa_pub_e: int):
+        super().__init__(Payload(rsa_pub_n), Payload(rsa_pub_e))
 
 
 class GrabItemPacket(Packet):
