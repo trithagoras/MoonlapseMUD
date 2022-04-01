@@ -194,7 +194,9 @@ def install_requirements(module_path):
 
     # If running Windows, we will also need curses
     if os.name != 'nt':
-        dependencies.remove('windows-curses')
+        winstrs = [s for s in dependencies if s.startswith("windows-curses")]
+        for s in winstrs:
+            dependencies.remove(s)
 
     if not venv_exists(vpy):
         configure_venv(rootdir)

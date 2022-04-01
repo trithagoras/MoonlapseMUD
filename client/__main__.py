@@ -64,7 +64,7 @@ def main() -> None:
     address = handle_arguments()
 
     try:
-        s = socket.create_connection(address)
+        s = socket.create_connection(address, timeout=10)
     except ConnectionRefusedError:
         print(f"Connection to {address[0]}:{address[1]} refused. Is the server up?")
         sys.exit(-1)
