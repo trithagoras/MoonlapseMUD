@@ -15,6 +15,7 @@ class GameView(View):
         self.times_logged: int = 0
 
         self.inventory_page = 0     # either page 0 or page 1
+        self.bank_page = 0          # TODO: add more pages than 2 (extensible for any size container?)
 
         # Init windows
         self.win1 = Window(self.controller.cs.stdscr, 3, 0, 23, 53)
@@ -65,10 +66,7 @@ class GameView(View):
             bank.append((key, val))
 
         line = 3
-        if self.inventory_page == 0:
-            rng = range(0, min(15, len(bank)))
-        else:
-            rng = range(15, min(30, len(bank)))
+        rng = range(15 * self.bank_page, min(15 * (self.bank_page+1), len(bank)))
 
         for i in rng:
             key, val = bank[i]
@@ -79,6 +77,13 @@ class GameView(View):
             win.addstr(line, 32, f"{value}")
             win.addstr(line, 42, f"{amount}")
             line += 1
+        
+        # selected item
+        win.addstr(3 + (self.controller.bank_index % 15), 1, "*")
+
+        win.addstr(19, 2, "↑ or ↓ to choose item")      # todo: change keybind and implement this
+        win.addstr(20, 2, f"← or → to flip page (current page {self.bank_page+1})")
+        win.addstr(21, 2, "[w]ithdraw single or [W]ithdraw all")
 
     def draw_map(self):
         self.win1.title(f"[1] {self.controller.room.name}")
@@ -196,7 +201,11 @@ class GameView(View):
         win.addstr(3 + (self.controller.inventory_index % 15), 1, "*")
 
         win.addstr(19, 2, "[ or ] to choose item")      # todo: change keybind and implement this
-        win.addstr(20, 2, "[<] or [>] to flip page")
+        win.addstr(20, 2, f"[<] or [>] to flip page (current page {self.inventory_page+1})")
+        if self.controller.state == game.State.IN_BANK:
+            win.addstr(21, 2, "[d]eposit single or [D]eposit all")
+        else:
+            win.addstr(21, 2, "[d]rop single or [D]rop all")
 
     def draw_log(self):
         title = "[3] Log"

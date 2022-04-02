@@ -57,6 +57,7 @@ class Game(Controller):
         self.inventory = {}     # inv_item.id : {inv_item_id, item, amount}
         self.bank = {}          # bank_item.id : {bank_item_id, item, amount}
         self.inventory_index = 0    # cursor position in inventory
+        self.bank_index = 0     # cursor position in bank
         self.room = None
 
         self.context = Context.NORMAL
@@ -260,6 +261,7 @@ class Game(Controller):
             else:
                 self.inventory_index = min(self.inventory_index + 1, min(29, len(self.inventory)-1))
         elif key == ord('D'):
+            # Drop item on ground, or deposity in bank
             if len(self.inventory) > 0:
                 # drop-all
                 inv = []
@@ -285,7 +287,7 @@ class Game(Controller):
                 self.balance_inventory()
         elif key == ord('d'):
             if len(self.inventory) > 0:
-                # drop single
+                # drop/deposit single
                 inv = []
                 for key in self.inventory:
                     inv.append(key)
@@ -323,6 +325,21 @@ class Game(Controller):
                 self.view.chat_scroll -= 1
             elif key == curses.KEY_UP and self.view.chat_scroll < self.view.times_logged - self.view.win3.height + self.view.chatwin.height:
                 self.view.chat_scroll += 1
+        
+        elif self.state == State.IN_BANK:
+            if key == curses.KEY_UP:
+                self.bank_index = max(self.bank_index - 1, 15 * self.view.bank_page)
+            elif key == curses.KEY_DOWN:
+                self.bank_index = min(self.bank_index + 1, min(15 * self.view.bank_page + 14, len(self.bank) - 1))
+            elif key == curses.KEY_LEFT:
+                self.view.bank_page = max(0, self.view.bank_page - 1)
+                self.bank_index = 15 * self.view.bank_page
+            elif key == curses.KEY_RIGHT:
+                if len(self.bank) > 15 * (self.view.bank_page + 1):
+                    self.view.bank_page += 1
+                    self.bank_index = 15 * self.view.bank_page
+
+        
         else:
             return False
         return True
