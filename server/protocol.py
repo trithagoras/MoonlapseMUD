@@ -416,6 +416,7 @@ class MoonlapseProtocol(NetstringReceiver):
                 player_x = self.player_instance.x
                 dy = bank_y - player_y
                 dx = bank_x - player_x
+                # Acceptable distance, to account for things not being in sync yet?
                 if dy*dy + dx*dx <= 8:
                     near_bank = True
         return near_bank
@@ -462,10 +463,10 @@ class MoonlapseProtocol(NetstringReceiver):
         leftover, model_dicts = self.add_item_to_container(self.player_inventory, container_item.item, amt)
         if leftover > 0:
             # Refund if inventory full
+            refund = container_item
+            refund.amount = leftover
             self.add_item_to_container(player_bank, container_item.item, leftover)
-            # Need to send entire bank again to update client (TODO: In the future we need to stop sending 
-            # the entire bank each time and let the client keep a copy of the bank on their end to update)
-            self.enter_bank()
+            self.outgoing.append(packet.InventoryItemPacket("BankItem", create_dict("ContainerItem", refund)))
 
         for model_dict in model_dicts:
             self.outgoing.append(packet.InventoryItemPacket('InventoryItem', model_dict))
@@ -654,8 +655,9 @@ class MoonlapseProtocol(NetstringReceiver):
                     self.start_gather(instance)
                     return
 
+                # Don't move into the bank
                 elif instance.entity.typename == "Bank":
-                    self.enter_bank()
+                    self.outgoing.append(packet.DenyPacket("Can't move there"))
                     return
 
         if (0 <= desired_y < self.roommap.height and 0 <= desired_x < self.roommap.width) and (self.roommap.at('solid', desired_y, desired_x) == maps.NOTHING):
@@ -666,6 +668,7 @@ class MoonlapseProtocol(NetstringReceiver):
                 proto.process_visible_instances()
         else:
             self.outgoing.append(packet.DenyPacket("Can't move there"))
+            return
 
     def move_rooms(self, dest_roomid: Optional[int]):
         print(f"\nmove_rooms(dest_roomid={dest_roomid})\n")
@@ -701,11 +704,15 @@ class MoonlapseProtocol(NetstringReceiver):
 
         self.outgoing.append(packet.WeatherChangePacket(self.server.weather))
 
-        # send inventory to player
+        # send inventory and bank to player
         if self.state == self.GET_ENTRY:    # Only send on initial login
-            items = models.ContainerItem.objects.filter(container=self.player_inventory)
-            for ci in items:
+            inv_items = models.ContainerItem.objects.filter(container=self.player_inventory)
+            for ci in inv_items:
                 self.outgoing.append(packet.InventoryItemPacket('InventoryItem', create_dict('ContainerItem', ci)))
+            player_bank: models.Bank = models.Bank.objects.get(player=self.player_info)   
+            bank_items = models.ContainerItem.objects.filter(container=player_bank)
+            for ci in bank_items:
+                self.outgoing.append(packet.BankItemPacket('BankItem', create_dict('ContainerItem', ci)))
 
         self.state = self.PLAY
         self.broadcast(packet.ServerLogPacket(f"{self.username} has arrived."))

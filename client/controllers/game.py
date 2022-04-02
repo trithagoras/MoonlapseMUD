@@ -155,9 +155,11 @@ class Game(Controller):
                 self.balance_container(self.inventory)
 
             elif mtype == 'BankItem':
-                # Show container item in bank
+                # Add container item to bank
+                if c_item_id in self.bank:
+                    amt -= self.bank[c_item_id]['amount']
                 self.bank[c_item_id] = c_item
-                self.state = State.IN_BANK
+                self.balance_container(self.bank)
 
     # ContainerItem = {'id': 194, 'player': 2, 'item': {'id': 7, 'entity': {'id': 13, 'typename': 'Item', 'name': 'Banana'},
     #                       'value': 1, 'max_stack_amt': 4}, 'amount': 4}
@@ -385,17 +387,17 @@ class Game(Controller):
 
     def process_normal_input(self, key: int) -> bool:
         if key == curses.KEY_UP:
-            self.move(-1, 0)
-            self.cs.ns.send_packet(packet.MoveUpPacket())
+            if self.move(-1, 0):
+                self.cs.ns.send_packet(packet.MoveUpPacket())
         elif key == curses.KEY_DOWN:
-            self.move(1, 0)
-            self.cs.ns.send_packet(packet.MoveDownPacket())
+            if self.move(1, 0):
+                self.cs.ns.send_packet(packet.MoveDownPacket())
         elif key == curses.KEY_LEFT:
-            self.move(0, -1)
-            self.cs.ns.send_packet(packet.MoveLeftPacket())
+            if self.move(0, -1):
+                self.cs.ns.send_packet(packet.MoveLeftPacket())
         elif key == curses.KEY_RIGHT:
-            self.move(0, 1)
-            self.cs.ns.send_packet(packet.MoveRightPacket())
+            if self.move(0, 1):
+                self.cs.ns.send_packet(packet.MoveRightPacket())
         elif key == ord('g'):
             self.state = State.GRABBING_ITEM
             self.cs.ns.send_packet(packet.GrabItemPacket())
@@ -403,7 +405,11 @@ class Game(Controller):
             return False
         return True
 
-    def move(self, dy, dx):
+    def move(self, dy, dx) -> bool:
+        """
+        Moves the game client in a direction. Returns whether the move was successful 
+        (can be used to determine whether to send a move packet or not)
+        """
         if not self.player_instance:
             # We are most likely loading the room, OK to ignore
             return
@@ -412,12 +418,13 @@ class Game(Controller):
         dest_y: int = y + dy
         dest_x: int = x + dx
 
-        # Immovable objects
+        # Immovable or special objects
         for instance in self.visible_instances:
             pos = instance['y'], instance['x']
             if pos == (dest_y, dest_x):
                 if instance.entity["typename"] == "Bank":
-                    return
+                    self.state = State.IN_BANK
+                    return False
 
 
         if self.room.coordinate_exists(dest_y, dest_x) and self.room.at('solid', dest_y, dest_x) == maps.NOTHING:
@@ -426,6 +433,9 @@ class Game(Controller):
                 'y': dest_y,
                 'x': dest_x
             })
+            return True
+
+        return False
 
     def process_look_input(self, key: int) -> bool:
         desired_y = self.look_cursor_y
