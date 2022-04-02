@@ -12,7 +12,7 @@ from client.controllers.widgets import TextField
 from client.controllers import keybindings
 
 
-# InventoryItem = {'id': 194, 'player': 2, 'item': {'id': 7, 'entity': {'id': 13, 'typename': 'Item', 'name': 'Banana'},
+# ContainerItem = {'id': 194, 'player': 2, 'item': {'id': 7, 'entity': {'id': 13, 'typename': 'Item', 'name': 'Banana'},
 #                       'value': 1, 'max_stack_amt': 4}, 'amount': 4}
 class Model:
     def __init__(self, attr: dict):
@@ -75,7 +75,7 @@ class Game(Controller):
 
     def process_packet(self, p) -> bool:
         if isinstance(p, packet.ServerModelPacket):
-            if p.payloads[0].value == 'InventoryItem':
+            if p.payloads[0].value == 'ContainerItem':
                 self.process_model(p.payloads[0].value, p.payloads[1].value)
             elif not self.ready():
                 self.initialise_my_models(p.payloads[0].value, p.payloads[1].value)
@@ -135,7 +135,7 @@ class Game(Controller):
             else:  # If not visible already, add to visible list (it is only ever sent to us if it's in view)
                 self.visible_instances.add(instance)
 
-        elif mtype == 'InventoryItem':
+        elif mtype == 'ContainerItem':
             inv_item = Model(data)
             inv_item_id = inv_item['id']
             amt = inv_item['amount']
@@ -151,7 +151,7 @@ class Game(Controller):
 
             self.balance_inventory()
 
-    # InventoryItem = {'id': 194, 'player': 2, 'item': {'id': 7, 'entity': {'id': 13, 'typename': 'Item', 'name': 'Banana'},
+    # ContainerItem = {'id': 194, 'player': 2, 'item': {'id': 7, 'entity': {'id': 13, 'typename': 'Item', 'name': 'Banana'},
     #                       'value': 1, 'max_stack_amt': 4}, 'amount': 4}
 
     def balance_inventory(self):

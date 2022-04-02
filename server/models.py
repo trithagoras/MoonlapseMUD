@@ -46,18 +46,16 @@ class Player(models.Model):
     entity = models.ForeignKey(Entity, on_delete=models.RESTRICT)
 
 
-class Bank(models.Model):
-    player = models.ForeignKey(Player, on_delete=models.RESTRICT)
+class Container(models.Model):
+    pass
 
 
-class BankItem(models.Model):
-    bank = models.ForeignKey(Bank, on_delete=models.RESTRICT)
-    item = models.ForeignKey(Item, on_delete=models.RESTRICT)
-    amount = models.IntegerField(null=True, default=1)
+class Inventory(Container):
+    player=models.ForeignKey(Player, on_delete=models.RESTRICT)
 
 
-class InventoryItem(models.Model):
-    player = models.ForeignKey(Player, on_delete=models.RESTRICT)
+class ContainerItem(models.Model):
+    container = models.ForeignKey(Container, on_delete=models.RESTRICT)
     item = models.ForeignKey(Item, on_delete=models.RESTRICT)
     amount = models.IntegerField(null=True, default=1)
 
