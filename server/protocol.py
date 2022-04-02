@@ -265,7 +265,7 @@ class MoonlapseProtocol(NetstringReceiver):
             self.broadcast(packet.ServerLogPacket(message), include_self=True)
             self.logger.log(message)
 
-    def add_item_to_container(self, container: models.Container, item: models.Item, amt: int) -> int:
+    def add_item_to_container(self, container: models.Container, item: models.Item, amt: int) -> Tuple[int, Iterable[Optional[dict]]]:
         """
         adds this item to the given container
         :param container: The container (bank, inventory, etc.) to add to
@@ -276,7 +276,7 @@ class MoonlapseProtocol(NetstringReceiver):
             * (int) leftover (if the container is full)
             * (iterable[dict]) server model dicts for the items that were added to the container (can be useful to send to the client)
         """
-        return_dicts = []
+        return_dicts: List[Optional[dict]] = []
         container_items = models.ContainerItem.objects.filter(item=item, container=container)
         for container_item in container_items:
             if container_item.amount == item.max_stack_amt:
@@ -384,20 +384,34 @@ class MoonlapseProtocol(NetstringReceiver):
         # send player their inventory back?
 
 
-    def drop_item(self, p: packet.DropItemPacket):
-        try:
-            inv_item = models.ContainerItem.objects.get(id=p.payloads[0].value)
-        except:
-            return
-        amt = p.payloads[1].value
+    def remove_item_from_container(self, container: models.Container, container_item: models.ContainerItem, amt: int):
+        """
+        removes this item from the given container
+        :param container: The container (bank, inventory, etc.) to remove the item from
+        :param item: The item to remove
+        :param amt: The amount to remove
+        """
+        container_item.amount -= amt
 
-        inv_item.amount -= amt
+        # update container item or delete if dropped all
+        if container_item.amount <= 0:
+            container_item.delete()
+        else:
+            container_item.save()
+
+        self.balance_container(container)
+
+    def drop_item(self, p: packet.DropItemPacket):
+        container_item_id: int = p.payloads[0].value
+        amt: int = p.payloads[1].value
+        container_item: models.ContainerItem = models.ContainerItem.objects.get(id=container_item_id)
+        self.remove_item_from_container(self.player_inventory, container_item, amt)
 
         # if an instance already exists at this coordinate
         d = self.server.get_instances_at(self.player_instance.room.pk, self.player_instance.y, self.player_instance.x)
         existing_item: Optional[models.InstancedEntity] = None
         for key, inst in d.items():
-            if inst.entity.pk == inv_item.item.entity.pk and inst.amount < inv_item.item.max_stack_amt:
+            if inst.entity.pk == container_item.item.entity.pk and inst.amount < container_item.item.max_stack_amt:
                 existing_item = inst
 
         # at this point, there should be either nothing in items, or 1 entry with amount < max_stack_amt
@@ -406,22 +420,22 @@ class MoonlapseProtocol(NetstringReceiver):
         # if there exists a duplicate item on floor already here
         if existing_item is not None:
             leftover = existing_item.amount + amt
-            if leftover <= inv_item.item.max_stack_amt:
+            if leftover <= container_item.item.max_stack_amt:
                 existing_item.amount = leftover
 
-                if inv_item.amount <= 0:
-                    inv_item.delete()
+                if container_item.amount <= 0:
+                    container_item.delete()
                 else:
-                    inv_item.save()
+                    container_item.save()
                 self.balance_container(self.player_inventory)
                 # todo: cancel old deferred to despawn and add new one
                 return
             else:
-                existing_item.amount = inv_item.item.max_stack_amt
-                leftover %= inv_item.item.max_stack_amt
+                existing_item.amount = container_item.item.max_stack_amt
+                leftover %= container_item.item.max_stack_amt
 
         # create instance and place here
-        inst = models.InstancedEntity(entity=inv_item.item.entity,
+        inst = models.InstancedEntity(entity=container_item.item.entity,
                                       room=self.player_instance.room, y=self.player_instance.y,
                                       x=self.player_instance.x, amount=leftover)
         pk = random.randint(0, (2**31 - 1))
@@ -431,14 +445,6 @@ class MoonlapseProtocol(NetstringReceiver):
         inst.pk = pk     # guaranteed unique due to above check
 
         self.server.instances[inst.pk] = inst
-
-        # update player inventory item or delete if dropped all
-        if inv_item.amount <= 0:
-            inv_item.delete()
-        else:
-            inv_item.save()
-
-        self.balance_container(self.player_inventory)
 
         # set despawn countdown (2 mins - 120s)
         self.server.add_deferred(self.server.despawn_instance, self.server.tickrate * 120, False, inst.pk)
