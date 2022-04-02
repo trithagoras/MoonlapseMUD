@@ -268,7 +268,10 @@ class Game(Controller):
 
                 iid = inv[self.inventory_index]
                 amt = self.inventory[iid]['amount']
-                self.cs.ns.send_packet(packet.DropItemPacket(iid, amt))
+                if self.state == State.IN_BANK:
+                    self.cs.ns.send_packet(packet.DepositItemPacket(iid, amt))
+                else:
+                    self.cs.ns.send_packet(packet.DropItemPacket(iid, amt))
                 self.inventory.pop(iid)
 
                 # need to account for both pages. index past the last item in list ==> index == last item in list
@@ -289,7 +292,11 @@ class Game(Controller):
 
                 iid = inv[self.inventory_index]
                 amt = self.inventory[iid]['amount']
-                self.cs.ns.send_packet(packet.DropItemPacket(iid, 1))
+                if self.state == State.IN_BANK:
+                    self.cs.ns.send_packet(packet.DepositItemPacket(iid, 1))
+                else:
+                    self.cs.ns.send_packet(packet.DropItemPacket(iid, 1))
+
                 if amt == 1:
                     self.inventory.pop(iid)
 

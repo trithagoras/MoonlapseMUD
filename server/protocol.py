@@ -1,5 +1,6 @@
 import random
 import math
+from re import X
 
 import django
 from django.db.utils import DataError
@@ -251,6 +252,8 @@ class MoonlapseProtocol(NetstringReceiver):
             self.grab_item_here()
         elif isinstance(p, packet.DropItemPacket):
             self.drop_item(p)
+        elif isinstance(p, packet.DepositItemPacket):
+            self.deposit_item_in_bank(p)
         elif isinstance(p, packet.WeatherChangePacket):
             self.outgoing.append(p)
 
@@ -400,6 +403,40 @@ class MoonlapseProtocol(NetstringReceiver):
             container_item.save()
 
         self.balance_container(container)
+
+    def deposit_item_in_bank(self, p: packet.DepositItemPacket):
+        # Check we're next to the bank first
+        near_bank: bool = False
+        for instance in self.visible_instances:
+            if instance.entity.typename == 'Bank':
+                bank_y = instance.y
+                bank_x = instance.x
+                player_y = self.player_instance.y
+                player_x = self.player_instance.x
+                dy = bank_y - player_y
+                dx = bank_x - player_x
+                if dy*dy + dx*dx <= 8:
+                    near_bank = True
+
+        if not near_bank:
+            self.outgoing.append(packet.DenyPacket("You must be at a bank to do that"))
+            return
+        
+        # We're near a bank so OK to proceed
+        container_item_id: int = p.payloads[0].value
+        amt: int = p.payloads[1].value
+        container_item: models.ContainerItem = models.ContainerItem.objects.get(id=container_item_id)
+
+    
+        self.remove_item_from_container(self.player_inventory, container_item, amt)
+
+        player_bank: models.Bank = models.Bank.objects.get(player=self.player_info)    
+        leftover, model_dicts = self.add_item_to_container(player_bank, container_item.item, amt)
+        if leftover > 0:
+            self.add_item_to_container(self.player_inventory, container_item.item, leftover)
+        for model_dict in model_dicts:
+            self.outgoing.append(packet.BankItemPacket('BankItem', model_dict))
+
 
     def drop_item(self, p: packet.DropItemPacket):
         container_item_id: int = p.payloads[0].value
