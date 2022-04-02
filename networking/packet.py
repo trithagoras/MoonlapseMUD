@@ -152,6 +152,18 @@ class ServerModelPacket(Packet):
         super().__init__(ptype, pmodel)
 
 
+class InventoryItemPacket(ServerModelPacket):
+    def __init__(self, type, modeldict: dict):
+        type="InventoryItem"
+        super().__init__(type, modeldict)
+
+
+class BankItemPacket(ServerModelPacket):
+    def __init__(self, type, modeldict: dict):
+        type = "BankItem"
+        super().__init__(type, modeldict)
+
+
 class HelloPacket(Packet):
     """
     A packet representing an entity model from the server in the form of a dictionary.

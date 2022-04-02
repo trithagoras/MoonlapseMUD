@@ -47,7 +47,7 @@ class Player(models.Model):
 
 
 class Container(models.Model):
-    pass
+    capacity = models.PositiveIntegerField(default=30)
 
 
 class Inventory(Container):
@@ -60,7 +60,6 @@ class Bank(Container):
 
 class ContainerItem(models.Model):
     container = models.ForeignKey(Container, on_delete=models.RESTRICT)
-    container_type = models.CharField(null=False, max_length=50)
     item = models.ForeignKey(Item, on_delete=models.RESTRICT)
     amount = models.IntegerField(null=True, default=1)
 

@@ -77,9 +77,7 @@ class Game(Controller):
 
     def process_packet(self, p) -> bool:
         if isinstance(p, packet.ServerModelPacket):
-            if p.payloads[0].value == 'ContainerItem':
-                self.process_model(p.payloads[0].value, p.payloads[1].value)
-            elif not self.ready():
+            if not self.ready():
                 self.initialise_my_models(p.payloads[0].value, p.payloads[1].value)
             else:
                 self.process_model(p.payloads[0].value, p.payloads[1].value)
@@ -137,14 +135,13 @@ class Game(Controller):
             else:  # If not visible already, add to visible list (it is only ever sent to us if it's in view)
                 self.visible_instances.add(instance)
 
-        elif mtype == 'ContainerItem':
+        elif mtype in ("InventoryItem", "BankItem"):
             c_item = Model(data)
             c_item_id = c_item['id']
             amt = c_item['amount']
 
-            if c_item['container_type'] == 'Inventory':
+            if mtype == 'InventoryItem':
                 # Add container item to inventory
-
                 if c_item_id in self.inventory:
                     amt -= self.inventory[c_item_id]['amount']
 
@@ -156,7 +153,7 @@ class Game(Controller):
 
                 self.balance_inventory()
 
-            elif c_item['container_type'] == 'Bank':
+            elif mtype == 'BankItem':
                 # Show container item in bank
                 self.bank[c_item_id] = c_item
                 self.state = State.IN_BANK

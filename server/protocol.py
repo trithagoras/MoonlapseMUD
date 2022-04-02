@@ -201,13 +201,13 @@ class MoonlapseProtocol(NetstringReceiver):
         # Create and save a new inventory for the player
         player_inventory = models.Inventory(player=player)
         player_inventory.save()
-        player_bank = models.Bank(player=player)
+        player_bank = models.Bank(player=player, capacity=150)
         player_bank.save()
 
         # Test bank item
         sacred_beverage_entity = models.Entity(typename="Item", name="Sacred beverage"); sacred_beverage_entity.save()
         sacred_beverage_item = models.Item(entity=sacred_beverage_entity, value=1000000); sacred_beverage_item.save()
-        models.ContainerItem(container=player_bank, container_type="Bank", item=sacred_beverage_item).save()
+        models.ContainerItem(container=player_bank, item=sacred_beverage_item).save()
 
         # adding instance to server
         self.server.instances[instance.pk] = instance
@@ -265,52 +265,54 @@ class MoonlapseProtocol(NetstringReceiver):
             self.broadcast(packet.ServerLogPacket(message), include_self=True)
             self.logger.log(message)
 
-    def add_item_to_inventory(self, item: models.Item, amt: int) -> int:
+    def add_item_to_container(self, container: models.Container, item: models.Item, amt: int) -> int:
         """
-        adds this item to inventory
-        :param item:
-        :param amt:
+        adds this item to the given container
+        :param container: The container (bank, inventory, etc.) to add to
+        :param item: The item to add
+        :param amt: The amount to add
         :require: amt <= item.max_stack_amt
-        :return: leftover (if inventory is full)
+        :return: a tuple with elements:
+            * (int) leftover (if the container is full)
+            * (iterable[dict]) server model dicts for the items that were added to the container (can be useful to send to the client)
         """
-
-        inv_items = models.ContainerItem.objects.filter(item=item, container=self.player_inventory)
-        for inv_item in inv_items:
-            if inv_item.amount == item.max_stack_amt:
+        return_dicts = []
+        container_items = models.ContainerItem.objects.filter(item=item, container=container)
+        for container_item in container_items:
+            if container_item.amount == item.max_stack_amt:
                 continue
             else:
-                leftover = max((inv_item.amount + amt) - item.max_stack_amt, 0)
-                inv_item.amount = min(item.max_stack_amt, inv_item.amount + amt)
-                inv_item.save()
-                self.outgoing.append(packet.ServerModelPacket('ContainerItem', create_dict('ContainerItem', inv_item)))
+                leftover = max((container_item.amount + amt) - item.max_stack_amt, 0)
+                container_item.amount = min(item.max_stack_amt, container_item.amount + amt)
+                container_item.save()
+                return_dicts.append(create_dict('ContainerItem', container_item))
 
                 while leftover > 0:
-                    # if inventory is full
-                    if self.inventory_full():
-                        self.outgoing.append(packet.DenyPacket("Your inventory is full"))
-                        return leftover
+                    # if container is full
+                    if self.container_full(container):
+                        self.outgoing.append(packet.DenyPacket("This container is full"))
+                        return leftover, return_dicts
 
                     new_amt = min(item.max_stack_amt, leftover)
-                    new_inv_item = models.ContainerItem(item=item, amount=new_amt, container=self.player_inventory, container_type="Inventory")
-                    new_inv_item.save()
-                    self.outgoing.append(packet.ServerModelPacket('ContainerItem', create_dict('ContainerItem', new_inv_item)))
+                    new_container_item = models.ContainerItem(item=item, amount=new_amt, container=container)
+                    new_container_item.save()
+                    return_dicts.append(create_dict('ContainerItem', new_container_item))
                     leftover -= new_amt
-                self.balance_inventory()
-                return 0
+                self.balance_container(container)
+                return 0, return_dicts
 
-        # if inventory is full
-        if self.inventory_full():
-            self.outgoing.append(packet.DenyPacket("Your inventory is full"))
-            return amt
+        if self.container_full(container):
+            self.outgoing.append(packet.DenyPacket("This container is full"))
+            return amt, return_dicts
 
-        new_inv_item = models.ContainerItem(item=item, amount=amt, container=self.player_inventory, container_type="Inventory")
-        new_inv_item.save()
-        self.balance_inventory()
-        self.outgoing.append(packet.ServerModelPacket('ContainerItem', create_dict('ContainerItem', new_inv_item)))
-        return 0
+        new_container_item = models.ContainerItem(item=item, amount=amt, container=container)
+        new_container_item.save()
+        self.balance_container(container)
+        return_dicts.append(create_dict('ContainerItem', new_container_item))
+        return 0, return_dicts
 
-    def inventory_full(self) -> bool:
-        return len(models.ContainerItem.objects.filter(container=self.player_inventory)) == 30
+    def container_full(self, container: models.Container) -> bool:
+        return len(models.ContainerItem.objects.filter(container=container)) >= container.capacity
 
     def kill_instance(self, instance):
         """
@@ -333,8 +335,9 @@ class MoonlapseProtocol(NetstringReceiver):
                     and i.y == self.player_instance.y and i.x == self.player_instance.x:
 
                 di = models.Item.objects.get(entity=i.entity)
-                leftover = self.add_item_to_inventory(di, i.amount)
-
+                leftover, inventory_item_dicts = self.add_item_to_container(self.player_inventory, di, i.amount)
+                for item_dict in inventory_item_dicts:
+                    self.outgoing.append(packet.InventoryItemPacket("InventoryItem", item_dict))
                 if leftover:
                     i.amount = leftover
                 else:
@@ -344,27 +347,27 @@ class MoonlapseProtocol(NetstringReceiver):
 
         self.outgoing.append(packet.DenyPacket("There is no item here."))
 
-    def balance_inventory(self):
-        inventory = models.ContainerItem.objects.filter(container=self.player_inventory)
-        uniqueItems = []
-        for invItem in inventory:
+    def balance_container(self, container: models.Container):
+        all_container_items = models.ContainerItem.objects.filter(container=container)
+        unique_container_items = []
+        for container_item in all_container_items:
             to_add = True
-            for uniqueItem in uniqueItems:
-                if uniqueItem.item.pk == invItem.item.pk:
+            for unique_container_item in unique_container_items:
+                if unique_container_item.item.pk == container_item.item.pk:
                     to_add = False
                     break
             if to_add:
-                uniqueItems.append(invItem)
+                unique_container_items.append(container_item)
 
-        for invItem in uniqueItems:
-            stacks = [ itm for itm in inventory if itm.item.pk == invItem.item.pk and itm.amount < invItem.item.max_stack_amt ]
+        for container_item in unique_container_items:
+            stacks = [ itm for itm in all_container_items if itm.item.pk == container_item.item.pk and itm.amount < container_item.item.max_stack_amt ]
             if not stacks:
                 continue
             sum = 0
             for itm in stacks:
                 sum += itm.amount
-            residue = sum % invItem.item.max_stack_amt
-            total_stacks = math.ceil(sum / invItem.item.max_stack_amt)
+            residue = sum % container_item.item.max_stack_amt
+            total_stacks = math.ceil(sum / container_item.item.max_stack_amt)
             stacks_to_remove = len(stacks) - total_stacks
             for i in range(stacks_to_remove):
                 stacks[0].delete()
@@ -378,7 +381,7 @@ class MoonlapseProtocol(NetstringReceiver):
             for stack in stacks:
                 stack.save()
 
-        # send player their inventory back
+        # send player their inventory back?
 
 
     def drop_item(self, p: packet.DropItemPacket):
@@ -410,7 +413,7 @@ class MoonlapseProtocol(NetstringReceiver):
                     inv_item.delete()
                 else:
                     inv_item.save()
-                self.balance_inventory()
+                self.balance_container(self.player_inventory)
                 # todo: cancel old deferred to despawn and add new one
                 return
             else:
@@ -435,7 +438,7 @@ class MoonlapseProtocol(NetstringReceiver):
         else:
             inv_item.save()
 
-        self.balance_inventory()
+        self.balance_container(self.player_inventory)
 
         # set despawn countdown (2 mins - 120s)
         self.server.add_deferred(self.server.despawn_instance, self.server.tickrate * 120, False, inst.pk)
@@ -478,7 +481,7 @@ class MoonlapseProtocol(NetstringReceiver):
         
         items = models.ContainerItem.objects.filter(container=player_bank)
         for ci in items:
-            self.outgoing.append(packet.ServerModelPacket('ContainerItem', create_dict('ContainerItem', ci)))
+            self.outgoing.append(packet.BankItemPacket('BankItem', create_dict('ContainerItem', ci)))
 
 
 
@@ -522,8 +525,10 @@ class MoonlapseProtocol(NetstringReceiver):
                 if random.randint(1, itm.chance) == 1:
                     amt = random.randint(itm.min_amt, itm.max_amt)
                     item = itm.item
-                    fail = self.add_item_to_inventory(item, amt)
+                    fail, inventory_item_dicts = self.add_item_to_container(self.player_inventory, item, amt)
                     if fail == 0:
+                        for item_dict in inventory_item_dicts:
+                            self.outgoing.append(packet.InventoryItemPacket("InventoryItem", item_dict))
                         self.outgoing.append(packet.ServerLogPacket(f"You acquire {amt} {item.entity.name}."))
 
             self.kill_instance(instance)

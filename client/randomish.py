@@ -1,7 +1,7 @@
 from typing import *
 import os
 
-M: int = 127  # Large enough prime (2^13 - 1)
+M: int = 127  # Large enough prime
 A: int = 3    # Primitive modulo M
 
 
