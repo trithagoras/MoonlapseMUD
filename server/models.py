@@ -51,11 +51,16 @@ class Container(models.Model):
 
 
 class Inventory(Container):
-    player=models.ForeignKey(Player, on_delete=models.RESTRICT)
+    player = models.ForeignKey(Player, on_delete=models.RESTRICT)
+
+
+class Bank(Container):
+    player = models.ForeignKey(Player, on_delete=models.RESTRICT)
 
 
 class ContainerItem(models.Model):
     container = models.ForeignKey(Container, on_delete=models.RESTRICT)
+    container_type = models.CharField(null=False, max_length=50)
     item = models.ForeignKey(Item, on_delete=models.RESTRICT)
     amount = models.IntegerField(null=True, default=1)
 

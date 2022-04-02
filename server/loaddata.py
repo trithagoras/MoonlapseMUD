@@ -95,4 +95,8 @@ ent_banana = models.Entity(name="Banana", typename="Item"); ent_banana.save()
 item_banana = models.Item(entity=ent_banana, value=1, max_stack_amt=4); item_banana.save()
 inst_banana = models.InstancedEntity(entity=ent_banana, room=rm_forest, y=5, x=5, respawn_time=3, amount=3); inst_banana.save()
 
+# bank in the garden
+ent_garden_bank = models.Entity(name="Garden Bank", typename="Bank"); ent_garden_bank.save()
+inst_garden_bank = models.InstancedEntity(entity=ent_garden_bank, room=rm_garden, y=10, x=16); inst_garden_bank.save()
+
 print("Done")

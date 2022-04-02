@@ -12,7 +12,7 @@ from client.controllers.widgets import TextField
 from client.controllers import keybindings
 
 
-# ContainerItem = {'id': 194, 'player': 2, 'item': {'id': 7, 'entity': {'id': 13, 'typename': 'Item', 'name': 'Banana'},
+# ContainerItem = {'id': 194, 'container': 2, 'item': {'id': 7, 'entity': {'id': 13, 'typename': 'Item', 'name': 'Banana'},
 #                       'value': 1, 'max_stack_amt': 4}, 'amount': 4}
 class Model:
     def __init__(self, attr: dict):
@@ -136,20 +136,27 @@ class Game(Controller):
                 self.visible_instances.add(instance)
 
         elif mtype == 'ContainerItem':
-            inv_item = Model(data)
-            inv_item_id = inv_item['id']
-            amt = inv_item['amount']
+            c_item = Model(data)
+            c_item_id = c_item['id']
+            amt = c_item['amount']
 
-            if inv_item_id in self.inventory:
-                amt -= self.inventory[inv_item_id]['amount']
+            if c_item['container_type'] == 'Inventory':
+                # Add container item to inventory
 
-            self.inventory[inv_item_id] = inv_item
+                if c_item_id in self.inventory:
+                    amt -= self.inventory[c_item_id]['amount']
 
-            if self.state == State.GRABBING_ITEM:
-                self.quicklog = f"You pick up {amt} {inv_item['item']['entity']['name']}."
-                self.state = State.NORMAL
+                self.inventory[c_item_id] = c_item
 
-            self.balance_inventory()
+                if self.state == State.GRABBING_ITEM:
+                    self.quicklog = f"You pick up {amt} {c_item['item']['entity']['name']}."
+                    self.state = State.NORMAL
+
+                self.balance_inventory()
+
+            elif c_item['container_type'] == 'Bank':
+                # Show container item in bank
+                self.logger.log(f"I have {amt} {c_item['item']['entity']['name']} in my bank")
 
     # ContainerItem = {'id': 194, 'player': 2, 'item': {'id': 7, 'entity': {'id': 13, 'typename': 'Item', 'name': 'Banana'},
     #                       'value': 1, 'max_stack_amt': 4}, 'amount': 4}

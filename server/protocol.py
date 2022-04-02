@@ -201,6 +201,13 @@ class MoonlapseProtocol(NetstringReceiver):
         # Create and save a new inventory for the player
         player_inventory = models.Inventory(player=player)
         player_inventory.save()
+        player_bank = models.Bank(player=player)
+        player_bank.save()
+
+        # Test bank item
+        sacred_beverage_entity = models.Entity(typename="Item", name="Sacred beverage"); sacred_beverage_entity.save()
+        sacred_beverage_item = models.Item(entity=sacred_beverage_entity, value=1000000); sacred_beverage_item.save()
+        models.ContainerItem(container=player_bank, container_type="Bank", item=sacred_beverage_item).save()
 
         # adding instance to server
         self.server.instances[instance.pk] = instance
@@ -284,7 +291,7 @@ class MoonlapseProtocol(NetstringReceiver):
                         return leftover
 
                     new_amt = min(item.max_stack_amt, leftover)
-                    new_inv_item = models.ContainerItem(item=item, amount=new_amt, container=self.player_inventory)
+                    new_inv_item = models.ContainerItem(item=item, amount=new_amt, container=self.player_inventory, container_type="Inventory")
                     new_inv_item.save()
                     self.outgoing.append(packet.ServerModelPacket('ContainerItem', create_dict('ContainerItem', new_inv_item)))
                     leftover -= new_amt
@@ -296,7 +303,7 @@ class MoonlapseProtocol(NetstringReceiver):
             self.outgoing.append(packet.DenyPacket("Your inventory is full"))
             return amt
 
-        new_inv_item = models.ContainerItem(item=item, amount=amt, container=self.player_inventory)
+        new_inv_item = models.ContainerItem(item=item, amount=amt, container=self.player_inventory, container_type="Inventory")
         new_inv_item.save()
         self.balance_inventory()
         self.outgoing.append(packet.ServerModelPacket('ContainerItem', create_dict('ContainerItem', new_inv_item)))
@@ -466,6 +473,15 @@ class MoonlapseProtocol(NetstringReceiver):
 
         return True
 
+    def enter_bank(self):
+        player_bank: models.Bank = models.Bank.objects.get(player=self.player_info)
+        
+        items = models.ContainerItem.objects.filter(container=player_bank)
+        for ci in items:
+            self.outgoing.append(packet.ServerModelPacket('ContainerItem', create_dict('ContainerItem', ci)))
+
+
+
     def start_gather(self, instance: models.InstancedEntity):
         node = models.ResourceNode.objects.get(entity=instance.entity)
 
@@ -540,21 +556,26 @@ class MoonlapseProtocol(NetstringReceiver):
         elif isinstance(p, packet.MoveLeftPacket):
             desired_x -= 1
 
-        # Check if we're going to land on a portal
+        # Check if we're going to land on a portal, resource node, bank, etc.
         for instance in self.visible_instances:
-            if instance.entity.typename == "Portal" and instance.y == desired_y and instance.x == desired_x:
-                portal = models.Portal.objects.get(entity=instance.entity)
-                desired_y = portal.linkedy
-                desired_x = portal.linkedx
-                self.player_instance.y = desired_y
-                self.player_instance.x = desired_x
-                if self.player_instance.room != portal.linkedroom:
-                    self.move_rooms(portal.linkedroom.id)
+            if instance.y == desired_y and instance.x == desired_x:
+                if instance.entity.typename == "Portal":
+                    portal = models.Portal.objects.get(entity=instance.entity)
+                    desired_y = portal.linkedy
+                    desired_x = portal.linkedx
+                    self.player_instance.y = desired_y
+                    self.player_instance.x = desired_x
+                    if self.player_instance.room != portal.linkedroom:
+                        self.move_rooms(portal.linkedroom.id)
+                        return
+
+                elif instance.entity.typename in ("OreNode", "TreeNode"):
+                    self.start_gather(instance)
                     return
 
-            elif instance.entity.typename in ("OreNode", "TreeNode") and instance.y == desired_y and instance.x == desired_x:
-                self.start_gather(instance)
-                return
+                elif instance.entity.typename == "Bank":
+                    self.enter_bank()
+                    return
 
         if (0 <= desired_y < self.roommap.height and 0 <= desired_x < self.roommap.width) and (self.roommap.at('solid', desired_y, desired_x) == maps.NOTHING):
             self.player_instance.y = desired_y

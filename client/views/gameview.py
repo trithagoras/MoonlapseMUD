@@ -113,6 +113,8 @@ class GameView(View):
                 elif typename == "TreeNode":
                     # different trees should mean different colors. perhaps by name?
                     self.win1.addstr(y, x, '♣', curses.COLOR_GREEN)
+                elif typename == 'Bank':
+                    self.win1.addstr(y, x, '$', curses.COLOR_YELLOW)
                 else:
                     self.win1.addstr(y, x, '?', curses.COLOR_MAGENTA)
 

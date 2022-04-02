@@ -18,3 +18,4 @@ server/venv/*
 *.pub
 *.pem
 *.DS_Store
+.vscode/*
