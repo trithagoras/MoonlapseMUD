@@ -43,6 +43,7 @@ class State:
     NORMAL = 0
     LOOKING = 1
     GRABBING_ITEM = 2
+    IN_BANK = 3
 
 
 class Game(Controller):
@@ -54,6 +55,7 @@ class Game(Controller):
         self.player_info = None  # id, entity, inventory
         self.player_instance = None  # id, entity, room_id, y, x
         self.inventory = {}     # inv_item.id : {inv_item_id, item, amount}
+        self.bank = {}          # bank_item.id : {bank_item_id, item, amount}
         self.inventory_index = 0    # cursor position in inventory
         self.room = None
 
@@ -156,7 +158,8 @@ class Game(Controller):
 
             elif c_item['container_type'] == 'Bank':
                 # Show container item in bank
-                self.logger.log(f"I have {amt} {c_item['item']['entity']['name']} in my bank")
+                self.bank[c_item_id] = c_item
+                self.state = State.IN_BANK
 
     # ContainerItem = {'id': 194, 'player': 2, 'item': {'id': 7, 'entity': {'id': 13, 'typename': 'Item', 'name': 'Banana'},
     #                       'value': 1, 'max_stack_amt': 4}, 'amount': 4}
@@ -225,6 +228,9 @@ class Game(Controller):
                 self.view.chat_scroll = 0
             self.chatbox.process_input(key)
             return True
+        elif keybindings.escape(key):
+            if self.state in (State.LOOKING, State.IN_BANK):
+                self.state = State.NORMAL
         elif keybindings.enter(key):
             self.chatbox.select()
         elif key == ord('q'):
@@ -345,6 +351,14 @@ class Game(Controller):
         x: int = self.player_instance['x']
         dest_y: int = y + dy
         dest_x: int = x + dx
+
+        # Immovable objects
+        for instance in self.visible_instances:
+            pos = instance['y'], instance['x']
+            if pos == (dest_y, dest_x):
+                if instance.entity["typename"] == "Bank":
+                    return
+
 
         if self.room.coordinate_exists(dest_y, dest_x) and self.room.at('solid', dest_y, dest_x) == maps.NOTHING:
             self.player_instance.update({

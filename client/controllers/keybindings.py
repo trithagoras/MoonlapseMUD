@@ -7,3 +7,5 @@ def backspace(k):
 def enter(k):
     return k in (curses.ascii.LF, curses.ascii.CR, curses.ascii.BEL, curses.KEY_ENTER)
 
+def escape(k):
+    return k in (curses.ascii.ESC, 27)

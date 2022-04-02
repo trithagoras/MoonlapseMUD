@@ -39,7 +39,10 @@ class GameView(View):
             win.border(color=(curses.COLOR_CYAN if focused else None))
 
         # window 1 content
-        self.draw_map()
+        if self.controller.state == game.State.IN_BANK:
+            self.draw_bank()
+        else:
+            self.draw_map()
 
         # window 2 content
         self.draw_inventory()
@@ -48,6 +51,34 @@ class GameView(View):
         self.draw_log()
 
         self.addstr(2, 1, self.controller.quicklog)
+
+    def draw_bank(self):
+        win = self.win1
+        win.title(f"[1] Bank")
+        win.addstr(1, 2, "Name")
+        win.addstr(1, 32, "Value")
+        win.addstr(1, 42, "Amount")
+
+        # creating list of bank items (to keep track of position)
+        bank = []
+        for key, val in self.controller.bank.items():
+            bank.append((key, val))
+
+        line = 3
+        if self.inventory_page == 0:
+            rng = range(0, min(15, len(bank)))
+        else:
+            rng = range(15, min(30, len(bank)))
+
+        for i in rng:
+            key, val = bank[i]
+            name = val['item']['entity']['name']
+            amount = val['amount']
+            value = val['item']['value']
+            win.addstr(line, 2, f"{name}")
+            win.addstr(line, 32, f"{value}")
+            win.addstr(line, 42, f"{amount}")
+            line += 1
 
     def draw_map(self):
         self.win1.title(f"[1] {self.controller.room.name}")
