@@ -672,7 +672,7 @@ class MoonlapseProtocol(NetstringReceiver):
         if self.state == self.GET_ENTRY:    # Only send on initial login
             items = models.ContainerItem.objects.filter(container=self.player_inventory)
             for ci in items:
-                self.outgoing.append(packet.ServerModelPacket('ContainerItem', create_dict('ContainerItem', ci)))
+                self.outgoing.append(packet.InventoryItemPacket('InventoryItem', create_dict('ContainerItem', ci)))
 
         self.state = self.PLAY
         self.broadcast(packet.ServerLogPacket(f"{self.username} has arrived."))
