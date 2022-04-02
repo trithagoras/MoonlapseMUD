@@ -243,23 +243,17 @@ class Game(Controller):
                 self.look_cursor_x = self.player_instance['x']
             else:
                 self.state = State.NORMAL
-        elif key == ord('<'):
-            self.view.inventory_page = 0
-            self.inventory_index = 0
-        elif key == ord('>'):
-            if len(self.inventory) >= 16:
-                self.view.inventory_page = 1
-                self.inventory_index = 15
         elif key == ord('['):
-            if self.view.inventory_page == 0:
-                self.inventory_index = max(self.inventory_index - 1, 0)
-            else:
-                self.inventory_index = max(self.inventory_index - 1, 15)
+            self.inventory_index = max(self.inventory_index - 1, 15 * self.view.inventory_page)
         elif key == ord(']'):
-            if self.view.inventory_page == 0:
-                self.inventory_index = min(self.inventory_index + 1, min(14, len(self.inventory)-1))
-            else:
-                self.inventory_index = min(self.inventory_index + 1, min(29, len(self.inventory)-1))
+            self.inventory_index = min(self.inventory_index + 1, min(15 * self.view.inventory_page + 14, len(self.inventory) - 1))
+        elif key == ord('<'):
+            self.view.inventory_page = max(0, self.view.inventory_page - 1)
+            self.inventory_index = 15 * self.view.inventory_page
+        elif key == ord('>'):
+            if len(self.inventory) > 15 * (self.view.inventory_page + 1):
+                self.view.inventory_page += 1
+                self.inventory_index = 15 * self.view.inventory_page
         elif key == ord('D'):
             # Drop item on ground, or deposity in bank
             if len(self.inventory) > 0:
