@@ -152,7 +152,7 @@ class Game(Controller):
                     self.quicklog = f"You pick up {amt} {c_item['item']['entity']['name']}."
                     self.state = State.NORMAL
 
-                self.balance_inventory()
+                self.balance_container(self.inventory)
 
             elif mtype == 'BankItem':
                 # Show container item in bank
@@ -162,29 +162,29 @@ class Game(Controller):
     # ContainerItem = {'id': 194, 'player': 2, 'item': {'id': 7, 'entity': {'id': 13, 'typename': 'Item', 'name': 'Banana'},
     #                       'value': 1, 'max_stack_amt': 4}, 'amount': 4}
 
-    def balance_inventory(self):
-        unique_inv_items = []
-        for invItem in self.inventory.values():
+    def balance_container(self, container: dict): # Container must be same structure as self.bank or self.inventory
+        unique_cnt_items = []
+        for cntItem in container.values():
             to_add = True
-            for unique_inv_item in unique_inv_items:
-                if unique_inv_item['item']['id'] == invItem['item']['id']:
+            for unique_cnt_item in unique_cnt_items:
+                if unique_cnt_item['item']['id'] == cntItem['item']['id']:
                     to_add = False
                     break
             if to_add:
-                unique_inv_items.append(invItem)
+                unique_cnt_items.append(cntItem)
 
-        for invItem in unique_inv_items:
-            stacks = [ itm for itm in self.inventory.values() if itm['item']['id'] == invItem['item']['id'] and itm['amount'] < invItem['item']['max_stack_amt'] ]
+        for cntItem in unique_cnt_items:
+            stacks = [ itm for itm in container.values() if itm['item']['id'] == cntItem['item']['id'] and itm['amount'] < cntItem['item']['max_stack_amt'] ]
             if not stacks:
                 continue
             sum = 0
             for itm in stacks:
                 sum += itm['amount']
-            residue = sum % invItem['item']['max_stack_amt']
-            total_stacks = math.ceil(sum / invItem['item']['max_stack_amt'])
+            residue = sum % cntItem['item']['max_stack_amt']
+            total_stacks = math.ceil(sum / cntItem['item']['max_stack_amt'])
             stacks_to_remove = len(stacks) - total_stacks
             for i in range(stacks_to_remove):
-                self.inventory.pop(stacks[0]['id'])
+                container.pop(stacks[0]['id'])
                 stacks.pop(0)
             for stack in stacks:
                 setattr(stack, 'amount', stack['item']['max_stack_amt'])
@@ -270,15 +270,15 @@ class Game(Controller):
                     self.cs.ns.send_packet(packet.DropItemPacket(iid, amt))
                 self.inventory.pop(iid)
 
-                # need to account for both pages. index past the last item in list ==> index == last item in list
+                # need to account for all pages. index past the last item in list ==> index == last item in list
                 if self.inventory_index >= len(inv) - 1:
                     self.inventory_index = max(0, len(inv) - 2)
 
-                # set page to 1 if list size < 16
-                if len(inv) - 1 < 16:
-                    self.view.inventory_page = 0
+                # go back a page if we've dropped the last item on the last page
+                while 15 * self.view.inventory_page >= len(self.inventory) and len(self.inventory) != 0:
+                    self.view.inventory_page = max(0, self.view.inventory_page - 1)
 
-                self.balance_inventory()
+                self.balance_container(self.inventory)
         elif key == ord('d'):
             if len(self.inventory) > 0:
                 # drop/deposit single
@@ -296,17 +296,17 @@ class Game(Controller):
                 if amt == 1:
                     self.inventory.pop(iid)
 
-                    # need to account for both pages. index past the last item in list ==> index == last item in list
+                    # need to account for all pages. index past the last item in list ==> index == last item in list
                     if self.inventory_index >= len(inv) - 1:
                         self.inventory_index = max(0, len(inv) - 2)
 
-                    # set page to 1 if list size < 16
-                    if len(inv) - 1 < 16:
-                        self.view.inventory_page = 0
+                    # go back a page if we've dropped the last item on the last page
+                    while 15 * self.view.inventory_page >= len(self.inventory) and len(self.inventory) != 0:
+                        self.view.inventory_page = max(0, self.view.inventory_page - 1)
                 else:
                     setattr(self.inventory[iid], 'amount', self.inventory[iid]['amount'] - 1)
 
-                self.balance_inventory()
+                self.balance_container(self.inventory)
         elif key == ord('1'):
             self.view.focused_win = self.view.win1
         elif key == ord('2'):
@@ -332,6 +332,51 @@ class Game(Controller):
                 if len(self.bank) > 15 * (self.view.bank_page + 1):
                     self.view.bank_page += 1
                     self.bank_index = 15 * self.view.bank_page
+            elif key == ord('w'):
+                if len(self.bank) > 0:
+                    # withdraw single
+                    bank = []
+                    for key in self.bank:
+                        bank.append(key)
+
+                    iid = bank[self.bank_index]
+                    amt = self.bank[iid]['amount']
+                    self.cs.ns.send_packet(packet.WithdrawItemPacket(iid, 1))
+
+                    if amt <= 1:
+                        self.bank.pop(iid)
+
+                        # need to account for all pages. index past the last item in list ==> index == last item in list
+                        if self.bank_index >= len(bank) - 1:
+                            self.bank_index = max(0, len(bank) - 2)
+
+                        # go back a page if we've withdrawn the last item on the last page
+                        while 15 * self.view.bank_page >= len(self.bank) and len(self.bank) != 0:
+                            self.view.bank_page = max(0, self.view.bank_page - 1)
+                    else:
+                        setattr(self.bank[iid], 'amount', self.bank[iid]['amount'] - 1)
+
+                    self.balance_container(self.bank)
+            elif key == ord('W'):
+                # With draw full stack
+                if len(self.bank) > 0:
+                    # drop-all
+                    bank = []
+                    for key in self.bank:
+                        bank.append(key)
+
+                    iid = bank[self.bank_index]
+                    amt = self.bank[iid]['amount']
+                    self.cs.ns.send_packet(packet.WithdrawItemPacket(iid, amt))
+                    self.bank.pop(iid)
+
+                    # need to account for all pages. index past the last item in list ==> index == last item in list
+                    if self.bank_index >= len(bank) - 1:
+                        self.bank_index = max(0, len(bank) - 2)
+
+                    # go back a page if we've withdrawn the last item on the last page
+                    while 15 * self.view.bank_page >= len(self.bank) and len(self.bank) != 0:
+                        self.view.bank_page = max(0, self.view.bank_page - 1)
 
         
         else:

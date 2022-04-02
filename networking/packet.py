@@ -316,6 +316,14 @@ class DepositItemPacket(Packet):
         super().__init__(Payload(inv_item_id), Payload(amt))
 
 
+class WithdrawItemPacket(Packet):
+    """
+    A packet sent from a client to its protocol to withdraw an item from the bank
+    """
+    def __init__(self, inv_item_id: int, amt: int):
+        super().__init__(Payload(inv_item_id), Payload(amt))
+
+
 class WeatherChangePacket(Packet):
     """
     A packet send from a protocol to its client to indicate change in weather

@@ -254,6 +254,8 @@ class MoonlapseProtocol(NetstringReceiver):
             self.drop_item(p)
         elif isinstance(p, packet.DepositItemPacket):
             self.deposit_item_in_bank(p)
+        elif isinstance(p, packet.WithdrawItemPacket):
+            self.withdraw_item_from_bank(p)
         elif isinstance(p, packet.WeatherChangePacket):
             self.outgoing.append(p)
 
@@ -404,8 +406,7 @@ class MoonlapseProtocol(NetstringReceiver):
 
         self.balance_container(container)
 
-    def deposit_item_in_bank(self, p: packet.DepositItemPacket):
-        # Check we're next to the bank first
+    def near_bank(self):
         near_bank: bool = False
         for instance in self.visible_instances:
             if instance.entity.typename == 'Bank':
@@ -417,8 +418,10 @@ class MoonlapseProtocol(NetstringReceiver):
                 dx = bank_x - player_x
                 if dy*dy + dx*dx <= 8:
                     near_bank = True
+        return near_bank
 
-        if not near_bank:
+    def deposit_item_in_bank(self, p: packet.DepositItemPacket):
+        if not self.near_bank():
             self.outgoing.append(packet.DenyPacket("You must be at a bank to do that"))
             return
         
@@ -433,9 +436,39 @@ class MoonlapseProtocol(NetstringReceiver):
         player_bank: models.Bank = models.Bank.objects.get(player=self.player_info)    
         leftover, model_dicts = self.add_item_to_container(player_bank, container_item.item, amt)
         if leftover > 0:
+            # Refund if bank full
+            refund = container_item
+            refund.amount = leftover
             self.add_item_to_container(self.player_inventory, container_item.item, leftover)
+            self.outgoing.append(packet.InventoryItemPacket("InventoryItem", create_dict("ContainerItem", refund)))
+
         for model_dict in model_dicts:
             self.outgoing.append(packet.BankItemPacket('BankItem', model_dict))
+
+    def withdraw_item_from_bank(self, p: packet.WithdrawItemPacket):
+        if not self.near_bank():
+            self.outgoing.append(packet.DenyPacket("You must be at a bank to do that"))
+            return
+        
+        # We're near a bank so OK to proceed
+        player_bank: models.Bank = models.Bank.objects.get(player=self.player_info)
+
+        container_item_id: int = p.payloads[0].value
+        amt: int = p.payloads[1].value
+        container_item: models.ContainerItem = models.ContainerItem.objects.get(id=container_item_id)
+
+        self.remove_item_from_container(player_bank, container_item, amt)
+
+        leftover, model_dicts = self.add_item_to_container(self.player_inventory, container_item.item, amt)
+        if leftover > 0:
+            # Refund if inventory full
+            self.add_item_to_container(player_bank, container_item.item, leftover)
+            # Need to send entire bank again to update client (TODO: In the future we need to stop sending 
+            # the entire bank each time and let the client keep a copy of the bank on their end to update)
+            self.enter_bank()
+
+        for model_dict in model_dicts:
+            self.outgoing.append(packet.InventoryItemPacket('InventoryItem', model_dict))
 
 
     def drop_item(self, p: packet.DropItemPacket):
