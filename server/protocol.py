@@ -65,6 +65,7 @@ class MoonlapseProtocol(NetstringReceiver):
         self.username = ""
         self.player_instance: Optional[models.InstancedEntity] = None
         self.player_inventory: Optional[models.Inventory] = None
+        self.player_bank: Optional[models.Inventory] = None
         self.player_info: Optional[models.Player] = None
         self.roommap: Optional[maps.Room] = None
         self.logged_in = False
@@ -162,6 +163,7 @@ class MoonlapseProtocol(NetstringReceiver):
         self.player_instance = models.InstancedEntity.objects.get(entity=self.player_info.entity)
         self.player_instance = self.server.instances[self.player_instance.pk]
         self.player_inventory = models.Inventory.objects.get(player=self.player_info)
+        self.player_bank = models.Bank.objects.get(player=self.player_info)
 
         self.outgoing.append(packet.OkPacket())
         self.move_rooms(self.player_instance.room.id)
@@ -434,8 +436,7 @@ class MoonlapseProtocol(NetstringReceiver):
     
         self.remove_item_from_container(self.player_inventory, container_item, amt)
 
-        player_bank: models.Bank = models.Bank.objects.get(player=self.player_info)    
-        leftover, model_dicts = self.add_item_to_container(player_bank, container_item.item, amt)
+        leftover, model_dicts = self.add_item_to_container(self.player_bank, container_item.item, amt)
         if leftover > 0:
             # Refund if bank full
             refund = container_item
@@ -452,20 +453,18 @@ class MoonlapseProtocol(NetstringReceiver):
             return
         
         # We're near a bank so OK to proceed
-        player_bank: models.Bank = models.Bank.objects.get(player=self.player_info)
-
         container_item_id: int = p.payloads[0].value
         amt: int = p.payloads[1].value
         container_item: models.ContainerItem = models.ContainerItem.objects.get(id=container_item_id)
 
-        self.remove_item_from_container(player_bank, container_item, amt)
+        self.remove_item_from_container(self.player_bank, container_item, amt)
 
         leftover, model_dicts = self.add_item_to_container(self.player_inventory, container_item.item, amt)
         if leftover > 0:
             # Refund if inventory full
             refund = container_item
             refund.amount = leftover
-            self.add_item_to_container(player_bank, container_item.item, leftover)
+            self.add_item_to_container(self.player_bank, container_item.item, leftover)
             self.outgoing.append(packet.InventoryItemPacket("BankItem", create_dict("ContainerItem", refund)))
 
         for model_dict in model_dicts:
@@ -552,15 +551,6 @@ class MoonlapseProtocol(NetstringReceiver):
             return False
 
         return True
-
-    def enter_bank(self):
-        player_bank: models.Bank = models.Bank.objects.get(player=self.player_info)
-        
-        items = models.ContainerItem.objects.filter(container=player_bank)
-        for ci in items:
-            self.outgoing.append(packet.BankItemPacket('BankItem', create_dict('ContainerItem', ci)))
-
-
 
     def start_gather(self, instance: models.InstancedEntity):
         node = models.ResourceNode.objects.get(entity=instance.entity)
@@ -709,8 +699,7 @@ class MoonlapseProtocol(NetstringReceiver):
             inv_items = models.ContainerItem.objects.filter(container=self.player_inventory)
             for ci in inv_items:
                 self.outgoing.append(packet.InventoryItemPacket('InventoryItem', create_dict('ContainerItem', ci)))
-            player_bank: models.Bank = models.Bank.objects.get(player=self.player_info)   
-            bank_items = models.ContainerItem.objects.filter(container=player_bank)
+            bank_items = models.ContainerItem.objects.filter(container=self.player_bank)
             for ci in bank_items:
                 self.outgoing.append(packet.BankItemPacket('BankItem', create_dict('ContainerItem', ci)))
 
