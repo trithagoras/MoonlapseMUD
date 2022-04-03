@@ -732,7 +732,7 @@ class MoonlapseProtocol(NetstringReceiver):
                 if not proto or not proto.logged_in:
                     instances_in_view.remove(instance)
 
-        self.visible_instances = copy.deepcopy(instances_in_view)
+        self.visible_instances = instances_in_view
 
         # Say goodbye to the instances which are no longer in our view
         just_left_view: Set[models.InstancedEntity] = prev_in_view.difference(self.visible_instances)
@@ -815,6 +815,8 @@ class MoonlapseProtocol(NetstringReceiver):
               f"[{self.player_instance.room.name if self.player_instance else None}]: {message}")
 
     def coord_in_view(self, y: int, x: int) -> bool:
+        if OOB in (y, x):
+            return False
         yview = self.player_instance.y - 10, self.player_instance.y + 10
         xview = self.player_instance.x - 10, self.player_instance.x + 10
 
