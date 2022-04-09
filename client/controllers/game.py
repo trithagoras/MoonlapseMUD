@@ -465,6 +465,9 @@ class Game(Controller):
                 self.quicklog = f"Can't trade with {trade_partner.entity['name']}!"
                 self.state = State.NORMAL
                 return False
+            elif trade_partner.entity["id"] == self.player_instance.entity["id"]:
+                self.quicklog = f"Can't trade with yourself!"
+                self.state = State.NORMAL
             else:
                 self.quicklog = f"Initiating trade request with {trade_partner.entity['name']}..."
                 self.state = State.NORMAL

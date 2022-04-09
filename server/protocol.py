@@ -71,6 +71,8 @@ class MoonlapseProtocol(NetstringReceiver):
         self.logged_in = False
         self.client_aes_key: Optional[bytes] = None
 
+        self.prospective_trade_partner_proto: Optional['MoonlapseProtocol'] = None
+
         self.state = self.GET_ENTRY
         self.actionloop = None
 
@@ -260,6 +262,40 @@ class MoonlapseProtocol(NetstringReceiver):
             self.withdraw_item_from_bank(p)
         elif isinstance(p, packet.WeatherChangePacket):
             self.outgoing.append(p)
+        elif isinstance(p, packet.TradeRequestPacket):
+            self.process_trade_request(p)
+
+    def process_trade_request(self, p: packet.TradeRequestPacket):
+        requesting_entity_id: int = p.payloads[0].value
+        prospective_trade_partner_entity_id: int = p.payloads[1].value
+
+        # Check we're not trying to trade with ourselves
+        if requesting_entity_id == prospective_trade_partner_entity_id:
+            self.outgoing.append(packet.DenyPacket("Can't trade with yourself"))
+            return
+
+        # If we are the requester, forward the trade request to our prospective trade partner
+        if requesting_entity_id == self.player_instance.entity.pk:
+            self.prospective_trade_partner_proto = self.server.get_proto_by_id(prospective_trade_partner_entity_id)
+            self.debug(f"Requesting to trade with {self.prospective_trade_partner_proto.player_instance.entity.name}...")
+            self.prospective_trade_partner_proto.process_packet(p)
+            return
+        
+        # If we were not the requester, more processing
+        requesting_protocol = self.server.get_proto_by_id(requesting_entity_id)
+        self.debug(f"Processing trade request from {requesting_protocol.player_instance.entity.name}...")
+        if self.prospective_trade_partner_proto == requesting_protocol:
+            # If we already had a trade request open for this guy...
+            self.debug("Matches our trade request, entering trade...")
+            self.enter_trade(requesting_protocol)
+        elif self.prospective_trade_partner_proto is None:
+            # If we don't already have a trade request pending, let our client know this guy wants to trade with us
+            self.debug("Forwarding this trade request to our client as an FYI")
+            self.outgoing.append(p)
+        else:
+            # We already have a trade request open for another guy, so tell this guy no can do
+            self.debug(f"We can't trade with this person because we already want to trade with {self.prospective_trade_partner_proto.player_instance.entity.name}")
+            requesting_protocol.process_packet(packet.DenyPacket(f"{self.player_instance.entity.name} is already wanting to trade with someone else"))
 
     def chat(self, p: packet.ChatPacket):
         """
@@ -714,7 +750,7 @@ class MoonlapseProtocol(NetstringReceiver):
         """
         Say goodbye to old entities no longer in view and process the new and still-existing entities in view
         """
-        prev_in_view = copy.deepcopy(self.visible_instances)
+        prev_in_view = self.visible_instances
 
         instances_in_view = set()
         for instance in self.server.instances_in_room(self.player_instance.room_id).values():
@@ -732,7 +768,7 @@ class MoonlapseProtocol(NetstringReceiver):
                 if not proto or not proto.logged_in:
                     instances_in_view.remove(instance)
 
-        self.visible_instances = instances_in_view
+        self.visible_instances = copy.deepcopy(instances_in_view)
 
         # Say goodbye to the instances which are no longer in our view
         just_left_view: Set[models.InstancedEntity] = prev_in_view.difference(self.visible_instances)
