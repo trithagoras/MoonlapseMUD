@@ -162,7 +162,7 @@ class GameView(View):
         self.win1.addstr(win1_hheight, win1_hwidth, '@', 0)
 
         # if looking, draw look cursor
-        if self.controller.state == game.State.LOOKING:
+        if self.controller.state in (game.State.LOOKING, game.State.SELECTING_TRADE_PARTNER):
             cy, cx = self.controller.look_cursor_y, self.controller.look_cursor_x
             y = win1_hheight + (cy - self.controller.player_instance.y)
             x = win1_hwidth + (cx - self.controller.player_instance.x) * 2

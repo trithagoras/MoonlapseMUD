@@ -44,6 +44,7 @@ class State:
     LOOKING = 1
     GRABBING_ITEM = 2
     IN_BANK = 3
+    SELECTING_TRADE_PARTNER = 4
 
 
 class Game(Controller):
@@ -195,7 +196,7 @@ class Game(Controller):
                 setattr(stacks[0], 'amount', residue)
 
     def update(self):
-        if self.state == State.LOOKING:
+        if self.state in (State.LOOKING, State.SELECTING_TRADE_PARTNER):
             self.quicklog = ""
             cpos = self.look_cursor_y, self.look_cursor_x
             for instance in self.visible_instances:
@@ -218,6 +219,8 @@ class Game(Controller):
             self.process_normal_input(key)
         elif self.state == State.LOOKING:
             self.process_look_input(key)
+        elif self.state == State.SELECTING_TRADE_PARTNER:
+            self.process_selecting_trade_partner_input(key)
 
     def process_global_input(self, key: int) -> bool:
         if self.chatbox.selected:
@@ -229,18 +232,23 @@ class Game(Controller):
             self.chatbox.process_input(key)
             return True
         elif keybindings.escape(key):
-            if self.state in (State.LOOKING, State.IN_BANK):
+            if self.state in (State.LOOKING, State.IN_BANK, State.SELECTING_TRADE_PARTNER):
                 self.state = State.NORMAL
-        elif keybindings.enter(key):
+        elif keybindings.enter(key) and self.state != State.SELECTING_TRADE_PARTNER:
             self.chatbox.select()
         elif key == ord('q'):
             self.cs.ns.send_packet(packet.LogoutPacket(self.cs.ns.username))
             self.context = Context.LOGOUT
         elif key == ord('k'):
-            self.quicklog = ""
-
             if self.state != State.LOOKING:
                 self.state = State.LOOKING
+                self.look_cursor_y = self.player_instance['y']
+                self.look_cursor_x = self.player_instance['x']
+            else:
+                self.state = State.NORMAL
+        elif key == ord('t'):
+            if self.state != State.SELECTING_TRADE_PARTNER:
+                self.state = State.SELECTING_TRADE_PARTNER
                 self.look_cursor_y = self.player_instance['y']
                 self.look_cursor_x = self.player_instance['x']
             else:
@@ -436,6 +444,31 @@ class Game(Controller):
             return True
 
         return False
+
+    def get_visible_instance_at(self, y, x) -> dict:
+        for instance in self.visible_instances:
+            pos = instance['y'], instance['x']
+            if pos == (y, x):
+                return instance
+        return None
+    
+    def process_selecting_trade_partner_input(self, key: int) -> bool:
+        if keybindings.enter(key):
+            trade_partner: dict = self.get_visible_instance_at(self.look_cursor_y, self.look_cursor_x)
+            if not trade_partner:
+                self.quicklog = f"No one to trade with!"
+                self.state = State.NORMAL
+                return False
+            elif trade_partner.entity["typename"] != "Player":
+                self.quicklog = f"Can't trade with {trade_partner.entity['name']}!"
+                self.state = State.NORMAL
+                return False
+            else:
+                self.quicklog = f"Initiating trade request with {trade_partner.entity['name']}..."
+                self.state = State.NORMAL
+                return True
+                
+        return self.process_look_input(key)
 
     def process_look_input(self, key: int) -> bool:
         desired_y = self.look_cursor_y
