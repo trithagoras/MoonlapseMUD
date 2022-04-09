@@ -164,6 +164,17 @@ class BankItemPacket(ServerModelPacket):
         super().__init__(type, modeldict)
 
 
+class TradeRequestPacket(Packet):
+    """
+    A packet sent from the client to its protocol, or from one protocol to another, or
+    from a protol to its client, representing the fact that someone wants to trade.
+    """
+    def __init__(self, from_player_entity_id: int, to_player_entity_id: int):
+        p_from_player_entity_id: Payload = Payload(from_player_entity_id)
+        p_to_player_entity_id: Payload = Payload(to_player_entity_id)
+        super().__init__(p_from_player_entity_id, p_to_player_entity_id)
+
+
 class HelloPacket(Packet):
     """
     A packet representing an entity model from the server in the form of a dictionary.

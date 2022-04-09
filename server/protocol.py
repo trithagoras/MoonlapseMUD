@@ -546,7 +546,7 @@ class MoonlapseProtocol(NetstringReceiver):
             self.outgoing.append(packet.ServerLogPacket(f"You do not have a {requirements[node.entity.typename]}."))
             return False
 
-        if self.inventory_full():
+        if self.container_full(self.player_inventory):
             self.outgoing.append(packet.DenyPacket(f"Your inventory is full."))
             return False
 

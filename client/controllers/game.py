@@ -433,6 +433,8 @@ class Game(Controller):
                 if instance.entity["typename"] == "Bank":
                     self.state = State.IN_BANK
                     return False
+                if instance.entity["typename"] in ("OreNode", "TreeNode"):
+                    return True
 
 
         if self.room.coordinate_exists(dest_y, dest_x) and self.room.at('solid', dest_y, dest_x) == maps.NOTHING:
@@ -466,6 +468,7 @@ class Game(Controller):
             else:
                 self.quicklog = f"Initiating trade request with {trade_partner.entity['name']}..."
                 self.state = State.NORMAL
+                self.cs.ns.send_packet(packet.TradeRequestPacket(self.player_instance.entity["id"], trade_partner.entity["id"]))
                 return True
                 
         return self.process_look_input(key)
