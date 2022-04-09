@@ -100,6 +100,14 @@ class Game(Controller):
         elif isinstance(p, packet.ServerLogPacket):
             self.logger.log(p.payloads[0].value)
 
+        elif isinstance(p, packet.TradeRequestPacket):
+            entityid: int = p.payloads[0].value
+            trade_requester = next((e for e in self.visible_instances if e.entity['id'] == entityid), None)
+            if trade_requester is not None:
+                self.logger.log(f"{trade_requester.entity['name']} wants to trade with you.")
+            else:
+                self.cs.ns.send_packet(packet.DenyPacket("The trade requester is not in view"))
+
         elif isinstance(p, packet.OkPacket):
             if self.context == Context.LOGOUT:
                 self.cs.change_controller("MainMenu")

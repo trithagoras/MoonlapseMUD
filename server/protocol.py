@@ -287,7 +287,7 @@ class MoonlapseProtocol(NetstringReceiver):
         if self.prospective_trade_partner_proto == requesting_protocol:
             # If we already had a trade request open for this guy...
             self.debug("Matches our trade request, entering trade...")
-            self.enter_trade(requesting_protocol)
+            self.enter_trade()
         elif self.prospective_trade_partner_proto is None:
             # If we don't already have a trade request pending, let our client know this guy wants to trade with us
             self.debug("Forwarding this trade request to our client as an FYI")
@@ -296,6 +296,10 @@ class MoonlapseProtocol(NetstringReceiver):
             # We already have a trade request open for another guy, so tell this guy no can do
             self.debug(f"We can't trade with this person because we already want to trade with {self.prospective_trade_partner_proto.player_instance.entity.name}")
             requesting_protocol.process_packet(packet.DenyPacket(f"{self.player_instance.entity.name} is already wanting to trade with someone else"))
+
+    def enter_trade(self):
+        self.debug(f"Now trading with {self.prospective_trade_partner_proto.player_instance.entity.name}...")
+        self.prospective_trade_partner_proto = None
 
     def chat(self, p: packet.ChatPacket):
         """
