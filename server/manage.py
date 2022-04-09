@@ -21,8 +21,13 @@ INSTALLED_APPS = [
     'server'
 ]
 
-DATABASES = {
-    'default': {
+if "debug" in cs and cs['debug']:
+    dbconf = {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': os.path.join(BASE_DIR, "moonlapse.db")
+    }
+else:
+    dbconf = {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': cs['database'],
         'USER': cs['user'],
@@ -30,6 +35,9 @@ DATABASES = {
         'HOST': cs['host'],
         'PORT': cs['port']
     }
+
+DATABASES = {
+    'default': dbconf
 }
 
 settings.configure(
