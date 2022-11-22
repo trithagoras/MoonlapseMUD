@@ -1,4 +1,4 @@
 pycryptodome==3.11.0
 rsa==4.7.2
-Pillow==9.0.1
+Pillow==9.3.0
 windows-curses==2.2.0
