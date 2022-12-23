@@ -1,5 +1,3 @@
-from twisted.internet import reactor, task
-
 # Required to import from shared modules
 import sys
 import os
@@ -19,6 +17,7 @@ if sys.executable != vpy:
     subprocess.run([vpy, parent] + sys.argv[1:])
     exit()
 
+from twisted.internet import reactor, task
 from server import manage
 from server.mlserver import MoonlapseServer
 

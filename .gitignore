@@ -1,4 +1,5 @@
 server/connectionstrings.json
+server/moonlapse.db
 *.pyc
 *.iml
 *.log
